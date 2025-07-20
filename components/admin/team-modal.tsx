@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,78 +16,90 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2 } from "lucide-react"
+import type { Team, Leader, Company } from "@/types"
+import { fetchApi } from "@/lib/api/utils"
 
 interface TeamModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: any) => void
-  team?: any
+  team?: Team | null
+  leaders: Leader[]
 }
 
-export function TeamModal({ isOpen, onClose, onSubmit, team }: TeamModalProps) {
+export function TeamModal({ isOpen, onClose, onSubmit, team, leaders }: TeamModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [loadingCompanies, setLoadingCompanies] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
-    leader: "",
+    leaderId: "",
     region: "",
-    members: "0",
-    status: "active",
     description: "",
+    status: "active",
+    companyId: "",
   })
 
   useEffect(() => {
     if (team) {
       setFormData({
         name: team.name || "",
-        leader: team.leader || "",
+        leaderId: team.leaderId?.toString() || "",
         region: team.region || "",
-        members: team.members?.toString() || "0",
-        status: team.status || "active",
         description: team.description || "",
+        status: team.status === 1 ? "active" : "inactive",
+        companyId: team.companyId?.toString() || "",
       })
     } else {
       setFormData({
         name: "",
-        leader: "",
+        leaderId: "",
         region: "",
-        members: "0",
-        status: "active",
         description: "",
+        status: "active",
+        companyId: "",
       })
     }
   }, [team])
+
+  // Load companies when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadCompanies()
+    }
+  }, [isOpen])
+
+  const loadCompanies = async () => {
+    setLoadingCompanies(true)
+    try {
+      const response = await fetchApi("/Companies/paged?pageNumber=1&pageSize=100")
+      if (response && response.data) {
+        setCompanies(response.data)
+      }
+    } catch (error) {
+      console.error("Failed to load companies:", error)
+    } finally {
+      setLoadingCompanies(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    onSubmit({
-      ...formData,
-      members: Number.parseInt(formData.members),
-    })
-    setIsLoading(false)
+    try {
+      await onSubmit(formData)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Sample leaders for the dropdown
-  const leaders = [
-    "Maria Silva",
-    "João Santos",
-    "Ana Oliveira",
-    "Carlos Mendes",
-    "Patricia Costa",
-    "Roberto Alves",
-    "Fernanda Lima",
-  ]
-
   // Sample regions for the dropdown
-  const regions = ["North Zone", "South Zone", "East Zone", "West Zone", "Central Zone"]
+  const regions = ["North Zone", "South Zone", "East Zone", "West Zone", "Central Zone", "Sudeste", "Sul", "Nordeste"]
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -114,16 +125,20 @@ export function TeamModal({ isOpen, onClose, onSubmit, team }: TeamModalProps) {
 
             <div className="grid gap-2">
               <Label htmlFor="leader">Team Leader</Label>
-              <Select value={formData.leader} onValueChange={(value) => handleChange("leader", value)}>
+              <Select value={formData.leaderId} onValueChange={(value) => handleChange("leaderId", value)}>
                 <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
                   <SelectValue placeholder="Select a leader" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
-                  {leaders.map((leader) => (
-                    <SelectItem key={leader} value={leader} className="hover:bg-[#2a3349]">
-                      {leader}
-                    </SelectItem>
-                  ))}
+                  {leaders.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-gray-400">No leaders available</div>
+                  ) : (
+                    leaders.map((leader) => (
+                      <SelectItem key={leader.id} value={leader.id.toString()} className="hover:bg-[#2a3349]">
+                        {leader.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -146,17 +161,32 @@ export function TeamModal({ isOpen, onClose, onSubmit, team }: TeamModalProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="members">Number of Members</Label>
-                <Input
-                  id="members"
-                  type="number"
-                  value={formData.members}
-                  onChange={(e) => handleChange("members", e.target.value)}
-                  min="0"
-                  max="50"
-                  className="bg-[#0f172a] border-[#2a3349] text-white"
-                  required
-                />
+                <Label htmlFor="company">Company</Label>
+                <Select
+                  value={formData.companyId}
+                  onValueChange={(value) => handleChange("companyId", value)}
+                  disabled={loadingCompanies}
+                >
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder={loadingCompanies ? "Loading companies..." : "Select a company"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                    {loadingCompanies ? (
+                      <div className="px-2 py-1.5 text-sm text-gray-400 flex items-center">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading companies...
+                      </div>
+                    ) : companies.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-gray-400">No companies found</div>
+                    ) : (
+                      companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id.toString()} className="hover:bg-[#2a3349]">
+                          {company.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid gap-2">
@@ -193,7 +223,7 @@ export function TeamModal({ isOpen, onClose, onSubmit, team }: TeamModalProps) {
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
             >
               Cancel
             </Button>

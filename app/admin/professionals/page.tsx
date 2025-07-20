@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -21,181 +21,243 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-// Sample data
-const initialProfessionals = [
-  {
-    id: 1,
-    name: "Maria Silva",
-    cpf: "123.456.789-00",
-    team: "Team Alpha",
-    status: "active",
-    phone: "(11) 98765-4321",
-    email: "maria.silva@noah.com",
-    shift: "morning",
-    weeklyHours: 40,
-    photo: "",
-    observations: "Excellent professional, always punctual",
-    rating: 4.8,
-    completedServices: 156,
-  },
-  {
-    id: 2,
-    name: "Ana Santos",
-    cpf: "987.654.321-00",
-    team: "Team Beta",
-    status: "active",
-    phone: "(11) 91234-5678",
-    email: "ana.santos@noah.com",
-    shift: "afternoon",
-    weeklyHours: 40,
-    photo: "",
-    observations: "",
-    rating: 4.9,
-    completedServices: 203,
-  },
-  {
-    id: 3,
-    name: "Carla Oliveira",
-    cpf: "456.789.012-34",
-    team: "Team Alpha",
-    status: "on_leave",
-    phone: "(11) 94567-8901",
-    email: "carla.oliveira@noah.com",
-    shift: "morning",
-    weeklyHours: 30,
-    photo: "",
-    observations: "On maternity leave until next month",
-    rating: 4.7,
-    completedServices: 98,
-  },
-  {
-    id: 4,
-    name: "Patricia Costa",
-    cpf: "345.678.901-23",
-    team: "Team Gamma",
-    status: "active",
-    phone: "(11) 93456-7890",
-    email: "patricia.costa@noah.com",
-    shift: "night",
-    weeklyHours: 36,
-    photo: "",
-    observations: "",
-    rating: 4.6,
-    completedServices: 124,
-  },
-  {
-    id: 5,
-    name: "Fernanda Lima",
-    cpf: "567.890.123-45",
-    team: "Team Beta",
-    status: "in_service",
-    phone: "(11) 95678-9012",
-    email: "fernanda.lima@noah.com",
-    shift: "afternoon",
-    weeklyHours: 40,
-    photo: "",
-    observations: "Specialized in deep cleaning",
-    rating: 5.0,
-    completedServices: 178,
-  },
-]
+import { professionalsApi } from "@/lib/api/professionals"
+import type { Professional, CreateProfessionalRequest, UpdateProfessionalRequest } from "@/types"
 
 export default function ProfessionalsPage() {
-  const [professionals, setProfessionals] = useState(initialProfessionals)
+  const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedProfessional, setSelectedProfessional] = useState<any>(null)
-  const [professionalToDelete, setProfessionalToDelete] = useState<any>(null)
+  const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null)
+  const [professionalToDelete, setProfessionalToDelete] = useState<Professional | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [teamFilter, setTeamFilter] = useState("all")
+  const [companyFilter, setCompanyFilter] = useState("all")
+  const [teams, setTeams] = useState<{ id: number; name: string }[]>([])
+  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([])
+  const [isLoadingFilters, setIsLoadingFilters] = useState(true)
   const { toast } = useToast()
 
-  const handleAddProfessional = (data: any) => {
-    const newProfessional = {
-      id: professionals.length + 1,
-      ...data,
-      rating: 0,
-      completedServices: 0,
+  // Load professionals on component mount
+  useEffect(() => {
+    loadInitialData()
+  }, [])
+
+  // Reload professionals when filters change
+  useEffect(() => {
+    if (!isLoadingFilters) {
+      loadProfessionals()
     }
-    setProfessionals([...professionals, newProfessional])
-    setIsModalOpen(false)
-    toast({
-      title: "Professional added successfully",
-      description: `${data.name} has been added to the system.`,
-    })
-  }
+  }, [statusFilter, teamFilter, companyFilter, searchQuery, isLoadingFilters])
 
-  const handleEditProfessional = (data: any) => {
-    setProfessionals(
-      professionals.map((professional) =>
-        professional.id === selectedProfessional.id
-          ? { ...professional, ...data, rating: professional.rating, completedServices: professional.completedServices }
-          : professional,
-      ),
-    )
-    setSelectedProfessional(null)
-    setIsModalOpen(false)
-    toast({
-      title: "Professional updated successfully",
-      description: `${data.name} has been updated.`,
-    })
-  }
+  const loadInitialData = async () => {
+    setIsLoading(true)
+    setIsLoadingFilters(true)
 
-  const handleDeleteProfessional = () => {
-    if (professionalToDelete) {
-      setProfessionals(professionals.filter((professional) => professional.id !== professionalToDelete.id))
+    try {
+      // Load all data in parallel
+      const [professionalsResponse, teamsResponse, companiesResponse] = await Promise.all([
+        professionalsApi.getProfessionals(1, 100, statusFilter, teamFilter, searchQuery, companyFilter),
+        professionalsApi.getTeams(),
+        professionalsApi.getCompanies(),
+      ])
+
+      // Set professionals
+      if (professionalsResponse.data) {
+        setProfessionals(professionalsResponse.data)
+      }
+
+      // Set teams
+      if (teamsResponse.data) {
+        console.log("Loaded teams:", teamsResponse.data)
+        setTeams(teamsResponse.data)
+      }
+
+      // Set companies
+      if (companiesResponse.data) {
+        console.log("Loaded companies:", companiesResponse.data)
+        setCompanies(companiesResponse.data)
+      }
+    } catch (error) {
+      console.error("Failed to load initial data:", error)
       toast({
-        title: "Professional deleted successfully",
-        description: `${professionalToDelete.name} has been removed from the system.`,
+        title: "Error",
+        description: "Failed to load data",
         variant: "destructive",
       })
-      setProfessionalToDelete(null)
+    } finally {
+      setIsLoading(false)
+      setIsLoadingFilters(false)
     }
   }
 
-  const handleViewDetails = (professional: any) => {
+  const loadProfessionals = async () => {
+    try {
+      const response = await professionalsApi.getProfessionals(
+        1,
+        100,
+        statusFilter,
+        teamFilter,
+        searchQuery,
+        companyFilter,
+      )
+
+      if (response.data) {
+        setProfessionals(response.data)
+      } else if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to load professionals:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load professionals",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddProfessional = async (data: CreateProfessionalRequest) => {
+    try {
+      const response = await professionalsApi.createProfessional(data)
+
+      if (response.data) {
+        toast({
+          title: "Success",
+          description: "Professional created successfully",
+        })
+        setIsModalOpen(false)
+        loadProfessionals()
+      } else if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to create professional:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create professional",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditProfessional = async (data: UpdateProfessionalRequest) => {
+    if (!selectedProfessional) return
+
+    try {
+      const response = await professionalsApi.updateProfessional(selectedProfessional.id.toString(), data)
+
+      if (response.data) {
+        toast({
+          title: "Success",
+          description: "Professional updated successfully",
+        })
+        setSelectedProfessional(null)
+        setIsModalOpen(false)
+        loadProfessionals()
+      } else if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to update professional:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update professional",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteProfessional = async () => {
+    if (!professionalToDelete) return
+
+    try {
+      const response = await professionalsApi.deleteProfessional(professionalToDelete.id.toString())
+
+      if (response.status === 200 || response.status === 204) {
+        toast({
+          title: "Success",
+          description: "Professional deleted successfully",
+          variant: "destructive",
+        })
+        setProfessionalToDelete(null)
+        loadProfessionals()
+      } else if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to delete professional:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete professional",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleViewDetails = (professional: Professional) => {
     setSelectedProfessional(professional)
     setIsDetailsModalOpen(true)
   }
 
-  const handleEdit = (professional: any) => {
+  const handleEdit = (professional: Professional) => {
     setSelectedProfessional(professional)
     setIsModalOpen(true)
   }
 
-  const handleViewSchedule = (professional: any) => {
+  const handleViewSchedule = (professional: Professional) => {
     toast({
       title: "Professional Schedule",
       description: `Viewing schedule for ${professional.name}`,
     })
   }
 
-  const filteredProfessionals = professionals.filter((professional) => {
-    const matchesSearch =
-      professional.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      professional.cpf.includes(searchQuery) ||
-      professional.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || professional.status === statusFilter
-    const matchesTeam = teamFilter === "all" || professional.team === teamFilter
-    return matchesSearch && matchesStatus && matchesTeam
-  })
-
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "active":
+      case "Active":
         return { label: "Active", className: "border-green-500 text-green-500" }
-      case "in_service":
-        return { label: "In Service", className: "border-blue-500 text-blue-500" }
-      case "on_leave":
-        return { label: "On Leave", className: "border-yellow-500 text-yellow-500" }
+      case "Inactive":
+        return { label: "Inactive", className: "border-red-500 text-red-500" }
       default:
         return { label: status, className: "border-gray-500 text-gray-500" }
     }
   }
 
-  const teams = ["Team Alpha", "Team Beta", "Team Gamma"]
+  const getTeamName = (teamId: number) => {
+    const team = teams.find((t) => t.id === teamId)
+    return team ? team.name : `Team ${teamId}`
+  }
+
+  const getCompanyName = (companyId: number) => {
+    const company = companies.find((c) => c.id === companyId)
+    return company ? company.name : `Company ${companyId}`
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading professionals...</div>
+      </div>
+    )
+  }
 
   return (
     <TooltipProvider>
@@ -236,32 +298,32 @@ export default function ProfessionalsPage() {
                 className={
                   statusFilter === "all"
                     ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                    : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                    : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
                 }
               >
                 All Status
               </Button>
               <Button
-                variant={statusFilter === "active" ? "default" : "outline"}
-                onClick={() => setStatusFilter("active")}
+                variant={statusFilter === "Active" ? "default" : "outline"}
+                onClick={() => setStatusFilter("Active")}
                 className={
-                  statusFilter === "active"
+                  statusFilter === "Active"
                     ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                    : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                    : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
                 }
               >
                 Active
               </Button>
               <Button
-                variant={statusFilter === "in_service" ? "default" : "outline"}
-                onClick={() => setStatusFilter("in_service")}
+                variant={statusFilter === "Inactive" ? "default" : "outline"}
+                onClick={() => setStatusFilter("Inactive")}
                 className={
-                  statusFilter === "in_service"
+                  statusFilter === "Inactive"
                     ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                    : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                    : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
                 }
               >
-                In Service
+                Inactive
               </Button>
             </div>
 
@@ -269,15 +331,35 @@ export default function ProfessionalsPage() {
               value={teamFilter}
               onChange={(e) => setTeamFilter(e.target.value)}
               className="px-3 py-2 bg-[#1a2234] border border-[#2a3349] text-white rounded-md focus:outline-none focus:ring-2 focus:ring-[#06b6d4]"
+              disabled={isLoadingFilters}
             >
               <option value="all">All Teams</option>
               {teams.map((team) => (
-                <option key={team} value={team}>
-                  {team}
+                <option key={team.id} value={team.id.toString()}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
+              className="px-3 py-2 bg-[#1a2234] border border-[#2a3349] text-white rounded-md focus:outline-none focus:ring-2 focus:ring-[#06b6d4]"
+              disabled={isLoadingFilters}
+            >
+              <option value="all">All Companies</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id.toString()}>
+                  {company.name}
                 </option>
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Debug info */}
+        <div className="text-xs text-gray-500">
+          Teams loaded: {teams.length} | Companies loaded: {companies.length} | Professionals: {professionals.length}
         </div>
 
         <div className="rounded-md border border-[#2a3349] overflow-hidden">
@@ -287,6 +369,7 @@ export default function ProfessionalsPage() {
                 <TableHead className="text-white">Professional</TableHead>
                 <TableHead className="text-white">CPF</TableHead>
                 <TableHead className="text-white">Team</TableHead>
+                <TableHead className="text-white">Company</TableHead>
                 <TableHead className="text-white">Phone</TableHead>
                 <TableHead className="text-white">Status</TableHead>
                 <TableHead className="text-white text-center">Rating</TableHead>
@@ -294,12 +377,12 @@ export default function ProfessionalsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProfessionals.map((professional) => (
+              {professionals.map((professional) => (
                 <TableRow key={professional.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
                   <TableCell className="font-medium text-white">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10 border border-[#2a3349]">
-                        <AvatarImage src={professional.photo || "/placeholder.svg"} />
+                        <AvatarImage src="/placeholder.svg" />
                         <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
                           {professional.name
                             .split(" ")
@@ -314,7 +397,8 @@ export default function ProfessionalsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-gray-400">{professional.cpf}</TableCell>
-                  <TableCell className="text-gray-400">{professional.team}</TableCell>
+                  <TableCell className="text-gray-400">{getTeamName(professional.teamId)}</TableCell>
+                  <TableCell className="text-gray-400">{getCompanyName(professional.companyId)}</TableCell>
                   <TableCell className="text-gray-400">{professional.phone}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={getStatusBadge(professional.status).className}>
@@ -324,7 +408,7 @@ export default function ProfessionalsPage() {
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center">
                       <span className="text-yellow-500 mr-1">★</span>
-                      <span className="text-white">{professional.rating}</span>
+                      <span className="text-white">{professional.rating || "N/A"}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -402,14 +486,13 @@ export default function ProfessionalsPage() {
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-400">
-            Showing <span className="font-medium text-white">{filteredProfessionals.length}</span> of{" "}
-            <span className="font-medium text-white">{professionals.length}</span> professionals
+            Showing <span className="font-medium text-white">{professionals.length}</span> professionals
           </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               Previous
             </Button>
@@ -423,21 +506,21 @@ export default function ProfessionalsPage() {
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               2
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               3
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               Next
             </Button>

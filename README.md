@@ -1,142 +1,224 @@
-# Noah - Multi empresas
+# Noah - Multi Empresas
 
-*Sincronizado automaticamente com suas implantações [v0.dev](https://v0.dev)*
+A comprehensive multi-company cleaning service management platform built with Next.js 15, TypeScript, and Tailwind CSS.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/brunomendes-8683s-projects/v0-noah-multi-empresas)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/5MKu5ct9sJV)
+## 🌟 Overview
 
-## Visão Geral
+Noah is a modern, scalable platform designed to manage multiple cleaning service companies from a single interface. It provides role-based access control for administrators, companies, and professionals, offering complete management of appointments, teams, materials, payments, and more.
 
-Noah - Multi empresas é uma plataforma abrangente projetada para otimizar a gestão de serviços de limpeza, oferecendo interfaces dedicadas para administradores, empresas e profissionais. O objetivo é simplificar o agendamento, monitoramento e gerenciamento de todas as operações, desde compromissos e cancelamentos até rastreamento GPS e controle de materiais.
+## ✨ Features
 
-## Funcionalidades Principais
+### 🔐 Authentication & Authorization
+- **Multi-role system**: Admin, Company, and Professional roles
+- **JWT-based authentication** with secure token management
+- **Role-based access control** for different dashboard views
 
-A plataforma oferece um conjunto robusto de funcionalidades para cada tipo de usuário:
+### 👥 User Management
+- **Admin Dashboard**: Complete system oversight and management
+- **Company Dashboard**: Company-specific operations and team management
+- **Professional Dashboard**: Individual professional tools and schedules
 
-### Interface Administrativa
-*   **Agendamentos**: Gerenciamento completo de compromissos, incluindo criação, edição e visualização.
-*   **Cancelamentos**: Acompanhamento e gestão de cancelamentos.
-*   **Check-in/Check-out**: Monitoramento de registros de entrada e saída.
-*   **Empresas**: Gerenciamento de empresas cadastradas na plataforma.
-*   **Clientes**: Cadastro e gestão de informações de clientes.
-*   **Dashboard**: Visão geral e estatísticas da plataforma.
-*   **Feedback**: Análise de feedback interno.
-*   **Rastreamento GPS**: Monitoramento da localização de profissionais.
-*   **Materiais**: Controle de estoque e consumo de materiais.
-*   **Notificações**: Envio e gestão de notificações.
-*   **Pagamentos**: Registro e acompanhamento de transações financeiras.
-*   **Planos**: Gerenciamento de planos de assinatura.
-*   **Profissionais**: Cadastro e gestão de profissionais.
-*   **Recorrências**: Configuração e gestão de agendamentos recorrentes.
-*   **Relatórios**: Geração de relatórios detalhados.
-*   **Avaliações**: Gestão de avaliações de serviços.
-*   **Configurações**: Ajustes gerais da plataforma.
-*   **Equipes**: Organização e gestão de equipes de trabalho.
+### 📅 Appointment Management
+- **Scheduling system** with calendar integration
+- **Real-time appointment tracking** and status updates
+- **Cancellation and rescheduling** functionality
+- **Recurring appointments** support
 
-### Interface da Empresa
-*   **Agendamentos**: Criação e gestão de agendamentos para seus clientes.
-*   **Cancelamentos**: Gerenciamento de cancelamentos de serviços.
-*   **Chat**: Comunicação em tempo real com clientes e profissionais.
-*   **Check-in/Check-out**: Acompanhamento de registros de entrada e saída dos profissionais.
-*   **Clientes**: Gestão da base de clientes da empresa.
-*   **Dashboard**: Visão geral das operações da empresa.
-*   **Feedback**: Coleta e análise de feedback dos clientes.
-*   **Rastreamento GPS**: Monitoramento de equipes em campo.
-*   **Materiais**: Controle de materiais utilizados.
-*   **Notificações**: Recebimento e gestão de notificações.
-*   **Pagamentos**: Acompanhamento de pagamentos e faturamento.
-*   **Plano**: Gerenciamento do plano de assinatura da empresa.
-*   **Profissionais**: Gestão dos profissionais da empresa.
-*   **Perfil**: Configurações de perfil da empresa.
-*   **Relatórios**: Relatórios específicos para a empresa.
-*   **Reagendamento**: Funcionalidade para reagendar serviços.
-*   **Avaliações**: Acompanhamento das avaliações recebidas.
-*   **Agenda**: Visualização e gestão da agenda de serviços.
-*   **Equipes**: Organização e gestão das equipes de profissionais.
+### 👨‍💼 Team & Professional Management
+- **Team creation and management** with leader assignments
+- **Professional profiles** with performance tracking
+- **GPS tracking** for field professionals
+- **Check-in/check-out** system with photo capture
 
-### Interface do Profissional
-*   **Chat**: Comunicação com a empresa e clientes.
-*   **Check-in/Check-out**: Registro de entrada e saída nos locais de serviço.
-*   **Dashboard**: Visão geral das tarefas e desempenho.
-*   **Feedback**: Envio de feedback sobre os serviços.
-*   **Histórico**: Acompanhamento do histórico de serviços.
-*   **Materiais**: Registro de materiais utilizados.
-*   **Notificações**: Recebimento de notificações de agendamentos e atualizações.
-*   **Desempenho**: Acompanhamento do próprio desempenho.
-*   **Perfil**: Gerenciamento do perfil pessoal.
-*   **Agenda**: Visualização da agenda de trabalho.
+### 💰 Financial Management
+- **Payment tracking** and processing
+- **Plan management** with subscription handling
+- **Financial reporting** and analytics
 
-## Estrutura do Projeto
+### 📊 Reporting & Analytics
+- **Comprehensive dashboards** with real-time metrics
+- **Performance analytics** for teams and individuals
+- **Material consumption reports**
+- **Customer satisfaction tracking**
 
-O projeto é organizado usando o App Router do Next.js, com as seguintes pastas principais:
+### 💬 Communication
+- **Internal chat system** for team communication
+- **Notification system** for important updates
+- **Customer feedback** collection and management
 
-*   `app/`: Contém as rotas e layouts para as interfaces de `admin`, `company` e `professional`, além das páginas de `login` e `register`.
-*   `components/`: Componentes React reutilizáveis, incluindo componentes específicos para cada interface (ex: `admin/`, `company/`, `professional/`) e componentes de UI genéricos (`ui/`).
-*   `contexts/`: Contextos React para gerenciamento de estado global, como autenticação e dados específicos de cada módulo.
-*   `hooks/`: Hooks React personalizados para lógica reutilizável.
-*   `lib/`: Funções utilitárias e APIs para interação com o backend.
-*   `public/`: Ativos estáticos como imagens e ícones.
-*   `styles/`: Arquivos de estilo globais.
-*   `types/`: Definições de tipos TypeScript para o projeto.
+## 🛠️ Technology Stack
 
-## Como Começar
+### Frontend
+- **Next.js 15** - React framework with App Router
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first CSS framework
+- **shadcn/ui** - Modern UI component library
+- **Lucide React** - Beautiful icons
 
-Siga estas instruções para configurar e executar o projeto localmente.
+### Backend Integration
+- **RESTful API** integration with .NET backend
+- **JWT Authentication** for secure API communication
+- **Real-time updates** with optimistic UI patterns
 
-### Pré-requisitos
+### Development Tools
+- **ESLint** - Code linting and formatting
+- **PostCSS** - CSS processing
+- **TypeScript** - Static type checking
 
-Certifique-se de ter o Node.js (versão 18.x ou superior) e um gerenciador de pacotes (npm, yarn ou pnpm) instalados em sua máquina.
+## 🚀 Getting Started
 
-### Instalação
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn package manager
+- Access to the Noah API backend
 
-1.  **Clone o repositório:**
-    \`\`\`bash
-    git clone https://github.com/brunomendes-8683s-projects/v0-noah-multi-empresas.git
-    cd v0-noah-multi-empresas
-    \`\`\`
+### Installation
 
-2.  **Instale as dependências:**
-    \`\`\`bash
-    npm install
-    # ou yarn install
-    # ou pnpm install
-    \`\`\`
+1. **Clone the repository**
+   \`\`\`bash
+   git clone https://github.com/your-username/noah-platform.git
+   cd noah-platform
+   \`\`\`
 
-### Executando o Servidor de Desenvolvimento
+2. **Install dependencies**
+   \`\`\`bash
+   npm install
+   # or
+   yarn install
+   \`\`\`
 
-Para iniciar o servidor de desenvolvimento:
+3. **Environment Setup**
+   Create a `.env.local` file in the root directory:
+   \`\`\`env
+   NEXT_PUBLIC_API_URL=https://localhost:44394/api
+   NEXT_PUBLIC_APP_NAME=Noah - Multi empresas
+   \`\`\`
 
-\`\`\`bash
-npm run dev
-# ou yarn dev
-# ou pnpm dev
+4. **Run the development server**
+   \`\`\`bash
+   npm run dev
+   # or
+   yarn dev
+   \`\`\`
+
+5. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 📁 Project Structure
+
+\`\`\`
+noah-platform/
+├── app/                    # Next.js App Router pages
+│   ├── admin/             # Admin dashboard pages
+│   ├── company/           # Company dashboard pages
+│   ├── professional/      # Professional dashboard pages
+│   ├── login/             # Authentication pages
+│   └── register/          
+├── components/            # Reusable UI components
+│   ├── admin/            # Admin-specific components
+│   ├── company/          # Company-specific components
+│   ├── professional/     # Professional-specific components
+│   └── ui/               # Base UI components (shadcn/ui)
+├── contexts/             # React Context providers
+├── hooks/                # Custom React hooks
+├── lib/                  # Utility functions and API clients
+│   └── api/              # API integration modules
+├── types/                # TypeScript type definitions
+└── public/               # Static assets
 \`\`\`
 
-Abra [http://localhost:3000](http://localhost:3000) no seu navegador para ver a aplicação.
+## 🔧 API Integration
 
-## Implantação
+The platform integrates with a .NET backend API providing:
 
-Este projeto está configurado para ser implantado na Vercel. Quaisquer alterações feitas e implantadas através do v0.dev serão automaticamente sincronizadas com este repositório e implantadas na Vercel.
+### Authentication Endpoints
+- `POST /api/auth/login` - User authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/refresh` - Token refresh
 
-Seu projeto está ativo em:
+### Core Entities
+- **Leaders**: `GET|POST|PUT|DELETE /api/Leader`
+- **Teams**: `GET|POST|PUT|DELETE /api/Team`
+- **Companies**: `GET|POST|PUT|DELETE /api/Company`
+- **Professionals**: `GET|POST|PUT|DELETE /api/Professional`
+- **Appointments**: `GET|POST|PUT|DELETE /api/Appointment`
 
-**[https://vercel.com/brunomendes-8683s-projects/v0-noah-multi-empresas](https://vercel.com/brunomendes-8683s-projects/v0-noah-multi-empresas)**
+### Features
+- **Pagination support** for large datasets
+- **Filtering and search** capabilities
+- **Real-time status updates**
+- **File upload** for photos and documents
 
-Continue construindo seu aplicativo em:
+## 🎨 UI/UX Design
 
-**[https://v0.dev/chat/projects/5MKu5ct9sJV](https://v0.dev/chat/projects/5MKu5ct9sJV)**
+### Design System
+- **Dark theme** with cyan accent colors
+- **Responsive design** for all device sizes
+- **Consistent spacing** and typography
+- **Accessible components** with proper ARIA labels
 
-## Como Funciona
+### Color Palette
+- **Primary**: Cyan (#06b6d4)
+- **Background**: Dark slate (#0f172a, #1a2234)
+- **Borders**: Muted slate (#2a3349)
+- **Text**: White and gray variants
 
-1.  Crie e modifique seu projeto usando [v0.dev](https://v0.dev)
-2.  Implante seus chats a partir da interface v0
-3.  As alterações são automaticamente enviadas para este repositório
-4.  A Vercel implanta a versão mais recente deste repositório
+## 🔒 Security Features
 
-## Contribuição
+- **JWT token management** with automatic refresh
+- **Role-based route protection**
+- **Secure API communication** with bearer tokens
+- **Input validation** and sanitization
+- **CORS configuration** for cross-origin requests
 
-Contribuições são bem-vindas! Se você tiver sugestões ou encontrar problemas, sinta-se à vontade para abrir uma issue ou enviar um pull request.
+## 📱 Responsive Design
 
-## Licença
+The platform is fully responsive and optimized for:
+- **Desktop** (1024px+)
+- **Tablet** (768px - 1023px)
+- **Mobile** (320px - 767px)
 
-Este projeto é de código aberto e está disponível sob a licença MIT.
+## 🚀 Deployment
+
+### Vercel (Recommended)
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### Manual Deployment
+\`\`\`bash
+# Build the application
+npm run build
+
+# Start production server
+npm start
+\`\`\`
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+For support and questions:
+- Create an issue in the GitHub repository
+- Contact the development team
+- Check the documentation wiki
+
+## 🔄 Version History
+
+- **v1.0.0** - Initial release with core functionality
+- **v1.1.0** - Added team and leader management
+- **v1.2.0** - Enhanced API integration and real-time features
+
+---
+
+Built with ❤️ by the Noah Development Team

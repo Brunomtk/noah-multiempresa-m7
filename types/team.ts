@@ -1,14 +1,52 @@
-// Team Types
+import type { Company } from "./company"
+import type { Leader } from "./leader"
+
 export interface Team {
-  id: string
+  id: number
   name: string
-  leaderId?: string
-  region?: string
-  description?: string
-  status: "active" | "inactive"
-  companyId: string
-  rating?: number
-  completedServices?: number
-  createdAt: string
-  updatedAt: string
+  region: string
+  description: string
+  rating: number
+  completedServices: number
+  status: number
+  companyId: number
+  company?: Company
+  leaderId: number
+  leader?: Leader
+  createdDate: string
+  updatedDate: string
+}
+
+export interface CreateTeamRequest {
+  name: string
+  leaderId: number
+  region: string
+  description: string
+  companyId: number
+}
+
+export interface UpdateTeamRequest {
+  id: number
+  createdDate: string
+  updatedDate: string
+  name: string
+  region: string
+  description: string
+  rating: number
+  completedServices: number
+  status: number
+  companyId: number
+  company?: Company
+  leaderId: number
+  leader?: Leader
+}
+
+export interface TeamsResponse {
+  results: Team[]
+  currentPage: number
+  pageCount: number
+  pageSize: number
+  totalItems: number
+  firstRowOnPage: number
+  lastRowOnPage: number
 }

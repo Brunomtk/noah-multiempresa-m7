@@ -1,74 +1,26 @@
-import type { Team, PaginatedResponse, ApiResponse, Professional } from "@/types"
+import type { Team, ApiResponse, Professional, CreateTeamRequest, UpdateTeamRequest, TeamsResponse } from "@/types"
 import { delay } from "./utils"
+import { fetchApi } from "./utils"
 
-// Mock data
-const mockTeams: Team[] = [
-  {
-    id: "1",
-    name: "Team Alpha",
-    leaderId: "101",
-    region: "North Zone",
-    description: "Specialized in residential cleaning",
-    status: "active",
-    companyId: "1",
-    rating: 4.8,
-    completedServices: 342,
-    createdAt: "2023-01-15T10:00:00Z",
-    updatedAt: "2023-05-20T14:30:00Z",
-  },
-  {
-    id: "2",
-    name: "Team Beta",
-    leaderId: "102",
-    region: "South Zone",
-    description: "Specialized in commercial cleaning",
-    status: "active",
-    companyId: "1",
-    rating: 4.7,
-    completedServices: 287,
-    createdAt: "2023-02-10T09:15:00Z",
-    updatedAt: "2023-05-18T11:45:00Z",
-  },
-  {
-    id: "3",
-    name: "Team Gamma",
-    leaderId: "103",
-    region: "East Zone",
-    description: "Specialized in post-construction cleaning",
-    status: "active",
-    companyId: "2",
-    rating: 4.9,
-    completedServices: 198,
-    createdAt: "2023-03-05T14:20:00Z",
-    updatedAt: "2023-05-15T16:30:00Z",
-  },
-  {
-    id: "4",
-    name: "Team Delta",
-    leaderId: "104",
-    region: "West Zone",
-    description: "Specialized in industrial cleaning",
-    status: "inactive",
-    companyId: "2",
-    rating: 4.6,
-    completedServices: 156,
-    createdAt: "2023-03-20T11:10:00Z",
-    updatedAt: "2023-05-10T09:45:00Z",
-  },
-  {
-    id: "5",
-    name: "Team Omega",
-    leaderId: "105",
-    region: "Central Zone",
-    description: "Specialized in deep cleaning services",
-    status: "active",
-    companyId: "3",
-    rating: 4.9,
-    completedServices: 412,
-    createdAt: "2023-01-05T08:30:00Z",
-    updatedAt: "2023-05-22T15:20:00Z",
-  },
-]
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://localhost:44394/api"
+
+// Helper function to get auth token
+function getAuthToken(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("noah_token")
+  }
+  return null
+}
+
+// Helper function to create headers
+function createHeaders(): HeadersInit {
+  const token = getAuthToken()
+  return {
+    "Content-Type": "application/json",
+    accept: "*/*",
+    ...(token && { Authorization: `Bearer ${token}` }),
+  }
+}
 
 // Mock team members
 const mockTeamMembers: Record<string, Professional[]> = {
@@ -146,7 +98,6 @@ const mockTeamMembers: Record<string, Professional[]> = {
       updatedAt: "2023-05-22T15:20:00Z",
     },
   ],
-  // Add more team members for other teams...
 }
 
 // Mock performance data
@@ -247,261 +198,133 @@ const mockUpcomingServices: Record<
       type: "Regular Cleaning",
     },
   ],
-  // Add more upcoming services for other teams...
 }
 
 // API functions
-export async function getTeams(
-  page = 1,
-  limit = 10,
-  status?: string,
-  search?: string,
-): Promise<ApiResponse<PaginatedResponse<Team>>> {
-  await delay(800) // Simulate network delay
+export const teamsApi = {
+  // Get all teams with pagination
+  getAll: async (page = 1, pageSize = 10, status = "all"): Promise<TeamsResponse> => {
+    const response = await fetchApi(`/Team?page=${page}&pageSize=${pageSize}&status=${status}`)
+    return response
+  },
 
-  // Filter teams based on status and search
-  let filteredTeams = [...mockTeams]
-
-  if (status && status !== "all") {
-    filteredTeams = filteredTeams.filter((team) => team.status === status)
-  }
-
-  if (search) {
-    const searchLower = search.toLowerCase()
-    filteredTeams = filteredTeams.filter(
-      (team) =>
-        team.name.toLowerCase().includes(searchLower) ||
-        team.region?.toLowerCase().includes(searchLower) ||
-        // We would need to join with professionals to search by leader name in a real API
-        mockTeamMembers[team.id]?.some(
-          (member) => member.id === team.leaderId && member.name.toLowerCase().includes(searchLower),
-        ),
-    )
-  }
-
-  // Calculate pagination
-  const totalItems = filteredTeams.length
-  const totalPages = Math.ceil(totalItems / limit)
-  const startIndex = (page - 1) * limit
-  const endIndex = startIndex + limit
-  const paginatedTeams = filteredTeams.slice(startIndex, endIndex)
-
-  // Add leader names to teams
-  const teamsWithLeaderNames = paginatedTeams.map((team) => {
-    const leader = mockTeamMembers[team.id]?.find((member) => member.id === team.leaderId)
-    return {
-      ...team,
-      leaderName: leader?.name || "Unknown",
-    }
-  })
-
-  return {
-    status: 200,
-    data: {
-      data: teamsWithLeaderNames,
-      meta: {
-        currentPage: page,
-        totalPages,
-        totalItems,
-        itemsPerPage: limit,
-      },
-    },
-  }
-}
-
-export async function getTeamById(id: string): Promise<ApiResponse<Team>> {
-  await delay(500) // Simulate network delay
-
-  const team = mockTeams.find((team) => team.id === id)
-
-  if (!team) {
-    return {
-      status: 404,
-      error: "Team not found",
-    }
-  }
-
-  const leader = mockTeamMembers[team.id]?.find((member) => member.id === team.leaderId)
-
-  return {
-    status: 200,
-    data: {
-      ...team,
-      leaderName: leader?.name || "Unknown",
-    },
-  }
-}
-
-export async function createTeam(teamData: Partial<Team>): Promise<ApiResponse<Team>> {
-  await delay(1000) // Simulate network delay
-
-  // Validate required fields
-  if (!teamData.name || !teamData.leaderId || !teamData.region || !teamData.companyId) {
-    return {
-      status: 400,
-      error: "Missing required fields",
-    }
-  }
+  // Get team by ID
+  getById: async (id: number): Promise<Team> => {
+    const response = await fetchApi(`/Team/${id}`)
+    return response
+  },
 
   // Create new team
-  const newTeam: Team = {
-    id: `${mockTeams.length + 1}`,
-    name: teamData.name,
-    leaderId: teamData.leaderId,
-    region: teamData.region,
-    description: teamData.description || "",
-    status: teamData.status || "active",
-    companyId: teamData.companyId,
-    rating: 0,
-    completedServices: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }
-
-  // In a real API, we would save this to the database
-  mockTeams.push(newTeam)
-
-  return {
-    status: 201,
-    data: newTeam,
-    message: "Team created successfully",
-  }
-}
-
-export async function updateTeam(id: string, teamData: Partial<Team>): Promise<ApiResponse<Team>> {
-  await delay(1000) // Simulate network delay
-
-  const teamIndex = mockTeams.findIndex((team) => team.id === id)
-
-  if (teamIndex === -1) {
-    return {
-      status: 404,
-      error: "Team not found",
-    }
-  }
+  create: async (data: CreateTeamRequest): Promise<Team> => {
+    const response = await fetchApi("/Team", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+    return response
+  },
 
   // Update team
-  const updatedTeam = {
-    ...mockTeams[teamIndex],
-    ...teamData,
-    updatedAt: new Date().toISOString(),
-  }
+  update: async (id: number, data: UpdateTeamRequest): Promise<void> => {
+    await fetchApi(`/Team/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
 
-  // In a real API, we would update this in the database
-  mockTeams[teamIndex] = updatedTeam
+  // Delete team
+  delete: async (id: number): Promise<void> => {
+    await fetchApi(`/Team/${id}`, {
+      method: "DELETE",
+    })
+  },
 
-  return {
-    status: 200,
-    data: updatedTeam,
-    message: "Team updated successfully",
-  }
-}
+  // Get team members
+  async getTeamMembers(teamId: string): Promise<ApiResponse<Professional[]>> {
+    await delay(500) // Simulate network delay
 
-export async function deleteTeam(id: string): Promise<ApiResponse<null>> {
-  await delay(1000) // Simulate network delay
+    const members = mockTeamMembers[teamId]
 
-  const teamIndex = mockTeams.findIndex((team) => team.id === id)
-
-  if (teamIndex === -1) {
-    return {
-      status: 404,
-      error: "Team not found",
+    if (!members) {
+      return {
+        status: 404,
+        error: "Team not found or has no members",
+      }
     }
-  }
 
-  // In a real API, we would delete this from the database
-  mockTeams.splice(teamIndex, 1)
-
-  return {
-    status: 200,
-    data: null,
-    message: "Team deleted successfully",
-  }
-}
-
-export async function getTeamMembers(teamId: string): Promise<ApiResponse<Professional[]>> {
-  await delay(500) // Simulate network delay
-
-  const members = mockTeamMembers[teamId]
-
-  if (!members) {
     return {
-      status: 404,
-      error: "Team not found or has no members",
+      status: 200,
+      data: members,
     }
-  }
+  },
 
-  return {
-    status: 200,
-    data: members,
-  }
-}
-
-export async function getTeamPerformance(teamId: string): Promise<
-  ApiResponse<{
-    onTimeCompletion: number
-    customerSatisfaction: number
-    qualityScore: number
-    efficiency: number
-  }>
-> {
-  await delay(500) // Simulate network delay
-
-  const performance = mockPerformanceData[teamId]
-
-  if (!performance) {
-    return {
-      status: 404,
-      error: "Team performance data not found",
-    }
-  }
-
-  return {
-    status: 200,
-    data: performance,
-  }
-}
-
-export async function getTeamUpcomingServices(teamId: string): Promise<
-  ApiResponse<
-    Array<{
-      id: string
-      date: string
-      time: string
-      customer: string
-      address: string
-      type: string
+  // Get team performance
+  async getTeamPerformance(teamId: string): Promise<
+    ApiResponse<{
+      onTimeCompletion: number
+      customerSatisfaction: number
+      qualityScore: number
+      efficiency: number
     }>
-  >
-> {
-  await delay(500) // Simulate network delay
+  > {
+    await delay(500) // Simulate network delay
 
-  const services = mockUpcomingServices[teamId]
+    const performance = mockPerformanceData[teamId]
 
-  if (!services) {
-    return {
-      status: 404,
-      error: "Team upcoming services not found",
+    if (!performance) {
+      return {
+        status: 404,
+        error: "Team performance data not found",
+      }
     }
-  }
 
-  return {
-    status: 200,
-    data: services,
-  }
-}
+    return {
+      status: 200,
+      data: performance,
+    }
+  },
 
-// Get available professionals for team assignment
-export async function getAvailableProfessionals(companyId: string): Promise<ApiResponse<Professional[]>> {
-  await delay(500) // Simulate network delay
+  // Get team upcoming services
+  async getTeamUpcomingServices(teamId: string): Promise<
+    ApiResponse<
+      Array<{
+        id: string
+        date: string
+        time: string
+        customer: string
+        address: string
+        type: string
+      }>
+    >
+  > {
+    await delay(500) // Simulate network delay
 
-  // In a real API, we would query professionals without a team or with specific criteria
-  const availableProfessionals = Object.values(mockTeamMembers)
-    .flat()
-    .filter((professional) => professional.companyId === companyId)
+    const services = mockUpcomingServices[teamId]
 
-  return {
-    status: 200,
-    data: availableProfessionals,
-  }
+    if (!services) {
+      return {
+        status: 404,
+        error: "Team upcoming services not found",
+      }
+    }
+
+    return {
+      status: 200,
+      data: services,
+    }
+  },
+
+  // Get available professionals for team assignment
+  async getAvailableProfessionals(companyId: string): Promise<ApiResponse<Professional[]>> {
+    await delay(500) // Simulate network delay
+
+    // In a real API, we would query professionals without a team or with specific criteria
+    const availableProfessionals = Object.values(mockTeamMembers)
+      .flat()
+      .filter((professional) => professional.companyId === companyId)
+
+    return {
+      status: 200,
+      data: availableProfessionals,
+    }
+  },
 }
