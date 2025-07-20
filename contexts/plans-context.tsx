@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import {
   getPlans,
   getPlan,
@@ -28,7 +28,7 @@ interface PlansContextType {
   fetchPlans: (page?: number, limit?: number) => Promise<void>
   fetchPlan: (id: string) => Promise<void>
   addPlan: (planData: PlanFormData) => Promise<boolean>
-  editPlan: (id: string, planData: Partial<PlanFormData>) => Promise<boolean>
+  editPlan: (id: string, planData: PlanFormData) => Promise<boolean>
   removePlan: (id: string) => Promise<boolean>
   activatePlan: (id: string) => Promise<boolean>
   deactivatePlan: (id: string) => Promise<boolean>
@@ -61,7 +61,7 @@ export function PlansProvider({ children }: { children: ReactNode }) {
     try {
       const response = await getPlans(page, limit, filters.status, filters.search)
 
-      if (response.success && response.data) {
+      if (response.status === 200 && response.data) {
         setPlans(response.data.items)
         setPagination({
           currentPage: response.data.meta.currentPage,
@@ -71,20 +71,12 @@ export function PlansProvider({ children }: { children: ReactNode }) {
         })
       } else {
         setError(response.error || "Failed to fetch plans")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to fetch plans",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to fetch plans")
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -97,24 +89,16 @@ export function PlansProvider({ children }: { children: ReactNode }) {
     try {
       const response = await getPlan(id)
 
-      if (response.success && response.data) {
+      if (response.status === 200 && response.data) {
         setCurrentPlan(response.data)
       } else {
         setError(response.error || "Failed to fetch plan")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to fetch plan",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to fetch plan")
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -127,72 +111,48 @@ export function PlansProvider({ children }: { children: ReactNode }) {
     try {
       const response = await createPlan(planData)
 
-      if (response.success && response.data) {
-        setPlans((prevPlans) => [...prevPlans, response.data])
-        toast({
-          title: "Success",
-          description: "Plan created successfully",
-        })
+      if (response.status === 201) {
+        // Changed from 200 to 201
+        toast.success("Plan created successfully")
+        // Refresh the plans list
+        await fetchPlans()
         return true
       } else {
         setError(response.error || "Failed to create plan")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to create plan",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to create plan")
         return false
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
       return false
     } finally {
       setLoading(false)
     }
   }
 
-  const editPlan = async (id: string, planData: Partial<PlanFormData>): Promise<boolean> => {
+  const editPlan = async (id: string, planData: PlanFormData): Promise<boolean> => {
     setLoading(true)
     setError(null)
 
     try {
       const response = await updatePlan(id, planData)
 
-      if (response.success && response.data) {
-        setPlans((prevPlans) => prevPlans.map((plan) => (plan.id === id ? response.data : plan)))
-
-        if (currentPlan && currentPlan.id === id) {
-          setCurrentPlan(response.data)
-        }
-
-        toast({
-          title: "Success",
-          description: "Plan updated successfully",
-        })
+      if (response.status === 200) {
+        toast.success("Plan updated successfully")
+        // Refresh the plans list
+        await fetchPlans()
         return true
       } else {
         setError(response.error || "Failed to update plan")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update plan",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to update plan")
         return false
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
       return false
     } finally {
       setLoading(false)
@@ -206,35 +166,24 @@ export function PlansProvider({ children }: { children: ReactNode }) {
     try {
       const response = await deletePlan(id)
 
-      if (response.success) {
-        setPlans((prevPlans) => prevPlans.filter((plan) => plan.id !== id))
+      if (response.status === 200) {
+        setPlans((prevPlans) => prevPlans.filter((plan) => plan.id.toString() !== id))
 
-        if (currentPlan && currentPlan.id === id) {
+        if (currentPlan && currentPlan.id.toString() === id) {
           setCurrentPlan(null)
         }
 
-        toast({
-          title: "Success",
-          description: "Plan deleted successfully",
-        })
+        toast.success("Plan deleted successfully")
         return true
       } else {
         setError(response.error || "Failed to delete plan")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to delete plan",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to delete plan")
         return false
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
       return false
     } finally {
       setLoading(false)
@@ -246,37 +195,22 @@ export function PlansProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const response = await updatePlanStatus(id, "active")
+      const response = await updatePlanStatus(id, 1) // 1 = active
 
-      if (response.success && response.data) {
-        setPlans((prevPlans) => prevPlans.map((plan) => (plan.id === id ? response.data : plan)))
-
-        if (currentPlan && currentPlan.id === id) {
-          setCurrentPlan(response.data)
-        }
-
-        toast({
-          title: "Success",
-          description: "Plan activated successfully",
-        })
+      if (response.status === 200) {
+        toast.success("Plan activated successfully")
+        // Refresh the plans list
+        await fetchPlans()
         return true
       } else {
         setError(response.error || "Failed to activate plan")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to activate plan",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to activate plan")
         return false
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
       return false
     } finally {
       setLoading(false)
@@ -288,37 +222,22 @@ export function PlansProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const response = await updatePlanStatus(id, "inactive")
+      const response = await updatePlanStatus(id, 0) // 0 = inactive
 
-      if (response.success && response.data) {
-        setPlans((prevPlans) => prevPlans.map((plan) => (plan.id === id ? response.data : plan)))
-
-        if (currentPlan && currentPlan.id === id) {
-          setCurrentPlan(response.data)
-        }
-
-        toast({
-          title: "Success",
-          description: "Plan deactivated successfully",
-        })
+      if (response.status === 200) {
+        toast.success("Plan deactivated successfully")
+        // Refresh the plans list
+        await fetchPlans()
         return true
       } else {
         setError(response.error || "Failed to deactivate plan")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to deactivate plan",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to deactivate plan")
         return false
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
       return false
     } finally {
       setLoading(false)
@@ -343,25 +262,17 @@ export function PlansProvider({ children }: { children: ReactNode }) {
     try {
       const response = await getPlanSubscribers(planId, page, limit)
 
-      if (response.success && response.data) {
+      if (response.status === 200 && response.data) {
         return response.data.items
       } else {
         setError(response.error || "Failed to fetch plan subscribers")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to fetch plan subscribers",
-          variant: "destructive",
-        })
+        toast.error(response.error || "Failed to fetch plan subscribers")
         return []
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      toast.error(errorMessage)
       return []
     } finally {
       setLoading(false)

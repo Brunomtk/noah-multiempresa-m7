@@ -1,144 +1,195 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
-import type { AuthUser, LoginCredentials, RegisterUserData } from "@/types"
-import { authApi } from "@/lib/api"
+import type { User, LoginCredentials, RegisterData } from "@/types"
+import { fetchApi } from "@/lib/api/utils"
+import { toast } from "sonner"
 
 interface AuthContextType {
-  user: AuthUser | null
+  user: User | null
   isLoading: boolean
   isAuthenticated: boolean
   login: (credentials: LoginCredentials) => Promise<boolean>
-  logout: () => Promise<void>
-  register: (userData: RegisterUserData) => Promise<boolean>
-  error: string | null
+  register: (data: RegisterData) => Promise<boolean>
+  logout: () => void
+  checkAuth: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Verificar autenticação ao carregar a página
-  useEffect(() => {
-    const checkAuth = async () => {
+  const login = async (credentials: LoginCredentials): Promise<boolean> => {
+    try {
       setIsLoading(true)
-      try {
-        const response = await authApi.checkAuth()
 
-        if (response.data) {
-          setUser(response.data)
-        } else {
-          setUser(null)
-        }
-      } catch (err) {
-        console.error("Auth check failed:", err)
-        setUser(null)
-      } finally {
-        setIsLoading(false)
+      const response = await fetch("https://localhost:44394/api/Users/authenticate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(credentials),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        toast.error("Login failed: " + errorText)
+        return false
       }
-    }
 
+      const data = await response.json()
+
+      // Salvar o token no localStorage
+      localStorage.setItem("noah_token", data.token)
+
+      // Criar objeto user com os dados recebidos
+      const userData: User = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        status: data.status,
+        avatar: data.avatar,
+        companyId: data.companyId,
+        professionalId: data.professionalId,
+        createdDate: data.createdDate,
+        updatedDate: data.updatedDate,
+      }
+
+      setUser(userData)
+      toast.success("Login successful!")
+      return true
+    } catch (error) {
+      console.error("Login error:", error)
+      toast.error("Login failed. Please try again.")
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const register = async (data: RegisterData): Promise<boolean> => {
+    try {
+      setIsLoading(true)
+
+      const response = await fetchApi("/Users/create", {
+        method: "POST",
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          password: data.password,
+          role: data.role,
+          status: 1,
+          companyId: data.companyId || null,
+          professionalId: data.professionalId || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        toast.error("Registration failed: " + errorText)
+        return false
+      }
+
+      const result = await response.json()
+
+      if (result === true) {
+        toast.success("Registration successful! Please login.")
+        return true
+      } else {
+        toast.error("Registration failed. Please try again.")
+        return false
+      }
+    } catch (error) {
+      console.error("Registration error:", error)
+      toast.error("Registration failed. Please try again.")
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const logout = () => {
+    localStorage.removeItem("noah_token")
+    setUser(null)
+    toast.success("Logged out successfully")
+  }
+
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem("noah_token")
+
+      if (!token) {
+        setIsLoading(false)
+        return
+      }
+
+      // Decodificar o JWT para obter o ID do usuário
+      const payload = JSON.parse(atob(token.split(".")[1]))
+      const userId = payload.UserId
+
+      if (!userId) {
+        localStorage.removeItem("noah_token")
+        setIsLoading(false)
+        return
+      }
+
+      // Buscar dados atualizados do usuário
+      const response = await fetchApi(`/Users/${userId}`)
+
+      if (!response.ok) {
+        localStorage.removeItem("noah_token")
+        setIsLoading(false)
+        return
+      }
+
+      const userData = await response.json()
+
+      const user: User = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        status: userData.status,
+        avatar: userData.avatar,
+        companyId: userData.companyId,
+        professionalId: userData.professionalId,
+        createdDate: userData.createdDate,
+        updatedDate: userData.updatedDate,
+      }
+
+      setUser(user)
+    } catch (error) {
+      console.error("Auth check error:", error)
+      localStorage.removeItem("noah_token")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
     checkAuth()
   }, [])
-
-  // Login
-  const login = async (credentials: LoginCredentials): Promise<boolean> => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const response = await authApi.login(credentials)
-
-      if (response.data) {
-        setUser(response.data)
-
-        // Redirecionar com base no papel do usuário
-        if (response.data.role === "admin") {
-          router.push("/admin/dashboard")
-        } else if (response.data.role === "company") {
-          router.push("/company/dashboard")
-        } else if (response.data.role === "professional") {
-          router.push("/professional/dashboard")
-        }
-
-        return true
-      } else {
-        setError(response.error || "Login failed")
-        return false
-      }
-    } catch (err) {
-      console.error("Login error:", err)
-      setError("An unexpected error occurred")
-      return false
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Logout
-  const logout = async (): Promise<void> => {
-    setIsLoading(true)
-
-    try {
-      await authApi.logout()
-      setUser(null)
-      router.push("/login")
-    } catch (err) {
-      console.error("Logout error:", err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Registro
-  const register = async (userData: RegisterUserData): Promise<boolean> => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const response = await authApi.register(userData)
-
-      if (response.data) {
-        // Após o registro bem-sucedido, redirecionar para login
-        router.push("/login")
-        return true
-      } else {
-        setError(response.error || "Registration failed")
-        return false
-      }
-    } catch (err) {
-      console.error("Registration error:", err)
-      setError("An unexpected error occurred")
-      return false
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const value = {
     user,
     isLoading,
     isAuthenticated: !!user,
     login,
-    logout,
     register,
-    error,
+    logout,
+    checkAuth,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext)
-
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
-
   return context
 }

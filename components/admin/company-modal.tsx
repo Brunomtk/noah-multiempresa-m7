@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2 } from "lucide-react"
-import type { Company } from "@/types"
+import type { Company, Plan } from "@/types"
+import { fetchApi } from "@/lib/api/utils"
 
 interface CompanyModalProps {
   isOpen: boolean
@@ -27,21 +28,31 @@ interface CompanyModalProps {
 
 export function CompanyModal({ isOpen, onClose, onSubmit, company }: CompanyModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false)
+  const [plans, setPlans] = useState<Plan[]>([])
   const [formData, setFormData] = useState({
     name: "",
     cnpj: "",
-    plan: "Basic",
+    planId: "",
     responsible: "",
     email: "",
     phone: "",
   })
 
+  // Load plans when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadPlans()
+    }
+  }, [isOpen])
+
+  // Set form data when company changes
   useEffect(() => {
     if (company) {
       setFormData({
         name: company.name || "",
         cnpj: company.cnpj || "",
-        plan: company.planName || "Basic",
+        planId: company.planId?.toString() || "",
         responsible: company.responsible || "",
         email: company.email || "",
         phone: company.phone || "",
@@ -50,7 +61,7 @@ export function CompanyModal({ isOpen, onClose, onSubmit, company }: CompanyModa
       setFormData({
         name: "",
         cnpj: "",
-        plan: "Basic",
+        planId: "",
         responsible: "",
         email: "",
         phone: "",
@@ -58,12 +69,32 @@ export function CompanyModal({ isOpen, onClose, onSubmit, company }: CompanyModa
     }
   }, [company])
 
+  const loadPlans = async () => {
+    setIsLoadingPlans(true)
+    try {
+      const response = await fetchApi("/Plan")
+      if (Array.isArray(response)) {
+        setPlans(response)
+      } else {
+        setPlans([])
+      }
+    } catch (error) {
+      console.error("Failed to load plans:", error)
+      setPlans([])
+    } finally {
+      setIsLoadingPlans(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      await onSubmit(formData)
+      await onSubmit({
+        ...formData,
+        planId: Number.parseInt(formData.planId),
+      })
     } catch (error) {
       console.error("Error submitting form:", error)
     } finally {
@@ -109,25 +140,25 @@ export function CompanyModal({ isOpen, onClose, onSubmit, company }: CompanyModa
             </div>
             <div className="grid gap-2">
               <Label htmlFor="plan">Plan</Label>
-              <Select value={formData.plan} onValueChange={(value) => handleChange("plan", value)}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder="Select a plan" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  <SelectItem value="Basic" className="hover:bg-[#2a3349]">
-                    Basic
-                  </SelectItem>
-                  <SelectItem value="Professional" className="hover:bg-[#2a3349]">
-                    Professional
-                  </SelectItem>
-                  <SelectItem value="Premium" className="hover:bg-[#2a3349]">
-                    Premium
-                  </SelectItem>
-                  <SelectItem value="Enterprise" className="hover:bg-[#2a3349]">
-                    Enterprise
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {isLoadingPlans ? (
+                <div className="flex items-center justify-center py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-400">Loading plans...</span>
+                </div>
+              ) : (
+                <Select value={formData.planId} onValueChange={(value) => handleChange("planId", value)}>
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder="Select a plan" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                    {plans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id.toString()} className="hover:bg-[#2a3349]">
+                        {plan.name} - R$ {plan.price}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="responsible">Responsible</Label>
@@ -167,7 +198,7 @@ export function CompanyModal({ isOpen, onClose, onSubmit, company }: CompanyModa
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
             >
               Cancel
             </Button>

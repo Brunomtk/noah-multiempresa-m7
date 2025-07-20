@@ -1,17 +1,18 @@
 // User Types
-export type UserRole = "admin" | "company" | "professional"
+export type UserRole = "admin" | "company" | "professional" | "operador"
 
 export interface User {
-  id: string
+  id: number
   name: string
   email: string
   role: UserRole
-  avatar?: string
-  createdAt: string
-  updatedAt: string
-  status: "active" | "inactive"
-  companyId?: string // Para usuários de empresa ou profissionais
-  professionalId?: string // Para usuários profissionais
+  avatar?: string | null
+  createdDate: string
+  updatedDate: string
+  status: number // 1 = active, 0 = inactive
+  companyId?: number | null
+  professionalId?: number | null
+  password?: string // Only for creation/update
 }
 
 export interface RegisterUserData {
@@ -19,5 +20,7 @@ export interface RegisterUserData {
   email: string
   password: string
   role: UserRole
-  companyId?: string
+  status: number
+  companyId?: number | null
+  professionalId?: number | null
 }

@@ -1,30 +1,23 @@
 "use client"
 
-import { ThemeProvider } from "@/components/theme-provider"
-import { AuthProvider } from "@/contexts/auth-context"
-import { CompaniesProvider } from "@/contexts/companies-context"
-import { ProfessionalsProvider } from "@/contexts/professionals-context"
-import { TeamsProvider } from "@/contexts/teams-context"
-import { RecurrencesProvider } from "@/contexts/recurrences-context"
-import { GpsTrackingProvider } from "@/contexts/gps-tracking-context"
-import { ReviewsProvider } from "@/contexts/reviews-context"
-import type { ReactNode } from "react"
+import type React from "react"
 
-export function Providers({ children }: { children: ReactNode }) {
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
+import { AuthProvider } from "@/contexts/auth-context"
+import { PlansProvider } from "@/contexts/plans-context"
+import { CompaniesProvider } from "@/contexts/companies-context"
+
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
       <AuthProvider>
-        <CompaniesProvider>
-          <ProfessionalsProvider>
-            <TeamsProvider>
-              <RecurrencesProvider>
-                <GpsTrackingProvider>
-                  <ReviewsProvider>{children}</ReviewsProvider>
-                </GpsTrackingProvider>
-              </RecurrencesProvider>
-            </TeamsProvider>
-          </ProfessionalsProvider>
-        </CompaniesProvider>
+        <PlansProvider>
+          <CompaniesProvider>
+            {children}
+            <Toaster />
+          </CompaniesProvider>
+        </PlansProvider>
       </AuthProvider>
     </ThemeProvider>
   )

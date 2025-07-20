@@ -8,9 +8,12 @@ import { Providers } from "./providers"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "NOAH Platform",
+  title: "Noah - Multi empresas",
   description: "Professional service management platform",
-    generator: 'v0.dev'
+  generator: "v0.dev",
+  icons: {
+    icon: "/logo.png", // Define o favicon usando a sua logo
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

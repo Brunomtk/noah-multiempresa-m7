@@ -50,15 +50,8 @@ export default function CompaniesPage() {
   // Fetch companies on initial load
   useEffect(() => {
     fetchCompanies()
-  }, [fetchCompanies])
+  }, [])
 
-  // Update filters when search or status changes
-  // Remova este useEffect que está causando o loop infinito
-  // useEffect(() => {
-  //   setFilters({ status: statusFilter, search: searchQuery })
-  // }, [statusFilter, searchQuery, setFilters])
-
-  // Substitua por funções de manipulação de eventos que não causam loops
   const handleStatusFilterChange = (status: string) => {
     setStatusFilter(status)
     setFilters({ status, search: searchQuery })
@@ -67,10 +60,12 @@ export default function CompaniesPage() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setSearchQuery(value)
-    // Opcional: usar debounce aqui para evitar muitas chamadas
+
+    // Debounce search
     const timeoutId = setTimeout(() => {
       setFilters({ status: statusFilter, search: value })
     }, 300)
+
     return () => clearTimeout(timeoutId)
   }
 
@@ -81,9 +76,8 @@ export default function CompaniesPage() {
       responsible: data.responsible,
       email: data.email,
       phone: data.phone,
-      status: "active",
-      planId: "1", // Default plan ID
-      planName: data.plan,
+      status: 1,
+      planId: data.planId,
     })
 
     if (result) {
@@ -98,13 +92,13 @@ export default function CompaniesPage() {
   const handleEditCompany = async (data: any) => {
     if (!selectedCompany) return
 
-    const result = await updateCompany(selectedCompany.id, {
+    const result = await updateCompany(selectedCompany.id.toString(), {
       name: data.name,
       cnpj: data.cnpj,
       responsible: data.responsible,
       email: data.email,
       phone: data.phone,
-      planName: data.plan,
+      planId: data.planId,
     })
 
     if (result) {
@@ -119,7 +113,7 @@ export default function CompaniesPage() {
 
   const handleDeleteCompany = async () => {
     if (companyToDelete) {
-      const success = await deleteCompany(companyToDelete.id)
+      const success = await deleteCompany(companyToDelete.id.toString())
       if (success) {
         toast({
           title: "Company deleted successfully",
@@ -183,7 +177,7 @@ export default function CompaniesPage() {
               className={
                 statusFilter === "all"
                   ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               }
             >
               All
@@ -194,7 +188,7 @@ export default function CompaniesPage() {
               className={
                 statusFilter === "active"
                   ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               }
             >
               Active
@@ -205,7 +199,7 @@ export default function CompaniesPage() {
               className={
                 statusFilter === "inactive"
                   ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               }
             >
               Inactive
@@ -256,18 +250,16 @@ export default function CompaniesPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-400">{company.cnpj}</TableCell>
-                    <TableCell className="text-gray-400">{company.planName}</TableCell>
+                    <TableCell className="text-gray-400">{company.plan?.name || "N/A"}</TableCell>
                     <TableCell className="text-gray-400">{company.responsible}</TableCell>
                     <TableCell>
                       <Badge
                         variant="outline"
                         className={
-                          company.status === "active"
-                            ? "border-green-500 text-green-500"
-                            : "border-red-500 text-red-500"
+                          company.status === 1 ? "border-green-500 text-green-500" : "border-red-500 text-red-500"
                         }
                       >
-                        {company.status === "active" ? "Active" : "Inactive"}
+                        {company.status === 1 ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -340,7 +332,7 @@ export default function CompaniesPage() {
                 size="sm"
                 disabled={pagination.currentPage === 1}
                 onClick={() => handlePageChange(pagination.currentPage - 1)}
-                className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               >
                 Previous
               </Button>
@@ -353,7 +345,7 @@ export default function CompaniesPage() {
                   className={
                     page === pagination.currentPage
                       ? "border-[#2a3349] bg-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-                      : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                      : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
                   }
                 >
                   {page}
@@ -364,7 +356,7 @@ export default function CompaniesPage() {
                 size="sm"
                 disabled={pagination.currentPage === pagination.totalPages}
                 onClick={() => handlePageChange(pagination.currentPage + 1)}
-                className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               >
                 Next
               </Button>

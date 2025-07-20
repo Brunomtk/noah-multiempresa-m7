@@ -1,9 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
-import type { Company, PaginatedResponse } from "@/types"
-import { companiesApi } from "@/lib/api/companies"
-import { useToast } from "@/hooks/use-toast"
+import type { Company } from "@/types"
+import { fetchApi } from "@/lib/api/utils"
+import { toast } from "sonner"
 
 interface CompaniesContextType {
   companies: Company[]
@@ -21,8 +21,8 @@ interface CompaniesContextType {
   }
   fetchCompanies: (page?: number, limit?: number, status?: string, search?: string) => Promise<void>
   getCompanyById: (id: string) => Promise<Company | null>
-  createCompany: (companyData: Omit<Company, "id" | "createdAt" | "updatedAt">) => Promise<Company | null>
-  updateCompany: (id: string, companyData: Partial<Company>) => Promise<Company | null>
+  createCompany: (companyData: any) => Promise<Company | null>
+  updateCompany: (id: string, companyData: any) => Promise<Company | null>
   deleteCompany: (id: string) => Promise<boolean>
   updateCompanyStatus: (id: string, status: "active" | "inactive") => Promise<Company | null>
   setFilters: (filters: { status?: string; search?: string }) => void
@@ -44,168 +44,123 @@ export function CompaniesProvider({ children }: { children: ReactNode }) {
     status: "all",
     search: "",
   })
-  const { toast } = useToast()
 
   const fetchCompanies = useCallback(
     async (page = 1, limit = 10, status = filters.status, search = filters.search) => {
-      // Evite atualizar o estado se já estiver carregando
       if (isLoading) return
 
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await companiesApi.getCompanies(page, limit, status, search)
+        const params = new URLSearchParams({
+          pageNumber: page.toString(),
+          pageSize: limit.toString(),
+        })
 
-        if (response.error) {
-          setError(response.error)
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return
+        if (search) {
+          params.append("Name", search)
         }
 
-        if (response.data) {
-          const paginatedData = response.data as PaginatedResponse<Company>
-          setCompanies(paginatedData.data)
-          setPagination(paginatedData.meta)
+        const response = await fetchApi(`/Companies/paged?${params.toString()}`)
+
+        if (response && response.data) {
+          setCompanies(response.data)
+          setPagination(response.meta)
+        } else {
+          setCompanies([])
+          setPagination({
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: 0,
+            itemsPerPage: 10,
+          })
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to fetch companies"
         setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
+        toast.error(errorMessage)
+        setCompanies([])
       } finally {
         setIsLoading(false)
       }
     },
-    [filters, toast, isLoading],
+    [filters, isLoading],
   )
 
-  const getCompanyById = useCallback(
-    async (id: string): Promise<Company | null> => {
-      setIsLoading(true)
-      setError(null)
+  const getCompanyById = useCallback(async (id: string): Promise<Company | null> => {
+    setIsLoading(true)
+    setError(null)
 
-      try {
-        const response = await companiesApi.getCompanyById(id)
-
-        if (response.error) {
-          setError(response.error)
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return null
-        }
-
-        return response.data || null
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch company"
-        setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [toast],
-  )
+    try {
+      const response = await fetchApi(`/Companies/${id}`)
+      return response || null
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch company"
+      setError(errorMessage)
+      toast.error(errorMessage)
+      return null
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   const createCompany = useCallback(
-    async (companyData: Omit<Company, "id" | "createdAt" | "updatedAt">): Promise<Company | null> => {
+    async (companyData: any): Promise<Company | null> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await companiesApi.createCompany(companyData)
-
-        if (response.error) {
-          setError(response.error)
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return null
-        }
-
-        toast({
-          title: "Success",
-          description: "Company created successfully",
+        await fetchApi("/Companies/create", {
+          method: "POST",
+          body: JSON.stringify(companyData),
         })
 
-        // Refresh the companies list
-        fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
+        toast.success("Company created successfully")
 
-        return response.data || null
+        // Refresh the companies list
+        await fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
+
+        return companyData as Company
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to create company"
         setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
+        toast.error(errorMessage)
         return null
       } finally {
         setIsLoading(false)
       }
     },
-    [fetchCompanies, pagination, toast],
+    [fetchCompanies, pagination],
   )
 
   const updateCompany = useCallback(
-    async (id: string, companyData: Partial<Company>): Promise<Company | null> => {
+    async (id: string, companyData: any): Promise<Company | null> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await companiesApi.updateCompany(id, companyData)
-
-        if (response.error) {
-          setError(response.error)
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return null
-        }
-
-        toast({
-          title: "Success",
-          description: "Company updated successfully",
+        await fetchApi(`/Companies/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(companyData),
         })
 
-        // Refresh the companies list
-        fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
+        toast.success("Company updated successfully")
 
-        return response.data || null
+        // Refresh the companies list
+        await fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
+
+        return companyData as Company
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to update company"
         setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
+        toast.error(errorMessage)
         return null
       } finally {
         setIsLoading(false)
       }
     },
-    [fetchCompanies, pagination, toast],
+    [fetchCompanies, pagination],
   )
 
   const deleteCompany = useCallback(
@@ -214,42 +169,26 @@ export function CompaniesProvider({ children }: { children: ReactNode }) {
       setError(null)
 
       try {
-        const response = await companiesApi.deleteCompany(id)
-
-        if (response.error) {
-          setError(response.error)
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return false
-        }
-
-        toast({
-          title: "Success",
-          description: "Company deleted successfully",
-          variant: "destructive",
+        await fetchApi(`/Companies/${id}`, {
+          method: "DELETE",
         })
 
+        toast.success("Company deleted successfully")
+
         // Refresh the companies list
-        fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
+        await fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
 
         return true
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to delete company"
         setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
+        toast.error(errorMessage)
         return false
       } finally {
         setIsLoading(false)
       }
     },
-    [fetchCompanies, pagination, toast],
+    [fetchCompanies, pagination],
   )
 
   const updateCompanyStatus = useCallback(
@@ -258,46 +197,32 @@ export function CompaniesProvider({ children }: { children: ReactNode }) {
       setError(null)
 
       try {
-        const response = await companiesApi.updateCompanyStatus(id, status)
-
-        if (response.error) {
-          setError(response.error)
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return null
-        }
-
-        toast({
-          title: "Success",
-          description: `Company ${status === "active" ? "activated" : "deactivated"} successfully`,
+        const statusValue = status === "active" ? 1 : 0
+        await fetchApi(`/Companies/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ status: statusValue }),
         })
 
-        // Refresh the companies list
-        fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
+        toast.success(`Company ${status === "active" ? "activated" : "deactivated"} successfully`)
 
-        return response.data || null
+        // Refresh the companies list
+        await fetchCompanies(pagination.currentPage, pagination.itemsPerPage)
+
+        return null
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to update company status"
         setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
+        toast.error(errorMessage)
         return null
       } finally {
         setIsLoading(false)
       }
     },
-    [fetchCompanies, pagination, toast],
+    [fetchCompanies, pagination],
   )
 
   const setFilters = useCallback(
     (newFilters: { status?: string; search?: string }) => {
-      // Verifique se os filtros realmente mudaram antes de atualizar
       if (
         (newFilters.status !== undefined && newFilters.status !== filters.status) ||
         (newFilters.search !== undefined && newFilters.search !== filters.search)

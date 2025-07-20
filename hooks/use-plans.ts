@@ -1,19 +1,21 @@
 import { usePlansContext } from "@/contexts/plans-context"
-import type { Plan, PlanFilters } from "@/types/plan"
-import { formatCurrency } from "@/lib/utils"
+import type { Plan } from "@/types/plan"
 
 export function usePlans() {
   const context = usePlansContext()
 
   // Format price for display
   const formatPrice = (price: number): string => {
-    return formatCurrency(price)
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(price)
   }
 
   // Format date for display
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString("pt-BR", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -21,11 +23,11 @@ export function usePlans() {
   }
 
   // Get status color for UI
-  const getStatusColor = (status: "active" | "inactive"): string => {
+  const getStatusColor = (status: number): string => {
     switch (status) {
-      case "active":
+      case 1:
         return "bg-green-100 text-green-800"
-      case "inactive":
+      case 0:
         return "bg-gray-100 text-gray-800"
       default:
         return "bg-gray-100 text-gray-800"
@@ -33,71 +35,50 @@ export function usePlans() {
   }
 
   // Get status label for display
-  const getStatusLabel = (status: "active" | "inactive"): string => {
-    switch (status) {
-      case "active":
-        return "Active"
-      case "inactive":
-        return "Inactive"
-      default:
-        return "Unknown"
-    }
+  const getStatusLabel = (status: number): string => {
+    return status === 1 ? "Ativo" : "Inativo"
   }
 
   // Format duration for display
-  const formatDuration = (months: number): string => {
-    if (months === 1) {
-      return "1 month"
-    } else if (months === 12) {
-      return "1 year"
-    } else if (months > 12 && months % 12 === 0) {
-      return `${months / 12} years`
-    } else {
-      return `${months} months`
-    }
+  const formatDuration = (duration: number): string => {
+    if (duration === 30) return "Mensal"
+    if (duration === 365) return "Anual"
+    return `${duration} dias`
   }
 
   // Format limits for display
   const formatLimits = (plan: Plan): string[] => {
     const limitDescriptions: string[] = []
 
-    if (plan.limits.professionals !== undefined) {
+    if (plan.professionalsLimit !== undefined) {
       limitDescriptions.push(
-        plan.limits.professionals === 0
-          ? "Unlimited professionals"
-          : `Up to ${plan.limits.professionals} professionals`,
+        plan.professionalsLimit === 0 ? "Profissionais ilimitados" : `Até ${plan.professionalsLimit} profissionais`,
       )
     }
 
-    if (plan.limits.teams !== undefined) {
-      limitDescriptions.push(plan.limits.teams === 0 ? "Unlimited teams" : `Up to ${plan.limits.teams} teams`)
+    if (plan.teamsLimit !== undefined) {
+      limitDescriptions.push(plan.teamsLimit === 0 ? "Equipes ilimitadas" : `Até ${plan.teamsLimit} equipes`)
     }
 
-    if (plan.limits.customers !== undefined) {
-      limitDescriptions.push(
-        plan.limits.customers === 0 ? "Unlimited customers" : `Up to ${plan.limits.customers} customers`,
-      )
+    if (plan.customersLimit !== undefined) {
+      limitDescriptions.push(plan.customersLimit === 0 ? "Clientes ilimitados" : `Até ${plan.customersLimit} clientes`)
     }
 
-    if (plan.limits.appointments !== undefined) {
+    if (plan.appointmentsLimit !== undefined) {
       limitDescriptions.push(
-        plan.limits.appointments === 0
-          ? "Unlimited appointments"
-          : `Up to ${plan.limits.appointments} appointments per month`,
+        plan.appointmentsLimit === 0 ? "Agendamentos ilimitados" : `Até ${plan.appointmentsLimit} agendamentos por mês`,
       )
     }
 
     return limitDescriptions
   }
 
-  // Update filters and trigger data fetch
-  const updateFilters = (newFilters: Partial<PlanFilters>) => {
-    context.updateFilters(newFilters)
+  const getPlanStatusText = (status: number): string => {
+    return status === 1 ? "Ativo" : "Inativo"
   }
 
-  // Reset filters to default values
-  const resetFilters = () => {
-    context.resetFilters()
+  const isPlanActive = (status: number): boolean => {
+    return status === 1
   }
 
   return {
@@ -108,7 +89,7 @@ export function usePlans() {
     getStatusLabel,
     formatDuration,
     formatLimits,
-    updateFilters,
-    resetFilters,
+    getPlanStatusText,
+    isPlanActive,
   }
 }

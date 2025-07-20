@@ -1,246 +1,82 @@
-import type { Plan } from "@/types/plan"
-import type { ApiResponse, PaginatedResponse } from "@/types/api"
-import { fetchWithAuth } from "./utils"
+import { fetchApi } from "./utils"
+import type { Plan, PlanFormData } from "@/types/plan"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.example.com"
-
-// Mock data for development
-const mockPlans: Plan[] = [
-  {
-    id: "plan-1",
-    name: "Basic",
-    price: 29.99,
-    features: [
-      "Up to 5 professionals",
-      "Up to 2 teams",
-      "Up to 100 customers",
-      "Up to 500 appointments per month",
-      "Basic reporting",
-      "Email support",
-    ],
-    limits: {
-      professionals: 5,
-      teams: 2,
-      customers: 100,
-      appointments: 500,
-    },
-    duration: 1, // 1 month
-    status: "active",
-    createdAt: new Date(2023, 0, 15).toISOString(),
-    updatedAt: new Date(2023, 0, 15).toISOString(),
-  },
-  {
-    id: "plan-2",
-    name: "Professional",
-    price: 59.99,
-    features: [
-      "Up to 15 professionals",
-      "Up to 5 teams",
-      "Up to 500 customers",
-      "Up to 2000 appointments per month",
-      "Advanced reporting",
-      "Priority email support",
-      "Phone support",
-    ],
-    limits: {
-      professionals: 15,
-      teams: 5,
-      customers: 500,
-      appointments: 2000,
-    },
-    duration: 1, // 1 month
-    status: "active",
-    createdAt: new Date(2023, 0, 15).toISOString(),
-    updatedAt: new Date(2023, 0, 15).toISOString(),
-  },
-  {
-    id: "plan-3",
-    name: "Enterprise",
-    price: 129.99,
-    features: [
-      "Unlimited professionals",
-      "Unlimited teams",
-      "Unlimited customers",
-      "Unlimited appointments",
-      "Custom reporting",
-      "24/7 priority support",
-      "Dedicated account manager",
-      "Custom integrations",
-    ],
-    limits: {},
-    duration: 1, // 1 month
-    status: "active",
-    createdAt: new Date(2023, 0, 15).toISOString(),
-    updatedAt: new Date(2023, 0, 15).toISOString(),
-  },
-  {
-    id: "plan-4",
-    name: "Starter",
-    price: 19.99,
-    features: [
-      "Up to 2 professionals",
-      "Up to 1 team",
-      "Up to 50 customers",
-      "Up to 200 appointments per month",
-      "Basic reporting",
-    ],
-    limits: {
-      professionals: 2,
-      teams: 1,
-      customers: 50,
-      appointments: 200,
-    },
-    duration: 1, // 1 month
-    status: "inactive",
-    createdAt: new Date(2023, 0, 15).toISOString(),
-    updatedAt: new Date(2023, 0, 15).toISOString(),
-  },
-]
+// Tipos para as respostas da API
+interface PaginatedResponse<T> {
+  results: T[]
+  currentPage: number
+  pageCount: number
+  pageSize: number
+  totalItems: number
+  firstRowOnPage: number
+  lastRowOnPage: number
+}
 
 // Get all plans with optional filtering
 export async function getPlans(
   page = 1,
   limit = 10,
-  status?: "active" | "inactive",
+  status?: number,
   search?: string,
-): Promise<ApiResponse<PaginatedResponse<Plan>>> {
+): Promise<{ status: number; data?: { items: Plan[]; meta: any }; error?: string }> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      let filteredPlans = [...mockPlans]
+    const params = new URLSearchParams({
+      pageNumber: page.toString(),
+      pageSize: limit.toString(),
+    })
+    if (search) params.append("name", search)
+    if (status !== undefined) params.append("status", status.toString())
 
-      // Apply status filter
-      if (status) {
-        filteredPlans = filteredPlans.filter((plan) => plan.status === status)
-      }
+    // Aqui fetchApi já retorna o objeto JSON parseado
+    const data = await fetchApi<PaginatedResponse<Plan>>(`/Plan/paged?${params}`)
 
-      // Apply search filter
-      if (search) {
-        const searchLower = search.toLowerCase()
-        filteredPlans = filteredPlans.filter(
-          (plan) =>
-            plan.name.toLowerCase().includes(searchLower) ||
-            plan.features.some((feature) => feature.toLowerCase().includes(searchLower)),
-        )
-      }
-
-      // Calculate pagination
-      const totalItems = filteredPlans.length
-      const totalPages = Math.ceil(totalItems / limit)
-      const startIndex = (page - 1) * limit
-      const endIndex = startIndex + limit
-      const paginatedPlans = filteredPlans.slice(startIndex, endIndex)
-
-      return {
-        success: true,
-        data: {
-          items: paginatedPlans,
-          meta: {
-            currentPage: page,
-            itemsPerPage: limit,
-            totalItems,
-            totalPages,
-          },
-        },
-      }
-    }
-
-    // For production, use actual API
-    const queryParams = new URLSearchParams()
-    queryParams.append("page", page.toString())
-    queryParams.append("limit", limit.toString())
-
-    if (status) {
-      queryParams.append("status", status)
-    }
-
-    if (search) {
-      queryParams.append("search", search)
-    }
-
-    const response = await fetchWithAuth(`${API_URL}/plans?${queryParams.toString()}`)
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error fetching plans:", error)
     return {
-      success: false,
+      status: 200,
+      data: {
+        items: data.results,
+        meta: {
+          currentPage: data.currentPage,
+          totalPages: data.pageCount,
+          totalItems: data.totalItems,
+          itemsPerPage: data.pageSize,
+        },
+      },
+    }
+  } catch (err) {
+    console.error("Error fetching plans:", err)
+    return {
+      status: 500,
       error: "Failed to fetch plans. Please try again.",
     }
   }
 }
 
 // Get a specific plan by ID
-export async function getPlan(id: string): Promise<ApiResponse<Plan>> {
+export async function getPlan(id: string): Promise<{ status: number; data?: Plan; error?: string }> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      const plan = mockPlans.find((p) => p.id === id)
-
-      if (!plan) {
-        return {
-          success: false,
-          error: "Plan not found",
-        }
-      }
-
-      return {
-        success: true,
-        data: plan,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/plans/${id}`)
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error fetching plan:", error)
+    const data = await fetchApi<Plan>(`/Plan/${id}`)
+    return { status: 200, data }
+  } catch (err) {
+    console.error("Error fetching plan:", err)
     return {
-      success: false,
+      status: 500,
       error: "Failed to fetch plan. Please try again.",
     }
   }
 }
 
 // Create a new plan
-export async function createPlan(planData: Omit<Plan, "id" | "createdAt" | "updatedAt">): Promise<ApiResponse<Plan>> {
+export async function createPlan(planData: PlanFormData): Promise<{ status: number; data?: Plan; error?: string }> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      const newPlan: Plan = {
-        ...planData,
-        id: `plan-${mockPlans.length + 1}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-
-      mockPlans.push(newPlan)
-
-      return {
-        success: true,
-        data: newPlan,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/plans`, {
+    const created = await fetchApi<Plan>("/Plan", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(planData),
     })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error creating plan:", error)
+    return { status: 201, data: created }
+  } catch (err) {
+    console.error("Error creating plan:", err)
     return {
-      success: false,
+      status: 500,
       error: "Failed to create plan. Please try again.",
     }
   }
@@ -249,214 +85,100 @@ export async function createPlan(planData: Omit<Plan, "id" | "createdAt" | "upda
 // Update an existing plan
 export async function updatePlan(
   id: string,
-  planData: Partial<Omit<Plan, "id" | "createdAt" | "updatedAt">>,
-): Promise<ApiResponse<Plan>> {
+  planData: PlanFormData,
+): Promise<{ status: number; data?: Plan; error?: string }> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      const planIndex = mockPlans.findIndex((p) => p.id === id)
-
-      if (planIndex === -1) {
-        return {
-          success: false,
-          error: "Plan not found",
-        }
-      }
-
-      const updatedPlan: Plan = {
-        ...mockPlans[planIndex],
-        ...planData,
-        updatedAt: new Date().toISOString(),
-      }
-
-      mockPlans[planIndex] = updatedPlan
-
-      return {
-        success: true,
-        data: updatedPlan,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/plans/${id}`, {
+    // Se a API retornar o objeto, ele virá aqui; caso contrário, devemos buscá-lo após o PUT
+    const updated = await fetchApi<Plan>(`/Plan/${id}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(planData),
     })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error updating plan:", error)
+    return { status: 200, data: updated }
+  } catch (err) {
+    console.error("Error updating plan:", err)
     return {
-      success: false,
+      status: 500,
       error: "Failed to update plan. Please try again.",
     }
   }
 }
 
 // Delete a plan
-export async function deletePlan(id: string): Promise<ApiResponse<null>> {
+export async function deletePlan(id: string): Promise<{ status: number; data?: null; error?: string }> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      const planIndex = mockPlans.findIndex((p) => p.id === id)
-
-      if (planIndex === -1) {
-        return {
-          success: false,
-          error: "Plan not found",
-        }
-      }
-
-      mockPlans.splice(planIndex, 1)
-
-      return {
-        success: true,
-        data: null,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/plans/${id}`, {
-      method: "DELETE",
-    })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error deleting plan:", error)
+    await fetchApi(`/Plan/${id}`, { method: "DELETE" })
+    return { status: 200, data: null }
+  } catch (err) {
+    console.error("Error deleting plan:", err)
     return {
-      success: false,
+      status: 500,
       error: "Failed to delete plan. Please try again.",
     }
   }
 }
 
 // Update plan status (activate/deactivate)
-export async function updatePlanStatus(id: string, status: "active" | "inactive"): Promise<ApiResponse<Plan>> {
+export async function updatePlanStatus(
+  id: string,
+  status: number,
+): Promise<{ status: number; data?: Plan; error?: string }> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      const planIndex = mockPlans.findIndex((p) => p.id === id)
-
-      if (planIndex === -1) {
-        return {
-          success: false,
-          error: "Plan not found",
-        }
-      }
-
-      const updatedPlan: Plan = {
-        ...mockPlans[planIndex],
-        status,
-        updatedAt: new Date().toISOString(),
-      }
-
-      mockPlans[planIndex] = updatedPlan
-
-      return {
-        success: true,
-        data: updatedPlan,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/plans/${id}/status`, {
+    await fetchApi(`/Plan/${id}/status`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({ status }),
     })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error updating plan status:", error)
+    // buscamos o plano atualizado
+    const data = await getPlan(id)
+    if (data.data) return { status: 200, data: data.data }
+    throw new Error("Failed to fetch updated plan")
+  } catch (err) {
+    console.error("Error updating plan status:", err)
     return {
-      success: false,
+      status: 500,
       error: "Failed to update plan status. Please try again.",
     }
   }
 }
 
-// Get companies subscribed to a specific plan
+// Get companies subscribed to a specific plan (mocked)
 export async function getPlanSubscribers(
   planId: string,
   page = 1,
   limit = 10,
-): Promise<ApiResponse<PaginatedResponse<any>>> {
+): Promise<{ status: number; data?: { items: any[]; meta: any }; error?: string }> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      // Mock company subscribers
-      const mockSubscribers = [
-        {
-          id: "company-1",
-          name: "Acme Corporation",
-          email: "info@acme.com",
-          subscriptionStart: new Date(2023, 1, 15).toISOString(),
-          subscriptionEnd: new Date(2024, 1, 15).toISOString(),
-          status: "active",
-        },
-        {
-          id: "company-2",
-          name: "TechSolutions Inc",
-          email: "contact@techsolutions.com",
-          subscriptionStart: new Date(2023, 2, 10).toISOString(),
-          subscriptionEnd: new Date(2024, 2, 10).toISOString(),
-          status: "active",
-        },
-        {
-          id: "company-3",
-          name: "Global Services Ltd",
-          email: "info@globalservices.com",
-          subscriptionStart: new Date(2023, 0, 5).toISOString(),
-          subscriptionEnd: new Date(2024, 0, 5).toISOString(),
-          status: "active",
-        },
-      ]
-
-      // Calculate pagination
-      const totalItems = mockSubscribers.length
-      const totalPages = Math.ceil(totalItems / limit)
-      const startIndex = (page - 1) * limit
-      const endIndex = startIndex + limit
-      const paginatedSubscribers = mockSubscribers.slice(startIndex, endIndex)
-
-      return {
-        success: true,
-        data: {
-          items: paginatedSubscribers,
-          meta: {
-            currentPage: page,
-            itemsPerPage: limit,
-            totalItems,
-            totalPages,
-          },
-        },
-      }
-    }
-
-    // For production, use actual API
-    const queryParams = new URLSearchParams()
-    queryParams.append("page", page.toString())
-    queryParams.append("limit", limit.toString())
-
-    const response = await fetchWithAuth(`${API_URL}/plans/${planId}/subscribers?${queryParams.toString()}`)
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error fetching plan subscribers:", error)
+    const mock = [
+      {
+        id: "company-1",
+        name: "Acme Corp",
+        email: "info@acme.com",
+        subscriptionStart: "2023-02-15T00:00:00Z",
+        subscriptionEnd: "2024-02-15T00:00:00Z",
+        status: "active",
+      },
+      {
+        id: "company-2",
+        name: "TechSolutions",
+        email: "contact@tech.com",
+        subscriptionStart: "2023-03-10T00:00:00Z",
+        subscriptionEnd: "2024-03-10T00:00:00Z",
+        status: "active",
+      },
+    ]
+    const total = mock.length
+    const pages = Math.ceil(total / limit)
+    const slice = mock.slice((page - 1) * limit, page * limit)
     return {
-      success: false,
+      status: 200,
+      data: {
+        items: slice,
+        meta: { currentPage: page, itemsPerPage: limit, totalItems: total, totalPages: pages },
+      },
+    }
+  } catch (err) {
+    console.error("Error fetching plan subscribers:", err)
+    return {
+      status: 500,
       error: "Failed to fetch plan subscribers. Please try again.",
     }
   }

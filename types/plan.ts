@@ -1,48 +1,42 @@
-// Plan Types
 export interface Plan {
-  id: string
+  id: number
   name: string
   price: number
   features: string[]
-  limits: {
-    professionals?: number
-    teams?: number
-    customers?: number
-    appointments?: number
-  }
-  duration: number // in months
-  status: "active" | "inactive"
-  createdAt: string
-  updatedAt: string
+  professionalsLimit: number
+  teamsLimit: number
+  customersLimit: number
+  appointmentsLimit: number
+  duration: number
+  status: number // 1 = active, 0 = inactive
+  subscriptions: any[] | null
+  createdDate: string
+  updatedDate: string
 }
 
 export interface PlanFormData {
   name: string
   price: number
   features: string[]
-  limits: {
-    professionals?: number
-    teams?: number
-    customers?: number
-    appointments?: number
-  }
+  professionalsLimit: number
+  teamsLimit: number
+  customersLimit: number
+  appointmentsLimit: number
   duration: number
-  status: "active" | "inactive"
+  status: number
 }
 
 export interface PlanFilters {
-  status?: "active" | "inactive"
+  status?: number
   search?: string
 }
 
-export interface PlanSubscription {
-  id: string
-  planId: string
-  companyId: string
-  startDate: string
-  endDate: string
-  status: "active" | "inactive" | "expired" | "cancelled"
-  autoRenew: boolean
-  createdAt: string
-  updatedAt: string
+export interface PaginatedResponse<T> {
+  results: T[]
+  currentPage: number
+  pageCount: number
+  pageSize: number
+  totalItems: number
+  firstRowOnPage: number
+  lastRowOnPage: number
 }

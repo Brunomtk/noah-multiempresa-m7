@@ -6,193 +6,258 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 import { X, Plus } from "lucide-react"
+import { usePlansContext } from "@/contexts/plans-context" // Changed to usePlansContext
+import type { Plan, PlanFormData } from "@/types/plan"
 
 interface PlanModalProps {
   isOpen: boolean
   onClose: () => void
-  planToEdit?: any
+  planToEdit?: Plan | null
 }
 
 export function PlanModal({ isOpen, onClose, planToEdit }: PlanModalProps) {
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [price, setPrice] = useState("")
-  const [billingCycle, setBillingCycle] = useState("monthly")
-  const [isActive, setIsActive] = useState(true)
-  const [features, setFeatures] = useState<string[]>([])
+  const { addPlan, editPlan, loading } = usePlansContext() // Changed to usePlansContext
+  const [formData, setFormData] = useState<PlanFormData>({
+    name: "",
+    price: 0,
+    features: [],
+    professionalsLimit: 1,
+    teamsLimit: 1,
+    customersLimit: 10,
+    appointmentsLimit: 100,
+    duration: 30,
+    status: 1,
+  })
   const [newFeature, setNewFeature] = useState("")
 
   useEffect(() => {
     if (planToEdit) {
-      setName(planToEdit.name || "")
-      setDescription(planToEdit.description || "")
-      setPrice(planToEdit.price?.toString() || "")
-      setBillingCycle(planToEdit.billingCycle || "monthly")
-      setIsActive(planToEdit.isActive !== undefined ? planToEdit.isActive : true)
-      setFeatures(planToEdit.features || [])
+      setFormData({
+        name: planToEdit.name,
+        price: planToEdit.price,
+        features: planToEdit.features,
+        professionalsLimit: planToEdit.professionalsLimit,
+        teamsLimit: planToEdit.teamsLimit,
+        customersLimit: planToEdit.customersLimit,
+        appointmentsLimit: planToEdit.appointmentsLimit,
+        duration: planToEdit.duration,
+        status: planToEdit.status,
+      })
     } else {
-      // Reset form for new plan
-      setName("")
-      setDescription("")
-      setPrice("")
-      setBillingCycle("monthly")
-      setIsActive(true)
-      setFeatures([])
+      setFormData({
+        name: "",
+        price: 0,
+        features: [],
+        professionalsLimit: 1,
+        teamsLimit: 1,
+        customersLimit: 10,
+        appointmentsLimit: 100,
+        duration: 30,
+        status: 1,
+      })
     }
-  }, [planToEdit])
+  }, [planToEdit, isOpen])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // In a real application, this would save the plan to the database
-    const planData = {
-      name,
-      description,
-      price: Number.parseFloat(price),
-      billingCycle,
-      isActive,
-      features,
+    let success = false
+    if (planToEdit) {
+      success = await editPlan(planToEdit.id.toString(), formData)
+    } else {
+      success = await addPlan(formData)
     }
 
-    console.log("Plan data:", planData)
-
-    // Close the modal
-    onClose()
-
-    // Show success message
-    alert(planToEdit ? "Plan updated successfully!" : "Plan created successfully!")
+    if (success) {
+      onClose()
+    }
   }
 
   const addFeature = () => {
-    if (newFeature.trim() !== "") {
-      setFeatures([...features, newFeature.trim()])
+    if (newFeature.trim() && !formData.features.includes(newFeature.trim())) {
+      setFormData((prev) => ({
+        ...prev,
+        features: [...prev.features, newFeature.trim()],
+      }))
       setNewFeature("")
     }
   }
 
-  const removeFeature = (index: number) => {
-    const updatedFeatures = [...features]
-    updatedFeatures.splice(index, 1)
-    setFeatures(updatedFeatures)
+  const removeFeature = (featureToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      features: prev.features.filter((feature) => feature !== featureToRemove),
+    }))
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      addFeature()
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[550px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{planToEdit ? "Edit Plan" : "Create New Plan"}</DialogTitle>
-          <DialogDescription>
-            {planToEdit ? "Update the plan information below." : "Fill in the information to create a new plan."}
-          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="description" className="text-right pt-2">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="col-span-3"
-                rows={3}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Plan Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter plan name"
                 required
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="price" className="text-right">
-                Price ($)
-              </Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="price">Price (R$)</Label>
               <Input
                 id="price"
                 type="number"
                 step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="col-span-3"
+                min="0"
+                value={formData.price}
+                onChange={(e) => setFormData((prev) => ({ ...prev, price: Number.parseFloat(e.target.value) || 0 }))}
+                placeholder="0.00"
                 required
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="billing-cycle" className="text-right">
-                Cycle
-              </Label>
-              <div className="col-span-3">
-                <Select value={billingCycle} onValueChange={setBillingCycle} required>
-                  <SelectTrigger id="billing-cycle">
-                    <SelectValue placeholder="Select billing cycle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="annual">Annual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="duration">Duration (days)</Label>
+              <Select
+                value={formData.duration.toString()}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, duration: Number.parseInt(value) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 days (Monthly)</SelectItem>
+                  <SelectItem value="365">365 days (Annual)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="is-active" className="text-right">
-                Active
-              </Label>
-              <div className="flex items-center space-x-2 col-span-3">
-                <Switch id="is-active" checked={isActive} onCheckedChange={setIsActive} />
-                <Label htmlFor="is-active">{isActive ? "Plan active" : "Plan inactive"}</Label>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">Features</Label>
-              <div className="col-span-3 space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    value={newFeature}
-                    onChange={(e) => setNewFeature(e.target.value)}
-                    placeholder="Add feature"
-                    className="flex-1"
-                  />
-                  <Button type="button" onClick={addFeature} size="icon">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2 mt-2">
-                  {features.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No features added</p>
-                  ) : (
-                    features.map((feature, index) => (
-                      <div key={index} className="flex items-center justify-between bg-muted p-2 rounded-md">
-                        <span className="text-sm">{feature}</span>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeFeature(index)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status.toString()}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, status: Number.parseInt(value) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Active</SelectItem>
+                  <SelectItem value="0">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="professionalsLimit">Professionals Limit</Label>
+              <Input
+                id="professionalsLimit"
+                type="number"
+                min="1"
+                value={formData.professionalsLimit}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, professionalsLimit: Number.parseInt(e.target.value) || 1 }))
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="teamsLimit">Teams Limit</Label>
+              <Input
+                id="teamsLimit"
+                type="number"
+                min="1"
+                value={formData.teamsLimit}
+                onChange={(e) => setFormData((prev) => ({ ...prev, teamsLimit: Number.parseInt(e.target.value) || 1 }))}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customersLimit">Customers Limit</Label>
+              <Input
+                id="customersLimit"
+                type="number"
+                min="1"
+                value={formData.customersLimit}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, customersLimit: Number.parseInt(e.target.value) || 1 }))
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="appointmentsLimit">Appointments Limit</Label>
+              <Input
+                id="appointmentsLimit"
+                type="number"
+                min="1"
+                value={formData.appointmentsLimit}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, appointmentsLimit: Number.parseInt(e.target.value) || 1 }))
+                }
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Features</Label>
+            <div className="flex gap-2">
+              <Input
+                value={newFeature}
+                onChange={(e) => setNewFeature(e.target.value)}
+                placeholder="Add a feature"
+                onKeyPress={handleKeyPress}
+              />
+              <Button type="button" onClick={addFeature} size="sm">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {formData.features.map((feature, index) => (
+                <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                  {feature}
+                  <button type="button" onClick={() => removeFeature(feature)} className="ml-1 hover:text-red-500">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : planToEdit ? "Update Plan" : "Create Plan"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

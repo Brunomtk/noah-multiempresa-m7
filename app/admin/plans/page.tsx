@@ -11,90 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Check, Edit, Plus, Search, Trash, Users } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-
-// Mock data for plans
-const mockPlans = [
-  {
-    id: "PLAN-001",
-    name: "Basic",
-    description: "Basic plan for small businesses",
-    price: 149.99,
-    billingCycle: "monthly",
-    features: ["Up to 5 users", "Basic scheduling", "Monthly reports", "Email support"],
-    isActive: true,
-    companiesCount: 12,
-  },
-  {
-    id: "PLAN-002",
-    name: "Standard",
-    description: "Standard plan for growing businesses",
-    price: 199.99,
-    billingCycle: "monthly",
-    features: [
-      "Up to 15 users",
-      "Advanced scheduling",
-      "Weekly reports",
-      "Email and chat support",
-      "Calendar integration",
-    ],
-    isActive: true,
-    companiesCount: 28,
-  },
-  {
-    id: "PLAN-003",
-    name: "Premium",
-    description: "Premium plan for established businesses",
-    price: 299.99,
-    billingCycle: "monthly",
-    features: [
-      "Up to 50 users",
-      "Advanced scheduling",
-      "Daily reports",
-      "Priority support",
-      "Calendar integration",
-      "Performance analytics",
-      "API integration",
-    ],
-    isActive: true,
-    companiesCount: 15,
-  },
-  {
-    id: "PLAN-004",
-    name: "Enterprise",
-    description: "Enterprise plan for large organizations",
-    price: 399.99,
-    billingCycle: "monthly",
-    features: [
-      "Unlimited users",
-      "All features",
-      "Custom reports",
-      "24/7 support",
-      "Dedicated account manager",
-      "Advanced API integration",
-      "Custom training",
-    ],
-    isActive: true,
-    companiesCount: 8,
-  },
-  {
-    id: "PLAN-005",
-    name: "Basic Annual",
-    description: "Annual basic plan with discount",
-    price: 1499.9,
-    billingCycle: "annual",
-    features: ["Up to 5 users", "Basic scheduling", "Monthly reports", "Email support"],
-    isActive: false,
-    companiesCount: 3,
-  },
-]
-
-// Stats data
-const statsData = {
-  totalPlans: mockPlans.length,
-  activePlans: mockPlans.filter((plan) => plan.isActive).length,
-  totalCompanies: mockPlans.reduce((acc, plan) => acc + plan.companiesCount, 0),
-  averagePrice: mockPlans.reduce((acc, plan) => acc + plan.price, 0) / mockPlans.length,
-}
+import { usePlansContext } from "@/contexts/plans-context" // Changed to usePlansContext
 
 export default function PlansPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -103,15 +20,34 @@ export default function PlansPage() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<any>(null)
 
+  const { plans, loading, addPlan, editPlan, removePlan, activatePlan, deactivatePlan, fetchPlans } = usePlansContext() // Changed to usePlansContext and added fetchPlans
+
+  // Helper function to format duration (moved from usePlans hook)
+  const formatDuration = (duration: number) => {
+    if (duration === 30) return "Monthly"
+    if (duration === 365) return "Annual"
+    return `${duration} days`
+  }
+
   // Filter plans based on search query and active status
-  const filteredPlans = mockPlans.filter((plan) => {
+  const searchLower = searchQuery.toLowerCase()
+
+  const filteredPlans = plans.filter((plan) => {
     const matchesSearch =
-      plan.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      plan.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = showInactive ? true : plan.isActive
+      plan.name.toLowerCase().includes(searchLower) ||
+      plan.features.some((feature) => feature.toLowerCase().includes(searchLower))
+    const matchesStatus = showInactive ? true : plan.status === 1
 
     return matchesSearch && matchesStatus
   })
+
+  // Atualizar as estatísticas para usar os dados reais
+  const statsData = {
+    totalPlans: plans.length,
+    activePlans: plans.filter((plan) => plan.status === 1).length,
+    totalCompanies: 0, // Será implementado quando tivermos o endpoint de subscribers
+    averagePrice: plans.length > 0 ? plans.reduce((acc, plan) => acc + plan.price, 0) / plans.length : 0,
+  }
 
   const handleOpenDetailsModal = (plan: any) => {
     setSelectedPlan(plan)
@@ -123,18 +59,19 @@ export default function PlansPage() {
     setIsPlanModalOpen(true)
   }
 
-  const handleDeletePlan = (planId: string) => {
-    // In a real application, this would delete the plan from the database
-    console.log(`Deleting plan ${planId}`)
-    // For now, we'll just show an alert
-    alert(`Plan ${planId} deleted`)
+  const handleDeletePlan = async (planId: number) => {
+    const success = await removePlan(planId.toString())
+    if (success) {
+      // Refresh será feito automaticamente pelo contexto
+    }
   }
 
-  const handleTogglePlanStatus = (planId: string, currentStatus: boolean) => {
-    // In a real application, this would update the plan status in the database
-    console.log(`Toggling plan ${planId} status to ${!currentStatus}`)
-    // For now, we'll just show an alert
-    alert(`Plan ${planId} status changed to ${!currentStatus ? "active" : "inactive"}`)
+  const handleTogglePlanStatus = async (planId: number, currentStatus: number) => {
+    if (currentStatus === 1) {
+      await deactivatePlan(planId.toString())
+    } else {
+      await activatePlan(planId.toString())
+    }
   }
 
   return (
@@ -231,9 +168,9 @@ export default function PlansPage() {
                     <TableCell className="font-medium">{plan.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{plan.description}</TableCell>
                     <TableCell>R$ {plan.price.toFixed(2)}</TableCell>
-                    <TableCell>{plan.billingCycle === "monthly" ? "Monthly" : "Annual"}</TableCell>
+                    <TableCell>{formatDuration(plan.duration)}</TableCell>
                     <TableCell>
-                      {plan.isActive ? (
+                      {plan.status === 1 ? (
                         <Badge className="bg-green-500">Active</Badge>
                       ) : (
                         <Badge variant="outline">Inactive</Badge>
@@ -242,7 +179,7 @@ export default function PlansPage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        {plan.companiesCount}
+                        {plan.subscriptions?.length || 0}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -257,9 +194,9 @@ export default function PlansPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleTogglePlanStatus(plan.id, plan.isActive)}
+                          onClick={() => handleTogglePlanStatus(plan.id, plan.status)}
                         >
-                          {plan.isActive ? (
+                          {plan.status === 1 ? (
                             <>
                               <Trash className="h-4 w-4 mr-1" />
                               Deactivate
@@ -271,17 +208,17 @@ export default function PlansPage() {
                             </>
                           )}
                         </Button>
-                        {plan.companiesCount === 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600"
-                            onClick={() => handleDeletePlan(plan.id)}
-                          >
-                            <Trash className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        )}
+                        {/* {plan.companiesCount === 0 && ( */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 bg-transparent"
+                          onClick={() => handleDeletePlan(plan.id)}
+                        >
+                          <Trash className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                        {/* )} */}
                       </div>
                     </TableCell>
                   </TableRow>
