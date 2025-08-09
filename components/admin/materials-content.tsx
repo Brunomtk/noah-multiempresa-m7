@@ -115,10 +115,6 @@ export function MaterialsContent() {
   }
 
   const getStockStatus = (material: Material) => {
-    if (!material || material.currentStock === null || material.currentStock === undefined) {
-      return { label: "Unknown", color: "bg-gray-100 text-gray-800 border-gray-200" }
-    }
-
     if (material.currentStock <= 0) {
       return { label: "Out of Stock", color: "bg-red-100 text-red-800 border-red-200" }
     }
@@ -332,94 +328,92 @@ export function MaterialsContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {materials
-                    .filter((material) => material != null)
-                    .map((material) => {
-                      const stockStatus = getStockStatus(material)
-                      return (
-                        <TableRow
-                          key={material.id}
-                          className="border-[#2a3349] hover:bg-[#2a3349]/30 cursor-pointer"
-                          onClick={() => handleDetails(material)}
-                        >
-                          <TableCell>
-                            <div>
-                              <div className="font-medium text-white">{material.name}</div>
-                              <div className="text-sm text-gray-400">{material.description}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[#06b6d4] border-[#06b6d4]/30">
-                              {material.category}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span className="text-white">
-                                {material.currentStock || 0} {material.unit}
-                              </span>
-                              <Badge className={stockStatus.color}>{stockStatus.label}</Badge>
-                            </div>
-                            <div className="text-sm text-gray-400">Min: {material.minimumStock}</div>
-                          </TableCell>
-                          <TableCell className="text-white">{formatCurrency(material.costPerUnit || 0)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              className={
-                                material.isActive ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
-                              }
-                            >
-                              {material.isActive ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-[#1a2234] border-[#2a3349] text-white">
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDetails(material)
-                                  }}
-                                  className="hover:bg-[#2a3349]"
-                                >
-                                  <Package className="mr-2 h-4 w-4" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleEdit(material)
-                                  }}
-                                  className="hover:bg-[#2a3349]"
-                                >
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteClick(material)
-                                  }}
-                                  className="hover:bg-red-600 text-red-400"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
+                  {materials.map((material) => {
+                    const stockStatus = getStockStatus(material)
+                    return (
+                      <TableRow
+                        key={material.id}
+                        className="border-[#2a3349] hover:bg-[#2a3349]/30 cursor-pointer"
+                        onClick={() => handleDetails(material)}
+                      >
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-white">{material.name}</div>
+                            <div className="text-sm text-gray-400">{material.description}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[#06b6d4] border-[#06b6d4]/30">
+                            {material.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white">
+                              {material.currentStock} {material.unit}
+                            </span>
+                            <Badge className={stockStatus.color}>{stockStatus.label}</Badge>
+                          </div>
+                          <div className="text-sm text-gray-400">Min: {material.minimumStock}</div>
+                        </TableCell>
+                        <TableCell className="text-white">{formatCurrency(material.costPerUnit)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            className={
+                              material.isActive ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+                            }
+                          >
+                            {material.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-[#1a2234] border-[#2a3349] text-white">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDetails(material)
+                                }}
+                                className="hover:bg-[#2a3349]"
+                              >
+                                <Package className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEdit(material)
+                                }}
+                                className="hover:bg-[#2a3349]"
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteClick(material)
+                                }}
+                                className="hover:bg-red-600 text-red-400"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
