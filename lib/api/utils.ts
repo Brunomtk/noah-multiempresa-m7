@@ -1,4 +1,4 @@
-// Get API URL from environment variables with fallback
+// Get API base URL from environment variables with fallback
 const getApiBaseUrl = (): string => {
   if (typeof window !== "undefined") {
     // Client-side
@@ -64,7 +64,7 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
   return response.json()
 }
 
-// Nova função apiRequest que usa a estrutura correta
+// Generic API request function
 export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken()
 
@@ -153,4 +153,65 @@ export function getUserData() {
 export function getCompanyId(): number | null {
   const user = getUserData()
   return user?.companyId || null
+}
+
+// Helper function to build query parameters
+export function buildQueryParams(params: Record<string, any>): string {
+  const searchParams = new URLSearchParams()
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      searchParams.append(key, String(value))
+    }
+  })
+
+  return searchParams.toString()
+}
+
+// Helper function for handling API errors
+export function handleApiError(error: any): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === "string") {
+    return error
+  }
+
+  if (error?.message) {
+    return error.message
+  }
+
+  return "An unexpected error occurred"
+}
+
+// Helper function to format API responses
+export function formatApiResponse<T>(response: any): T {
+  // Handle different response formats
+  if (response?.data) {
+    return response.data
+  }
+
+  if (response?.results) {
+    return response.results
+  }
+
+  return response
+}
+
+// Helper function for pagination
+export interface PaginationParams {
+  page?: number
+  pageSize?: number
+  sortBy?: string
+  sortOrder?: "asc" | "desc"
+}
+
+export function buildPaginationParams(params: PaginationParams): Record<string, any> {
+  return {
+    page: params.page || 1,
+    pageSize: params.pageSize || 10,
+    sortBy: params.sortBy || "id",
+    sortOrder: params.sortOrder || "asc",
+  }
 }

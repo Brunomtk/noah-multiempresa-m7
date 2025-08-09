@@ -134,16 +134,36 @@ export function useAdminMaterials() {
 
       const { data: materialsData, totalCount: count, totalPages: pages } = extractArrayFromResponse<Material>(response)
 
-      setMaterials(materialsData)
+      // Ensure all materials have required properties with safe defaults
+      const safeMaterials = materialsData.map((material) => ({
+        ...material,
+        currentStock: typeof material.currentStock === "number" ? material.currentStock : 0,
+        minimumStock: typeof material.minimumStock === "number" ? material.minimumStock : 0,
+        costPerUnit: typeof material.costPerUnit === "number" ? material.costPerUnit : 0,
+        isActive: typeof material.isActive === "boolean" ? material.isActive : true,
+        name: material.name || "Unknown Material",
+        category: material.category || "Uncategorized",
+        unit: material.unit || "unit",
+        description: material.description || "",
+      }))
+
+      setMaterials(safeMaterials)
       setTotalCount(count)
       setTotalPages(pages)
 
-      // Calculate stats
-      const totalMaterials = materialsData.length
-      const activeMaterials = materialsData.filter((m) => m.isActive).length
-      const lowStockMaterials = materialsData.filter((m) => m.currentStock <= m.minimumStock).length
-      const totalValue = materialsData.reduce((sum, m) => sum + m.currentStock * m.costPerUnit, 0)
-      const categories = [...new Set(materialsData.map((m) => m.category))].filter(Boolean)
+      // Calculate stats with safe defaults
+      const totalMaterials = safeMaterials.length
+      const activeMaterials = safeMaterials.filter((m) => m.isActive).length
+      const lowStockMaterials = safeMaterials.filter(
+        (m) =>
+          typeof m.currentStock === "number" && typeof m.minimumStock === "number" && m.currentStock <= m.minimumStock,
+      ).length
+      const totalValue = safeMaterials.reduce((sum, m) => {
+        const stock = typeof m.currentStock === "number" ? m.currentStock : 0
+        const cost = typeof m.costPerUnit === "number" ? m.costPerUnit : 0
+        return sum + stock * cost
+      }, 0)
+      const categories = [...new Set(safeMaterials.map((m) => m.category))].filter(Boolean)
 
       setStats({
         totalMaterials,
@@ -153,7 +173,7 @@ export function useAdminMaterials() {
         categories,
       })
 
-      console.log(`Loaded ${materialsData.length} materials`)
+      console.log(`Loaded ${safeMaterials.length} materials`)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch materials"
       setError(errorMessage)

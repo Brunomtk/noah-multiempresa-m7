@@ -1,41 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Plus, Search, Filter, Download, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Package,
-  Search,
-  Plus,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  AlertTriangle,
-  TrendingUp,
-  DollarSign,
-  Archive,
-  Filter,
-  RefreshCw,
-} from "lucide-react"
-import { useAdminMaterials, type Material } from "@/hooks/use-admin-materials"
-import { MaterialModal } from "@/components/admin/material-modal"
-import { MaterialDetailsModal } from "@/components/admin/material-details-modal"
+import { useAdminMaterials } from "@/hooks/use-admin-materials"
+import { MaterialModal } from "./material-modal"
+import { MaterialDetailsModal } from "./material-details-modal"
+import { PageLoading } from "@/components/ui/page-loading"
 
 export function MaterialsContent() {
   const {
@@ -46,186 +22,167 @@ export function MaterialsContent() {
     stats,
     totalCount,
     totalPages,
+    createMaterial,
+    updateMaterial,
+    deleteMaterial,
+    getMaterialById,
+    updateStock,
     updateFilters,
     setPage,
     reloadData,
-    deleteMaterial,
   } = useAdminMaterials()
 
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null)
+  const [selectedMaterial, setSelectedMaterial] = useState<any>(null)
 
-  const handleSearch = (value: string) => {
-    updateFilters({ search: value })
-  }
-
-  const handleCategoryFilter = (category: string) => {
-    updateFilters({ category: category === "all" ? undefined : category })
-  }
-
-  const handleStatusFilter = (status: string) => {
-    updateFilters({
-      isActive: status === "all" ? undefined : status === "active",
-    })
-  }
-
-  const handleStockFilter = (stock: string) => {
-    updateFilters({
-      lowStock: stock === "low" ? true : undefined,
-    })
-  }
-
-  const handleSort = (sortBy: string) => {
-    const newOrder = filters.sortBy === sortBy && filters.sortOrder === "asc" ? "desc" : "asc"
-    updateFilters({ sortBy: sortBy as any, sortOrder: newOrder })
-  }
-
-  const handleEdit = (material: Material) => {
-    setSelectedMaterial(material)
-    setShowEditModal(true)
-  }
-
-  const handleDetails = (material: Material) => {
-    setSelectedMaterial(material)
-    setShowDetailsModal(true)
-  }
-
-  const handleDeleteClick = (material: Material) => {
-    setMaterialToDelete(material)
-    setShowDeleteDialog(true)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (materialToDelete) {
-      await deleteMaterial(materialToDelete.id)
-      setShowDeleteDialog(false)
-      setMaterialToDelete(null)
-    }
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount)
-  }
-
-  const getStockStatus = (material: Material) => {
-    if (material.currentStock <= 0) {
-      return { label: "Out of Stock", color: "bg-red-100 text-red-800 border-red-200" }
-    }
-    if (material.currentStock <= material.minimumStock) {
-      return { label: "Low Stock", color: "bg-yellow-100 text-yellow-800 border-yellow-200" }
-    }
-    return { label: "In Stock", color: "bg-green-100 text-green-800 border-green-200" }
+  if (loading && materials.length === 0) {
+    return <PageLoading />
   }
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-white mb-2">Error Loading Materials</h3>
-          <p className="text-gray-400 mb-4">{error}</p>
-          <Button onClick={reloadData} className="bg-[#06b6d4] hover:bg-[#0891b2]">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Try Again
-          </Button>
+          <p className="text-red-600 mb-4">Error loading materials: {error}</p>
+          <Button onClick={reloadData}>Try Again</Button>
         </div>
       </div>
+    )
+  }
+
+  const handleViewDetails = async (material: any) => {
+    setSelectedMaterial(material)
+    setShowDetailsModal(true)
+  }
+
+  const handleEdit = async (material: any) => {
+    setSelectedMaterial(material)
+    setShowCreateModal(true)
+  }
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Are you sure you want to delete this material?")) {
+      await deleteMaterial(id)
+    }
+  }
+
+  const getStatusBadge = (isActive: boolean) => {
+    return <Badge variant={isActive ? "default" : "secondary"}>{isActive ? "Active" : "Inactive"}</Badge>
+  }
+
+  const getStockStatus = (material: any) => {
+    if (!material || typeof material.currentStock !== "number" || typeof material.minimumStock !== "number") {
+      return <Badge variant="secondary">Unknown</Badge>
+    }
+
+    if (material.currentStock <= 0) {
+      return <Badge variant="destructive">Out of Stock</Badge>
+    }
+
+    if (material.currentStock <= material.minimumStock) {
+      return (
+        <Badge variant="outline" className="border-orange-500 text-orange-600">
+          Low Stock
+        </Badge>
+      )
+    }
+
+    return (
+      <Badge variant="default" className="bg-green-100 text-green-800">
+        In Stock
+      </Badge>
     )
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Materials Management</h1>
-          <p className="text-gray-400">Manage your cleaning materials and supplies</p>
+          <h1 className="text-3xl font-bold">Materials Management</h1>
+          <p className="text-muted-foreground">Manage your inventory and materials</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Material
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm">
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Material
+          </Button>
+        </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-[#1a2234] border-[#2a3349]">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Total Materials</CardTitle>
-            <Package className="h-4 w-4 text-[#06b6d4]" />
+            <CardTitle className="text-sm font-medium">Total Materials</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.totalMaterials}</div>
-            <p className="text-xs text-gray-400">{stats.activeMaterials} active</p>
+            <div className="text-2xl font-bold">{stats.totalMaterials}</div>
           </CardContent>
         </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349]">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Low Stock Items</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <CardTitle className="text-sm font-medium">Active Materials</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.lowStockMaterials}</div>
-            <p className="text-xs text-gray-400">Need restocking</p>
+            <div className="text-2xl font-bold">{stats.activeMaterials}</div>
           </CardContent>
         </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349]">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Total Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{formatCurrency(stats.totalValue)}</div>
-            <p className="text-xs text-gray-400">Inventory value</p>
+            <div className="text-2xl font-bold text-orange-600">{stats.lowStockMaterials}</div>
           </CardContent>
         </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349]">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Categories</CardTitle>
-            <Archive className="h-4 w-4 text-purple-500" />
+            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.categories.length}</div>
-            <p className="text-xs text-gray-400">Material types</p>
+            <div className="text-2xl font-bold">
+              ${stats.totalValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="bg-[#1a2234] border-[#2a3349]">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
+          <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-5">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search materials..."
-                value={filters.search || ""}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 bg-[#0f172a] border-[#2a3349] text-white"
-              />
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search materials..."
+                  value={filters.search || ""}
+                  onChange={(e) => updateFilters({ search: e.target.value })}
+                  className="pl-8"
+                />
+              </div>
             </div>
-
-            <Select value={filters.category || "all"} onValueChange={handleCategoryFilter}>
-              <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+            <Select
+              value={filters.category || "all"}
+              onValueChange={(value) => updateFilters({ category: value === "all" ? undefined : value })}
+            >
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a2234] border-[#2a3349]">
+              <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {stats.categories.map((category) => (
                   <SelectItem key={category} value={category}>
@@ -234,186 +191,95 @@ export function MaterialsContent() {
                 ))}
               </SelectContent>
             </Select>
-
             <Select
-              value={filters.isActive === undefined ? "all" : filters.isActive ? "active" : "inactive"}
-              onValueChange={handleStatusFilter}
+              value={filters.isActive === undefined ? "all" : filters.isActive.toString()}
+              onValueChange={(value) =>
+                updateFilters({
+                  isActive: value === "all" ? undefined : value === "true",
+                })
+              }
             >
-              <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+              <SelectTrigger className="w-[120px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a2234] border-[#2a3349]">
+              <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="true">Active</SelectItem>
+                <SelectItem value="false">Inactive</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={filters.lowStock ? "low" : "all"} onValueChange={handleStockFilter}>
-              <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                <SelectValue placeholder="Stock Level" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a2234] border-[#2a3349]">
-                <SelectItem value="all">All Stock Levels</SelectItem>
-                <SelectItem value="low">Low Stock Only</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Button
               variant="outline"
-              onClick={reloadData}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+              onClick={() => updateFilters({ lowStock: !filters.lowStock })}
+              className={filters.lowStock ? "bg-orange-100 border-orange-300" : ""}
             >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
+              <Filter className="h-4 w-4 mr-2" />
+              Low Stock Only
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Materials Table */}
-      <Card className="bg-[#1a2234] border-[#2a3349]">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Materials ({totalCount})</CardTitle>
+          <CardTitle>Materials ({totalCount})</CardTitle>
+          <CardDescription>
+            Showing {materials.length} of {totalCount} materials
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <Skeleton className="h-12 w-12 rounded bg-[#2a3349]" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-[250px] bg-[#2a3349]" />
-                    <Skeleton className="h-4 w-[200px] bg-[#2a3349]" />
-                  </div>
-                </div>
-              ))}
+          {materials.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No materials found</p>
             </div>
           ) : (
-            <div className="rounded-md border border-[#2a3349]">
+            <div className="rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#2a3349] hover:bg-[#2a3349]/50">
-                    <TableHead
-                      className="text-gray-400 cursor-pointer hover:text-white"
-                      onClick={() => handleSort("name")}
-                    >
-                      Name
-                      {filters.sortBy === "name" && (
-                        <TrendingUp
-                          className={`ml-2 h-4 w-4 inline ${filters.sortOrder === "desc" ? "rotate-180" : ""}`}
-                        />
-                      )}
-                    </TableHead>
-                    <TableHead
-                      className="text-gray-400 cursor-pointer hover:text-white"
-                      onClick={() => handleSort("category")}
-                    >
-                      Category
-                    </TableHead>
-                    <TableHead
-                      className="text-gray-400 cursor-pointer hover:text-white"
-                      onClick={() => handleSort("currentStock")}
-                    >
-                      Stock
-                    </TableHead>
-                    <TableHead
-                      className="text-gray-400 cursor-pointer hover:text-white"
-                      onClick={() => handleSort("costPerUnit")}
-                    >
-                      Cost/Unit
-                    </TableHead>
-                    <TableHead className="text-gray-400">Status</TableHead>
-                    <TableHead className="text-gray-400">Actions</TableHead>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Current Stock</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Cost per Unit</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Stock Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {materials.map((material) => {
-                    const stockStatus = getStockStatus(material)
-                    return (
-                      <TableRow
-                        key={material.id}
-                        className="border-[#2a3349] hover:bg-[#2a3349]/30 cursor-pointer"
-                        onClick={() => handleDetails(material)}
-                      >
-                        <TableCell>
-                          <div>
-                            <div className="font-medium text-white">{material.name}</div>
-                            <div className="text-sm text-gray-400">{material.description}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[#06b6d4] border-[#06b6d4]/30">
-                            {material.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="text-white">
-                              {material.currentStock} {material.unit}
-                            </span>
-                            <Badge className={stockStatus.color}>{stockStatus.label}</Badge>
-                          </div>
-                          <div className="text-sm text-gray-400">Min: {material.minimumStock}</div>
-                        </TableCell>
-                        <TableCell className="text-white">{formatCurrency(material.costPerUnit)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            className={
-                              material.isActive ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
-                            }
+                  {materials.map((material) => (
+                    <TableRow key={material.id}>
+                      <TableCell className="font-medium">{material.name}</TableCell>
+                      <TableCell>{material.category}</TableCell>
+                      <TableCell>{typeof material.currentStock === "number" ? material.currentStock : "N/A"}</TableCell>
+                      <TableCell>{material.unit}</TableCell>
+                      <TableCell>
+                        ${typeof material.costPerUnit === "number" ? material.costPerUnit.toFixed(2) : "N/A"}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(material.isActive)}</TableCell>
+                      <TableCell>{getStockStatus(material)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(material)}>
+                            View
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(material)}>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(material.id)}
+                            className="text-red-600 hover:text-red-700"
                           >
-                            {material.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-[#1a2234] border-[#2a3349] text-white">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDetails(material)
-                                }}
-                                className="hover:bg-[#2a3349]"
-                              >
-                                <Package className="mr-2 h-4 w-4" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleEdit(material)
-                                }}
-                                className="hover:bg-[#2a3349]"
-                              >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteClick(material)
-                                }}
-                                className="hover:bg-red-600 text-red-400"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -422,28 +288,23 @@ export function MaterialsContent() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-400">
-                Showing {materials.length} of {totalCount} materials
-              </div>
-              <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                Page {filters.page || 1} of {totalPages}
+              </p>
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(Math.max(1, (filters.page || 1) - 1))}
-                  disabled={filters.page === 1}
-                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+                  onClick={() => setPage((filters.page || 1) - 1)}
+                  disabled={!filters.page || filters.page <= 1}
                 >
                   Previous
                 </Button>
-                <span className="text-sm text-gray-400">
-                  Page {filters.page || 1} of {totalPages}
-                </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(Math.min(totalPages, (filters.page || 1) + 1))}
-                  disabled={filters.page === totalPages}
-                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+                  onClick={() => setPage((filters.page || 1) + 1)}
+                  disabled={!filters.page || filters.page >= totalPages}
                 >
                   Next
                 </Button>
@@ -457,20 +318,15 @@ export function MaterialsContent() {
       <MaterialModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onSuccess={() => {
-          setShowCreateModal(false)
-          reloadData()
-        }}
-      />
-
-      <MaterialModal
-        open={showEditModal}
-        onOpenChange={setShowEditModal}
         material={selectedMaterial}
-        onSuccess={() => {
-          setShowEditModal(false)
+        onSave={async (data) => {
+          if (selectedMaterial) {
+            await updateMaterial(selectedMaterial.id, data)
+          } else {
+            await createMaterial(data)
+          }
+          setShowCreateModal(false)
           setSelectedMaterial(null)
-          reloadData()
         }}
       />
 
@@ -480,35 +336,16 @@ export function MaterialsContent() {
         material={selectedMaterial}
         onEdit={() => {
           setShowDetailsModal(false)
-          setShowEditModal(true)
+          setShowCreateModal(true)
         }}
-        onDelete={() => {
-          setShowDetailsModal(false)
+        onDelete={async () => {
           if (selectedMaterial) {
-            handleDeleteClick(selectedMaterial)
+            await handleDelete(selectedMaterial.id)
+            setShowDetailsModal(false)
+            setSelectedMaterial(null)
           }
         }}
       />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="bg-[#1a2234] border-[#2a3349]">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Delete Material</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-400">
-              Are you sure you want to delete "{materialToDelete?.name}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700 text-white">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
