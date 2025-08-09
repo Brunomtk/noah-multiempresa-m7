@@ -64,3 +64,43 @@ export async function getUnreadNotificationsCount(userId: number): Promise<numbe
 export async function getUserNotifications(userId: number): Promise<Notification[]> {
   return fetchApi<Notification[]>(`${API_BASE}/user/${userId}`)
 }
+
+// Send notification to specific users
+export async function sendNotification(data: {
+  title: string
+  message: string
+  type: number
+  recipientIds: number[]
+  companyId?: number
+}): Promise<Notification[]> {
+  try {
+    const response = await fetchApi<Notification[]>(`${API_BASE}/send`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+    return response
+  } catch (error) {
+    console.error("Error sending notification:", error)
+    throw error
+  }
+}
+
+// Broadcast notification to all users in a company or role
+export async function broadcastNotification(data: {
+  title: string
+  message: string
+  type: number
+  companyId?: number
+  role?: string
+}): Promise<Notification> {
+  try {
+    const response = await fetchApi<Notification>(`${API_BASE}/broadcast`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+    return response
+  } catch (error) {
+    console.error("Error broadcasting notification:", error)
+    throw error
+  }
+}

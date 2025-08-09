@@ -177,6 +177,14 @@ export const appointmentsApi = {
   },
 }
 
+// Get appointments by company
+export async function getAppointmentsByCompany(
+  companyId: number,
+  filters: Omit<AppointmentFilters, "companyId"> = {},
+): Promise<{ data?: AppointmentResponse; error?: string }> {
+  return appointmentsApi.getAppointments({ ...filters, companyId })
+}
+
 // Funções de compatibilidade para o contexto existente
 export const getAppointments = appointmentsApi.getAppointments
 export const getAppointmentById = appointmentsApi.getAppointmentById

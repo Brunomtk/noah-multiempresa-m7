@@ -51,6 +51,78 @@ export async function getProfessionalUnreadNotificationsCount(): Promise<number>
   }
 }
 
+// Get professional notification by ID
+export async function getProfessionalNotificationById(id: number): Promise<Notification | null> {
+  try {
+    const response = await apiRequest(`/Notifications/${id}`)
+    return response || null
+  } catch (error) {
+    console.error("Error fetching notification by ID:", error)
+    return null
+  }
+}
+
+// Mark professional notification as read
+export async function markProfessionalNotificationAsRead(id: number): Promise<boolean> {
+  try {
+    await apiRequest(`/Notifications/${id}/read`, { method: "POST" })
+    return true
+  } catch (error) {
+    console.error("Error marking notification as read:", error)
+    return false
+  }
+}
+
+// Send professional notification response
+export async function sendProfessionalNotificationResponse(id: number, response: string): Promise<boolean> {
+  try {
+    await apiRequest(`/Notifications/${id}/response`, {
+      method: "POST",
+      body: JSON.stringify({ response }),
+    })
+    return true
+  } catch (error) {
+    console.error("Error sending notification response:", error)
+    return false
+  }
+}
+
+// Mark all professional notifications as read
+export async function markAllProfessionalNotificationsAsRead(): Promise<boolean> {
+  try {
+    const userId = getUserIdFromToken()
+    await apiRequest(`/Notifications/user/${userId}/mark-all-read`, { method: "POST" })
+    return true
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error)
+    return false
+  }
+}
+
+// Get professional notifications by priority
+export async function getProfessionalNotificationsByPriority(priority: number): Promise<Notification[]> {
+  try {
+    const userId = getUserIdFromToken()
+    const response = await apiRequest(`/Notifications/user/${userId}?priority=${priority}`)
+    return response || []
+  } catch (error) {
+    console.error("Error fetching notifications by priority:", error)
+    return []
+  }
+}
+
+// Get recent professional notifications
+export async function getProfessionalRecentNotifications(limit = 10): Promise<Notification[]> {
+  try {
+    const userId = getUserIdFromToken()
+    const response = await apiRequest(`/Notifications/user/${userId}/recent?limit=${limit}`)
+    return response || []
+  } catch (error) {
+    console.error("Error fetching recent notifications:", error)
+    return []
+  }
+}
+
 export async function getProfessionalNotificationStats() {
   const notifications = await getProfessionalNotifications()
   const unreadCount = await getProfessionalUnreadNotificationsCount()

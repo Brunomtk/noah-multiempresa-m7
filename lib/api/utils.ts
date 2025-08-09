@@ -4,6 +4,12 @@ export const apiDelay = (ms: number) => new Promise((resolve) => setTimeout(reso
 // URL base da API
 const API_BASE_URL = "https://localhost:44394/api"
 
+// Export API_URL for compatibility
+export const API_URL = API_BASE_URL
+
+// Export delay function for compatibility
+export const delay = apiDelay
+
 // Função para obter o token de autenticação
 function getAuthToken(): string | null {
   if (typeof window === "undefined") return null

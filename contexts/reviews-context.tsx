@@ -33,6 +33,8 @@ interface ReviewsContextType {
 
 const ReviewsContext = createContext<ReviewsContextType | undefined>(undefined)
 
+export { ReviewsContext }
+
 export function ReviewsProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([])
   const [filters, setFiltersState] = useState<ReviewFilters>({
@@ -270,3 +272,6 @@ export function useReviews() {
   }
   return context
 }
+
+// Export useReviewsContext as alias for compatibility
+export const useReviewsContext = useReviews
