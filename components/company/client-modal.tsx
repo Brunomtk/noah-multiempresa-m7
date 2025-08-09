@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Trash2, MapPin } from "lucide-react"
+import { MapPin } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { useAuth } from "@/contexts/auth-context"
+import { customersApi } from "@/lib/api/customers"
+import type { CreateCustomerRequest, UpdateCustomerRequest } from "@/types/customer"
 
 interface Address {
   id?: number
@@ -31,7 +33,11 @@ interface Client {
   email: string
   phone: string
   addresses: Address[]
+  appointments?: number
+  totalSpent?: number
+  lastService?: string | null
   status: "active" | "inactive"
+  createdAt?: string
   notes?: string
 }
 
@@ -40,192 +46,178 @@ interface ClientModalProps {
   onClose: () => void
   client?: Client | null
   isEditing?: boolean
+  onSaved?: () => void
 }
 
-export default function ClientModal({ isOpen, onClose, client, isEditing = false }: ClientModalProps) {
-  const [formData, setFormData] = useState<Client>({
+export default function ClientModal({ isOpen, onClose, client, isEditing = false, onSaved }: ClientModalProps) {
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+
+  // Form state
+  const [formData, setFormData] = useState({
     name: "",
-    type: "individual",
+    type: "individual" as "individual" | "business",
     document: "",
     email: "",
     phone: "",
-    addresses: [{ street: "", city: "", state: "", zipCode: "", isDefault: true }],
-    status: "active",
+    address: "",
+    status: true,
     notes: "",
   })
 
-  const [currentTab, setCurrentTab] = useState("info")
-  const [errors, setErrors] = useState<Record<string, string>>({})
-
-  // Initialize form with client data if editing
+  // Initialize form data
   useEffect(() => {
     if (client && isEditing) {
       setFormData({
-        ...client,
-        // Ensure we have the correct structure
-        addresses:
-          client.addresses?.length > 0
-            ? client.addresses
-            : [{ street: "", city: "", state: "", zipCode: "", isDefault: true }],
+        name: client.name || "",
+        type: client.type || "individual",
+        document: client.document || "",
+        email: client.email || "",
+        phone: client.phone || "",
+        address: client.addresses?.[0]?.street || "",
+        status: client.status === "active",
         notes: client.notes || "",
       })
-    }
-  }, [client, isEditing])
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-
-    // Clear error when field is edited
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors[name]
-        return newErrors
+    } else {
+      // Reset form for new client
+      setFormData({
+        name: "",
+        type: "individual",
+        document: "",
+        email: "",
+        phone: "",
+        address: "",
+        status: true,
+        notes: "",
       })
     }
-  }
+  }, [client, isEditing, isOpen])
 
-  const handleTypeChange = (value: "individual" | "business") => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({
       ...prev,
-      type: value,
+      [field]: value,
     }))
   }
 
-  const handleStatusChange = (checked: boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      status: checked ? "active" : "inactive",
-    }))
-  }
-
-  const handleAddressChange = (index: number, field: keyof Address, value: string | boolean) => {
-    setFormData((prev) => {
-      const newAddresses = [...prev.addresses]
-      newAddresses[index] = {
-        ...newAddresses[index],
-        [field]: value,
-      }
-      return {
-        ...prev,
-        addresses: newAddresses,
-      }
-    })
-  }
-
-  const handleAddAddress = () => {
-    setFormData((prev) => ({
-      ...prev,
-      addresses: [...prev.addresses, { street: "", city: "", state: "", zipCode: "", isDefault: false }],
-    }))
-  }
-
-  const handleRemoveAddress = (index: number) => {
-    if (formData.addresses.length <= 1) {
+  const validateForm = () => {
+    if (!formData.name.trim()) {
       toast({
-        title: "Cannot remove address",
-        description: "Client must have at least one address",
+        title: "Validation Error",
+        description: "Name is required",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (!formData.document.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Document is required",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (!formData.email.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Email is required",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (!formData.phone.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Phone is required",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    return true
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validateForm()) return
+    if (!user?.companyId) {
+      toast({
+        title: "Error",
+        description: "Company information not found",
         variant: "destructive",
       })
       return
     }
 
-    setFormData((prev) => {
-      const newAddresses = prev.addresses.filter((_, i) => i !== index)
+    try {
+      setLoading(true)
 
-      // If we removed the default address, make the first one default
-      if (prev.addresses[index].isDefault && newAddresses.length > 0) {
-        newAddresses[0].isDefault = true
-      }
+      if (isEditing && client) {
+        // Update existing client
+        const updateData: UpdateCustomerRequest = {
+          id: client.id!.toString(),
+          name: formData.name,
+          document: formData.document,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          status: formData.status ? 1 : 0,
+          companyId: user.companyId.toString(),
+        }
 
-      return {
-        ...prev,
-        addresses: newAddresses,
-      }
-    })
-  }
+        await customersApi.update(updateData)
 
-  const handleSetDefaultAddress = (index: number) => {
-    setFormData((prev) => {
-      const newAddresses = prev.addresses.map((addr, i) => ({
-        ...addr,
-        isDefault: i === index,
-      }))
-
-      return {
-        ...prev,
-        addresses: newAddresses,
-      }
-    })
-  }
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required"
-    }
-
-    if (!formData.document.trim()) {
-      newErrors.document = "Document is required"
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required"
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid"
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone is required"
-    }
-
-    // Validate addresses
-    formData.addresses.forEach((address, index) => {
-      if (!address.street.trim()) {
-        newErrors[`address_${index}_street`] = "Street is required"
-      }
-      if (!address.city.trim()) {
-        newErrors[`address_${index}_city`] = "City is required"
-      }
-      if (!address.state.trim()) {
-        newErrors[`address_${index}_state`] = "State is required"
-      }
-      if (!address.zipCode.trim()) {
-        newErrors[`address_${index}_zipCode`] = "ZIP code is required"
-      }
-    })
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      // If there are errors in the current tab, switch to that tab
-      if (Object.keys(errors).some((key) => key.startsWith("address_"))) {
-        setCurrentTab("addresses")
+        toast({
+          title: "Success",
+          description: "Client updated successfully",
+        })
       } else {
-        setCurrentTab("info")
+        // Create new client
+        const createData: CreateCustomerRequest = {
+          name: formData.name,
+          document: formData.document,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          status: formData.status ? 1 : 0,
+          companyId: user.companyId.toString(),
+        }
+
+        await customersApi.create(createData)
+
+        toast({
+          title: "Success",
+          description: "Client created successfully",
+        })
       }
-      return
+
+      onSaved?.()
+      onClose()
+    } catch (error) {
+      console.error("Error saving client:", error)
+      toast({
+        title: "Error",
+        description: `Failed to ${isEditing ? "update" : "create"} client. Please try again.`,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-
-    // Here you would typically send the data to your API
-    console.log("Submitting client data:", formData)
-
-    toast({
-      title: isEditing ? "Client updated" : "Client created",
-      description: `${formData.name} has been ${isEditing ? "updated" : "added"} successfully.`,
-    })
-
-    onClose()
   }
 
   return (
@@ -237,265 +229,142 @@ export default function ClientModal({ isOpen, onClose, client, isEditing = false
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-            <TabsList className="bg-[#2a3349] mb-4">
-              <TabsTrigger value="info" className="data-[state=active]:bg-[#06b6d4] text-white">
-                Client Information
-              </TabsTrigger>
-              <TabsTrigger value="addresses" className="data-[state=active]:bg-[#06b6d4] text-white">
-                Addresses
-              </TabsTrigger>
-              <TabsTrigger value="notes" className="data-[state=active]:bg-[#06b6d4] text-white">
-                Notes
-              </TabsTrigger>
-            </TabsList>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-white">
+                Name *
+              </Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
+                className="bg-[#2a3349] border-0 text-white placeholder:text-gray-500 focus-visible:ring-[#06b6d4]"
+                placeholder="Enter client name"
+                required
+              />
+            </div>
 
-            <TabsContent value="info" className="space-y-4 mt-2">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="type" className="text-white">
-                    Client Type
-                  </Label>
-                  <RadioGroup
-                    value={formData.type}
-                    onValueChange={handleTypeChange as (value: string) => void}
-                    className="flex space-x-4 mt-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="individual" id="individual" className="border-[#06b6d4] text-[#06b6d4]" />
-                      <Label htmlFor="individual" className="text-white">
-                        Individual
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="business" id="business" className="border-[#06b6d4] text-[#06b6d4]" />
-                      <Label htmlFor="business" className="text-white">
-                        Business
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                <div>
-                  <Label htmlFor="name" className="text-white">
-                    {formData.type === "individual" ? "Full Name" : "Company Name"}
-                  </Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                    placeholder={formData.type === "individual" ? "John Smith" : "Acme Corporation"}
-                  />
-                  {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
-                </div>
-
-                <div>
-                  <Label htmlFor="document" className="text-white">
-                    {formData.type === "individual" ? "CPF" : "CNPJ"}
-                  </Label>
-                  <Input
-                    id="document"
-                    name="document"
-                    value={formData.document}
-                    onChange={handleChange}
-                    className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                    placeholder={formData.type === "individual" ? "123.456.789-00" : "12.345.678/0001-90"}
-                  />
-                  {errors.document && <p className="text-red-500 text-sm mt-1">{errors.document}</p>}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="email" className="text-white">
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                      placeholder="email@example.com"
-                    />
-                    {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="phone" className="text-white">
-                      Phone
-                    </Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                      placeholder="(555) 123-4567"
-                    />
-                    {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="status"
-                    checked={formData.status === "active"}
-                    onCheckedChange={handleStatusChange}
-                    className="data-[state=checked]:bg-green-500"
-                  />
-                  <Label htmlFor="status" className="text-white">
-                    {formData.status === "active" ? "Active" : "Inactive"}
-                  </Label>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="addresses" className="space-y-6 mt-2">
-              {formData.addresses.map((address, index) => (
-                <div key={index} className="p-4 border border-[#2a3349] rounded-lg space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-white font-medium flex items-center">
-                      <MapPin className="h-4 w-4 mr-2 text-[#06b6d4]" />
-                      Address {index + 1}
-                      {address.isDefault && (
-                        <span className="ml-2 text-xs bg-[#06b6d4] text-white px-2 py-0.5 rounded-full">Default</span>
-                      )}
-                    </h3>
-                    <div className="flex items-center space-x-2">
-                      {!address.isDefault && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349]"
-                          onClick={() => handleSetDefaultAddress(index)}
-                        >
-                          Set as Default
-                        </Button>
-                      )}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349]"
-                        onClick={() => handleRemoveAddress(index)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor={`address_${index}_street`} className="text-white">
-                      Street
-                    </Label>
-                    <Input
-                      id={`address_${index}_street`}
-                      value={address.street}
-                      onChange={(e) => handleAddressChange(index, "street", e.target.value)}
-                      className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                      placeholder="123 Main St"
-                    />
-                    {errors[`address_${index}_street`] && (
-                      <p className="text-red-500 text-sm mt-1">{errors[`address_${index}_street`]}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor={`address_${index}_city`} className="text-white">
-                        City
-                      </Label>
-                      <Input
-                        id={`address_${index}_city`}
-                        value={address.city}
-                        onChange={(e) => handleAddressChange(index, "city", e.target.value)}
-                        className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                        placeholder="New York"
-                      />
-                      {errors[`address_${index}_city`] && (
-                        <p className="text-red-500 text-sm mt-1">{errors[`address_${index}_city`]}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor={`address_${index}_state`} className="text-white">
-                        State
-                      </Label>
-                      <Input
-                        id={`address_${index}_state`}
-                        value={address.state}
-                        onChange={(e) => handleAddressChange(index, "state", e.target.value)}
-                        className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                        placeholder="NY"
-                      />
-                      {errors[`address_${index}_state`] && (
-                        <p className="text-red-500 text-sm mt-1">{errors[`address_${index}_state`]}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor={`address_${index}_zipCode`} className="text-white">
-                        ZIP Code
-                      </Label>
-                      <Input
-                        id={`address_${index}_zipCode`}
-                        value={address.zipCode}
-                        onChange={(e) => handleAddressChange(index, "zipCode", e.target.value)}
-                        className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1"
-                        placeholder="10001"
-                      />
-                      {errors[`address_${index}_zipCode`] && (
-                        <p className="text-red-500 text-sm mt-1">{errors[`address_${index}_zipCode`]}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-dashed border-[#2a3349] text-[#06b6d4] hover:bg-[#2a3349] hover:text-[#06b6d4]"
-                onClick={handleAddAddress}
+            <div className="space-y-2">
+              <Label htmlFor="type" className="text-white">
+                Client Type
+              </Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value: "individual" | "business") => handleInputChange("type", value)}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Address
-              </Button>
-            </TabsContent>
+                <SelectTrigger className="bg-[#2a3349] border-0 text-white focus:ring-[#06b6d4]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#2a3349] border-[#3a4359] text-white">
+                  <SelectItem value="individual">Individual</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-            <TabsContent value="notes" className="mt-2">
-              <div>
-                <Label htmlFor="notes" className="text-white">
-                  Additional Notes
-                </Label>
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  className="bg-[#2a3349] border-0 text-white focus-visible:ring-[#06b6d4] mt-1 min-h-[150px]"
-                  placeholder="Add any additional information about this client..."
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="document" className="text-white">
+                Document ({formData.type === "business" ? "CNPJ" : "CPF"}) *
+              </Label>
+              <Input
+                id="document"
+                value={formData.document}
+                onChange={(e) => handleInputChange("document", e.target.value)}
+                className="bg-[#2a3349] border-0 text-white placeholder:text-gray-500 focus-visible:ring-[#06b6d4]"
+                placeholder={formData.type === "business" ? "00.000.000/0000-00" : "000.000.000-00"}
+                required
+              />
+            </div>
 
-          <DialogFooter className="mt-6">
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-white">
+                Phone *
+              </Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                className="bg-[#2a3349] border-0 text-white placeholder:text-gray-500 focus-visible:ring-[#06b6d4]"
+                placeholder="(00) 00000-0000"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-white">
+              Email *
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleInputChange("email", e.target.value)}
+              className="bg-[#2a3349] border-0 text-white placeholder:text-gray-500 focus-visible:ring-[#06b6d4]"
+              placeholder="client@example.com"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address" className="text-white flex items-center">
+              <MapPin className="h-4 w-4 mr-2 text-[#06b6d4]" />
+              Address
+            </Label>
+            <Input
+              id="address"
+              value={formData.address}
+              onChange={(e) => handleInputChange("address", e.target.value)}
+              className="bg-[#2a3349] border-0 text-white placeholder:text-gray-500 focus-visible:ring-[#06b6d4]"
+              placeholder="Street, City, State, ZIP"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes" className="text-white">
+              Notes
+            </Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => handleInputChange("notes", e.target.value)}
+              className="bg-[#2a3349] border-0 text-white placeholder:text-gray-500 focus-visible:ring-[#06b6d4] min-h-[80px]"
+              placeholder="Additional notes about the client..."
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-[#2a3349] rounded-lg">
+            <div>
+              <Label htmlFor="status" className="text-white font-medium">
+                Active Status
+              </Label>
+              <p className="text-sm text-gray-400">
+                {formData.status ? "Client is active and can receive services" : "Client is inactive"}
+              </p>
+            </div>
+            <Switch
+              id="status"
+              checked={formData.status}
+              onCheckedChange={(checked) => handleInputChange("status", checked)}
+              className="data-[state=checked]:bg-[#06b6d4]"
+            />
+          </div>
+
+          <DialogFooter className="flex justify-end gap-2 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              disabled={loading}
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
             >
               Cancel
             </Button>
-            <Button type="submit" className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
-              {isEditing ? "Update Client" : "Add Client"}
+            <Button type="submit" disabled={loading} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
+              {loading ? (isEditing ? "Updating..." : "Creating...") : isEditing ? "Update Client" : "Create Client"}
             </Button>
           </DialogFooter>
         </form>

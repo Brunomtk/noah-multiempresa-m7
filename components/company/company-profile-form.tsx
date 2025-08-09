@@ -1,321 +1,354 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useCompany } from "@/hooks/use-company"
-import { Loader2, Upload } from "lucide-react"
-import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/components/ui/use-toast"
+import { Building2, Camera, Loader2, Save } from "lucide-react"
+import { fetchApi } from "@/lib/api/utils"
 
-const profileFormSchema = z.object({
-  name: z.string().min(2, {
-    message: "O nome deve ter pelo menos 2 caracteres.",
-  }),
-  cnpj: z.string().min(14, {
-    message: "CNPJ inválido.",
-  }),
-  email: z.string().email({
-    message: "Email inválido.",
-  }),
-  phone: z.string().min(10, {
-    message: "Telefone inválido.",
-  }),
-  website: z
-    .string()
-    .url({
-      message: "URL inválida.",
-    })
-    .optional()
-    .or(z.literal("")),
-  address: z.string().min(5, {
-    message: "Endereço deve ter pelo menos 5 caracteres.",
-  }),
-  city: z.string().min(2, {
-    message: "Cidade deve ter pelo menos 2 caracteres.",
-  }),
-  state: z.string().min(2, {
-    message: "Estado deve ter pelo menos 2 caracteres.",
-  }),
-  zipCode: z.string().min(8, {
-    message: "CEP inválido.",
-  }),
-  description: z.string().optional(),
+// Form validation schema
+const companyProfileSchema = z.object({
+  name: z.string().min(2, "Company name must be at least 2 characters"),
+  cnpj: z.string().min(14, "CNPJ must be at least 14 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  phone: z.string().min(10, "Phone number must be at least 10 characters"),
+  responsible: z.string().min(2, "Responsible person name must be at least 2 characters"),
 })
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>
+type CompanyProfileFormData = z.infer<typeof companyProfileSchema>
+
+// Helper function to decode JWT token
+function decodeJWT(token: string) {
+  try {
+    const base64Url = token.split(".")[1]
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    )
+    return JSON.parse(jsonPayload)
+  } catch {
+    return null
+  }
+}
+
+// Helper function to get token
+function getToken(): string | null {
+  if (typeof window !== "undefined") {
+    return (
+      localStorage.getItem("noah_token") ||
+      localStorage.getItem("authToken") ||
+      localStorage.getItem("token")
+    )
+  }
+  return null
+}
 
 export function CompanyProfileForm() {
-  const { toast } = useToast()
-  const { company, updateCompany } = useCompany()
-  const [isLoading, setIsLoading] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [companyData, setCompanyData] = useState<any>(null)
+  const [userData, setUserData] = useState<any>(null)
 
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
+  const form = useForm<CompanyProfileFormData>({
+    resolver: zodResolver(companyProfileSchema),
     defaultValues: {
-      name: company?.name || "",
-      cnpj: company?.cnpj || "",
-      email: company?.email || "",
-      phone: company?.phone || "",
-      website: company?.website || "",
-      address: company?.address || "",
-      city: company?.city || "",
-      state: company?.state || "",
-      zipCode: company?.zipCode || "",
-      description: company?.description || "",
+      name: "",
+      cnpj: "",
+      email: "",
+      phone: "",
+      responsible: "",
     },
-    mode: "onChange",
   })
 
-  async function onSubmit(data: ProfileFormValues) {
-    setIsLoading(true)
+  // Fetch company data on component mount
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      try {
+        setLoading(true)
+
+        const token = getToken()
+        if (!token) throw new Error("No authentication token found. Please login again.")
+
+        // Decode JWT to get user ID
+        const decoded = decodeJWT(token)
+        const userId = decoded?.UserId
+        if (!userId) throw new Error("User ID not found in token. Please login again.")
+
+        // First, get user data to get companyId
+        const user = await fetchApi<any>(`/Users/${userId}`)
+        setUserData(user)
+
+        const companyId = user.companyId
+        if (!companyId) throw new Error("No company associated with this user")
+
+        // Now get company data
+        const company = await fetchApi<any>(`/Companies/${companyId}`)
+        setCompanyData(company)
+
+        // Update form with company data
+        form.reset({
+          name: company.name || "",
+          cnpj: company.cnpj || "",
+          email: company.email || "",
+          phone: company.phone || "",
+          responsible: company.responsible || "",
+        })
+      } catch (error) {
+        console.error("Error fetching company data:", error)
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to load company data",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCompanyData()
+  }, [form])
+
+  // Handle form submission
+  const onSubmit = async (data: CompanyProfileFormData) => {
     try {
-      // Simulação de atualização
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setSaving(true)
 
-      // Aqui seria a chamada real para atualizar o perfil
-      // await updateCompany(company.id, data);
+      if (!companyData) throw new Error("Company data not found")
 
-      toast({
-        title: "Perfil atualizado",
-        description: "As informações do perfil foram atualizadas com sucesso.",
+      // Update company
+      await fetchApi(`/Companies/${companyData.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: data.name,
+          cnpj: data.cnpj,
+          responsible: data.responsible,
+          email: data.email,
+          phone: data.phone,
+          planId: companyData.planId,
+          status: companyData.status,
+        }),
       })
-    } catch (error) {
+
+      // Also update user email if changed
+      if (userData && userData.email !== data.email) {
+        await fetchApi(`/Users/${userData.id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            name: userData.name,
+            email: data.email,
+            password: userData.password || "",
+            role: userData.role,
+            status: userData.status,
+            companyId: userData.companyId,
+            professionalId: userData.professionalId,
+          }),
+        }).catch(() => {
+          console.warn("Failed to update user email, but company was updated successfully")
+        })
+      }
+
       toast({
-        title: "Erro ao atualizar",
-        description: "Ocorreu um erro ao atualizar as informações do perfil.",
+        title: "Success",
+        description: "Company information updated successfully",
+      })
+
+      // Refresh company data
+      const updatedCompany = await fetchApi<any>(`/Companies/${companyData.id}`)
+      setCompanyData(updatedCompany)
+    } catch (error) {
+      console.error("Error updating company:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update company information",
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setSaving(false)
     }
   }
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setIsUploading(true)
-    try {
-      // Simulação de upload
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Aqui seria a chamada real para fazer upload do logo
-      // const logoUrl = await uploadCompanyLogo(company.id, file);
-
-      toast({
-        title: "Logo atualizado",
-        description: "O logo da empresa foi atualizado com sucesso.",
-      })
-    } catch (error) {
-      toast({
-        title: "Erro ao fazer upload",
-        description: "Ocorreu um erro ao fazer upload do logo.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploading(false)
-    }
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-20 w-20 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-8">
-        <div className="relative">
-          <Avatar className="h-24 w-24">
-            <AvatarImage src={company?.logoUrl || ""} alt={company?.name || "Logo da empresa"} />
-            <AvatarFallback className="text-2xl">{company?.name?.charAt(0) || "N"}</AvatarFallback>
-          </Avatar>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Building2 className="h-5 w-5" />
+          Company Information
+        </CardTitle>
+        <CardDescription>Manage your company's basic information and contact details</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Company Logo Section */}
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={companyData?.logo || ""} alt={companyData?.name || "Company"} />
+                <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                  <Building2 className="h-8 w-8" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Company Logo</p>
+                <Button type="button" variant="outline" size="sm" disabled>
+                  <Camera className="h-4 w-4 mr-2" />
+                  Change Logo
+                </Button>
+                <p className="text-xs text-muted-foreground">JPG, PNG or GIF. Max size 2MB.</p>
+              </div>
+            </div>
 
-          <div className="absolute -bottom-2 -right-2">
-            <div className="relative">
-              <Button size="icon" variant="outline" className="rounded-full h-8 w-8" disabled={isUploading}>
-                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              </Button>
-              <input
-                type="file"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                disabled={isUploading}
+            {/* Form Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter company name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="cnpj"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CNPJ *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="00.000.000/0000-00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email *</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="company@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(11) 99999-9999" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="responsible"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Responsible Person *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter responsible person name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-        </div>
 
-        <div>
-          <h3 className="text-lg font-medium">Logo da Empresa</h3>
-          <p className="text-sm text-muted-foreground">
-            Faça upload do logo da sua empresa. Recomendamos uma imagem quadrada de pelo menos 512x512px.
-          </p>
-        </div>
-      </div>
-
-      <Separator />
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome da Empresa</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nome da sua empresa" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="cnpj"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CNPJ</FormLabel>
-                  <FormControl>
-                    <Input placeholder="00.000.000/0000-00" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="email@empresa.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telefone</FormLabel>
-                  <FormControl>
-                    <Input placeholder="(00) 00000-0000" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="website"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Website</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://www.seusite.com.br" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Endereço</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Rua, número, complemento" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="city"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cidade</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Sua cidade" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="state"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Estado</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Seu estado" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="zipCode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CEP</FormLabel>
-                  <FormControl>
-                    <Input placeholder="00000-000" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Descrição da Empresa</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Descreva sua empresa, serviços oferecidos, etc."
-                    className="min-h-[120px]"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+            {/* Company Info Display */}
+            {companyData && (
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <h3 className="font-medium mb-2">Additional Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="font-medium">Company ID:</span> {companyData.id}
+                  </div>
+                  <div>
+                    <span className="font-medium">Plan ID:</span> {companyData.planId}
+                  </div>
+                  <div>
+                    <span className="font-medium">Status:</span>{" "}
+                    <span className={companyData.status === 1 ? "text-green-600" : "text-red-600"}>
+                      {companyData.status === 1 ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">Created:</span>{" "}
+                    {new Date(companyData.createdDate).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
             )}
-          />
 
-          <Button type="submit" disabled={isLoading}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar Alterações
-          </Button>
-        </form>
-      </Form>
-    </div>
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   )
 }

@@ -2,16 +2,24 @@
 
 import { useState, useEffect } from "react"
 import type { GPSTracking, GPSTrackingFilters } from "@/types/gps-tracking"
-import { getGpsTrackingRecords } from "@/lib/api/gps-tracking"
+import { gpsTrackingApi } from "@/lib/api/gps-tracking"
 
 export function useGpsTracking(initialFilters?: GPSTrackingFilters) {
   const [gpsRecords, setGpsRecords] = useState<GPSTracking[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+  })
   const [filters, setFilters] = useState<GPSTrackingFilters>(
     initialFilters || {
       status: "all",
       searchQuery: "",
+      pageNumber: 1,
+      pageSize: 10,
     },
   )
 
@@ -19,8 +27,16 @@ export function useGpsTracking(initialFilters?: GPSTrackingFilters) {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getGpsTrackingRecords(filters)
-      setGpsRecords(data)
+      const { data: response, error: apiError } = await gpsTrackingApi.getRecords(filters)
+
+      if (apiError) {
+        throw new Error(apiError)
+      }
+
+      if (response) {
+        setGpsRecords(response.data)
+        setPagination(response.meta)
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch GPS tracking records"
       setError(errorMessage)
@@ -42,17 +58,32 @@ export function useGpsTracking(initialFilters?: GPSTrackingFilters) {
     setFilters({
       status: "all",
       searchQuery: "",
+      pageNumber: 1,
+      pageSize: 10,
     })
   }
 
   // Helper function to format status for display
-  const formatStatus = (status: "active" | "inactive") => {
-    return status === "active" ? "Active" : "Inactive"
+  const formatStatus = (status: number) => {
+    return status === 1 ? "Active" : "Inactive"
   }
 
   // Helper function to get status color
-  const getStatusColor = (status: "active" | "inactive") => {
-    return status === "active" ? "green" : "red"
+  const getStatusColor = (status: number) => {
+    return status === 1 ? "green" : "red"
+  }
+
+  // Helper function to convert status string to number
+  const convertStatusToNumber = (status: string | number) => {
+    if (typeof status === "number") return status
+    if (status === "active") return 1
+    if (status === "inactive") return 2
+    return 1 // default to active
+  }
+
+  // Helper function to convert status number to string
+  const convertStatusToString = (status: number) => {
+    return status === 1 ? "active" : "inactive"
   }
 
   return {
@@ -60,10 +91,13 @@ export function useGpsTracking(initialFilters?: GPSTrackingFilters) {
     isLoading,
     error,
     filters,
+    pagination,
     updateFilters,
     resetFilters,
     refreshData: fetchGpsRecords,
     formatStatus,
     getStatusColor,
+    convertStatusToNumber,
+    convertStatusToString,
   }
 }

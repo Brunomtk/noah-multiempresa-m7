@@ -6,7 +6,6 @@ import { createContext, useContext, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BarChart3,
   Bell,
   Building2,
   Calendar,
@@ -19,15 +18,16 @@ import {
   MapPin,
   MessageSquare,
   Package,
-  Package2,
   Settings,
   Star,
   Users,
+  UserCog,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea as UIScrollArea } from "@/components/ui/scroll-area"
 import { NoahLogo } from "@/components/noah-logo"
+import { useAuth } from "@/contexts/auth-context"
 
 type SidebarContextType = {
   isOpen: boolean
@@ -56,10 +56,12 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
 export function AdminSidebar() {
   const { isOpen, toggleSidebar } = useSidebar()
+  const { user } = useAuth()
   const pathname = usePathname()
 
   const navItems = [
     { href: "/admin/dashboard", label: "Dashboard", icon: Home },
+    { href: "/admin/users", label: "Users", icon: UserCog },
     { href: "/admin/companies", label: "Companies", icon: Building2 },
     { href: "/admin/customers", label: "Customers", icon: Users },
     { href: "/admin/professionals", label: "Professionals", icon: Users },
@@ -74,11 +76,32 @@ export function AdminSidebar() {
     { href: "/admin/payments", label: "Payments", icon: CreditCard },
     { href: "/admin/plans", label: "Plans", icon: Package },
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
-    { href: "/admin/materials", label: "Materials", icon: Package2 },
-    { href: "/admin/materials/reports", label: "Material Reports", icon: BarChart3 },
-    { href: "/admin/reports", label: "Reports", icon: BarChart3 },
-    { href: "/admin/settings", label: "Settings", icon: Settings },
+    { href: "/admin/settings", label: "Profile", icon: Settings },
   ]
+
+  const getUserInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((word) => word.charAt(0))
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role?.toLowerCase()) {
+      case "admin":
+        return "Administrator"
+      case "company":
+        return "Company"
+      case "professional":
+        return "Professional"
+      case "operador":
+        return "Operator"
+      default:
+        return role || "User"
+    }
+  }
 
   return (
     <div
@@ -134,17 +157,34 @@ export function AdminSidebar() {
       </UIScrollArea>
 
       <div className="border-t border-[#2a3349] p-4">
-        <div className={cn("flex items-center gap-3", !isOpen && "justify-center")}>
-          <div className="h-8 w-8 rounded-full bg-[#06b6d4] flex items-center justify-center text-white font-semibold">
-            A
+        <Link
+          href="/admin/settings"
+          className={cn(
+            "flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-[#1a2234]",
+            !isOpen && "justify-center",
+          )}
+          title={!isOpen ? user?.name || "Profile" : undefined}
+        >
+          <div className="h-8 w-8 rounded-full bg-[#06b6d4] flex items-center justify-center text-white font-semibold text-sm">
+            {user?.avatar ? (
+              <img
+                src={user.avatar || "/placeholder.svg"}
+                alt={user.name}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              getUserInitials(user?.name || "User")
+            )}
           </div>
-          {isOpen && (
+          {isOpen && user && (
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">Admin User</p>
-              <p className="text-xs text-gray-400 truncate">admin@noah.com</p>
+              <p className="text-sm font-medium text-white truncate">{user.name}</p>
+              <p className="text-xs text-gray-400 truncate">
+                {getRoleDisplayName(user.role)} • {user.email}
+              </p>
             </div>
           )}
-        </div>
+        </Link>
       </div>
     </div>
   )

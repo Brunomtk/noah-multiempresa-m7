@@ -42,11 +42,11 @@ export interface UpdateTeamRequest {
 }
 
 export interface TeamsResponse {
-  results: Team[]
-  currentPage: number
-  pageCount: number
-  pageSize: number
-  totalItems: number
-  firstRowOnPage: number
-  lastRowOnPage: number
+  data: Team[]
+  meta: {
+    currentPage: number
+    totalPages: number
+    totalItems: number
+    itemsPerPage: number
+  }
 }

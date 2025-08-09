@@ -2,135 +2,146 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { NoahLogo } from "@/components/noah-logo"
-import {
-  Calendar,
-  CheckCircle,
-  ClipboardList,
-  Home,
-  MessageSquare,
-  Package,
-  BarChart,
-  Bell,
-  History,
-  User,
-  Menu,
-} from "lucide-react"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Calendar, CheckCircle, Home, MessageSquare, TrendingUp, User, Bell, Menu, LogOut } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+
+const navigation = [
+  {
+    name: "Dashboard",
+    href: "/professional/dashboard",
+    icon: Home,
+  },
+  {
+    name: "Schedule",
+    href: "/professional/schedule",
+    icon: Calendar,
+  },
+  {
+    name: "Check-in/out",
+    href: "/professional/check",
+    icon: CheckCircle,
+  },
+  {
+    name: "Performance",
+    href: "/professional/performance",
+    icon: TrendingUp,
+  },
+  {
+    name: "Feedback",
+    href: "/professional/feedback",
+    icon: MessageSquare,
+  },
+  {
+    name: "Notifications",
+    href: "/professional/notifications",
+    icon: Bell,
+  },
+  {
+    name: "Profile",
+    href: "/professional/profile",
+    icon: User,
+  },
+]
 
 export function ProfessionalMobileNav() {
-  const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout } = useAuth()
 
-  const routes = [
-    {
-      label: "Dashboard",
-      icon: Home,
-      href: "/professional/dashboard",
-      active: pathname === "/professional/dashboard",
-    },
-    {
-      label: "Check",
-      icon: CheckCircle,
-      href: "/professional/check",
-      active: pathname === "/professional/check",
-    },
-    {
-      label: "Schedule",
-      icon: Calendar,
-      href: "/professional/schedule",
-      active: pathname === "/professional/schedule",
-    },
-    {
-      label: "Feedback",
-      icon: ClipboardList,
-      href: "/professional/feedback",
-      active: pathname === "/professional/feedback",
-    },
-    {
-      label: "Materials",
-      icon: Package,
-      href: "/professional/materials",
-      active: pathname === "/professional/materials",
-    },
-    {
-      label: "Performance",
-      icon: BarChart,
-      href: "/professional/performance",
-      active: pathname === "/professional/performance",
-    },
-    {
-      label: "Chat",
-      icon: MessageSquare,
-      href: "/professional/chat",
-      active: pathname === "/professional/chat",
-    },
-    {
-      label: "History",
-      icon: History,
-      href: "/professional/history",
-      active: pathname === "/professional/history",
-    },
-    {
-      label: "Notifications",
-      icon: Bell,
-      href: "/professional/notifications",
-      active: pathname === "/professional/notifications",
-    },
-    {
-      label: "Profile",
-      icon: User,
-      href: "/professional/profile",
-      active: pathname === "/professional/profile",
-    },
-  ]
+  const handleLogout = () => {
+    logout()
+    router.push("/login")
+    setOpen(false)
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role?.toLowerCase()) {
+      case "professional":
+        return "Professional"
+      case "admin":
+        return "Administrator"
+      case "company":
+        return "Company"
+      default:
+        return role || "User"
+    }
+  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
+          <span className="sr-only">Toggle navigation menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="p-0 bg-[#0f172a] border-r border-[#2a3349] w-[280px]">
-        <div className="flex h-16 items-center px-6 border-b border-[#2a3349]">
-          <Link href="/professional/dashboard" className="flex items-center space-x-2" onClick={() => setOpen(false)}>
-            <NoahLogo className="h-8 w-8" />
-            <span className="text-xl font-bold text-white">Noah Pro</span>
-          </Link>
-        </div>
-        <ScrollArea className="h-[calc(100vh-4rem)]">
-          <div className="space-y-1 p-4">
-            {routes.map((route) => (
-              <Link
-                key={route.href}
-                href={route.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors",
-                  route.active ? "bg-[#06b6d4] text-white" : "text-gray-400 hover:bg-[#1a2234] hover:text-white",
-                )}
-              >
-                <route.icon className="h-5 w-5 flex-shrink-0" />
-                <span>{route.label}</span>
-              </Link>
-            ))}
+      <SheetContent side="left" className="w-64 p-0">
+        <div className="flex h-full flex-col">
+          {/* User Info */}
+          <div className="p-6">
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={user?.avatar || ""} alt={user?.name || ""} />
+                <AvatarFallback>{user?.name ? getInitials(user.name) : "U"}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{user?.name || "User"}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
+                <Badge variant="secondary" className="mt-1 text-xs">
+                  {getRoleLabel(user?.role || "")}
+                </Badge>
+              </div>
+            </div>
           </div>
-        </ScrollArea>
-        <div className="border-t border-[#2a3349] p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-[#06b6d4] flex items-center justify-center text-white font-semibold">
-              P
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">Professional</p>
-              <p className="text-xs text-gray-400 truncate">pro@company.com</p>
-            </div>
+
+          <Separator />
+
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1 p-4">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <Button
+                  key={item.name}
+                  asChild
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn("w-full justify-start", isActive && "bg-secondary text-secondary-foreground")}
+                  onClick={() => setOpen(false)}
+                >
+                  <Link href={item.href}>
+                    <item.icon className="mr-2 h-4 w-4" />
+                    {item.name}
+                  </Link>
+                </Button>
+              )
+            })}
+          </nav>
+
+          <Separator />
+
+          {/* Logout */}
+          <div className="p-4">
+            <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
           </div>
         </div>
       </SheetContent>

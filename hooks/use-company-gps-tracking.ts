@@ -1,26 +1,30 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { GPSTracking } from "@/types/gps-tracking"
-import {
-  getCompanyGpsTrackingRecords,
-  getCompanyGpsTrackingByStatus,
-  type CompanyGpsTrackingFilters,
-} from "@/lib/api/company-gps-tracking"
+import type { GPSTracking, CompanyGPSTrackingFilters } from "@/types/gps-tracking"
+import { getCompanyGpsTrackingRecords, getCompanyGpsTrackingByStatus } from "@/lib/api/company-gps-tracking"
 
 interface UseCompanyGpsTrackingProps {
   companyId: string
-  initialFilters?: CompanyGpsTrackingFilters
+  initialFilters?: CompanyGPSTrackingFilters
 }
 
 export function useCompanyGpsTracking({ companyId, initialFilters }: UseCompanyGpsTrackingProps) {
   const [gpsRecords, setGpsRecords] = useState<GPSTracking[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<CompanyGpsTrackingFilters>(
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+  })
+  const [filters, setFilters] = useState<CompanyGPSTrackingFilters>(
     initialFilters || {
       status: "all",
       searchQuery: "",
+      pageNumber: 1,
+      pageSize: 10,
     },
   )
 
@@ -31,7 +35,8 @@ export function useCompanyGpsTracking({ companyId, initialFilters }: UseCompanyG
     setError(null)
     try {
       const data = await getCompanyGpsTrackingRecords(companyId, filters)
-      setGpsRecords(data)
+      setGpsRecords(data.data)
+      setPagination(data.meta)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch GPS tracking records"
       setError(errorMessage)
@@ -47,7 +52,7 @@ export function useCompanyGpsTracking({ companyId, initialFilters }: UseCompanyG
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, filters])
 
-  const updateFilters = (newFilters: Partial<CompanyGpsTrackingFilters>) => {
+  const updateFilters = (newFilters: Partial<CompanyGPSTrackingFilters>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }))
   }
 
@@ -55,15 +60,18 @@ export function useCompanyGpsTracking({ companyId, initialFilters }: UseCompanyG
     setFilters({
       status: "all",
       searchQuery: "",
+      pageNumber: 1,
+      pageSize: 10,
     })
   }
 
-  const fetchByStatus = async (status: "active" | "inactive" | "all") => {
+  const fetchByStatus = async (status: number | "all") => {
     setIsLoading(true)
     setError(null)
     try {
       const data = await getCompanyGpsTrackingByStatus(companyId, status)
-      setGpsRecords(data)
+      setGpsRecords(data.data)
+      setPagination(data.meta)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : `Failed to fetch ${status} GPS tracking records`
       setError(errorMessage)
@@ -73,13 +81,13 @@ export function useCompanyGpsTracking({ companyId, initialFilters }: UseCompanyG
   }
 
   // Helper function to format status for display
-  const formatStatus = (status: "active" | "inactive") => {
-    return status === "active" ? "Active" : "Inactive"
+  const formatStatus = (status: number) => {
+    return status === 1 ? "Active" : "Inactive"
   }
 
   // Helper function to get status color
-  const getStatusColor = (status: "active" | "inactive") => {
-    return status === "active" ? "green" : "red"
+  const getStatusColor = (status: number) => {
+    return status === 1 ? "green" : "red"
   }
 
   // Helper function to get professional status color
@@ -115,6 +123,7 @@ export function useCompanyGpsTracking({ companyId, initialFilters }: UseCompanyG
     isLoading,
     error,
     filters,
+    pagination,
     updateFilters,
     resetFilters,
     refreshData: fetchGpsRecords,

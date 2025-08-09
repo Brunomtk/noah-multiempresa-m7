@@ -1,7 +1,7 @@
 import { CompanyHeader } from "@/components/company/company-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Skeleton } from "@/components/ui/skeleton"
+import { PageLoading } from "@/components/ui/page-loading"
 
 export default function CompanyProfileLoading() {
   return (
@@ -24,36 +24,11 @@ export default function CompanyProfileLoading() {
                 <CardDescription>Atualize as informações básicas da sua empresa</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                  <Skeleton className="h-10 w-[150px] mt-6" />
-                </div>
+                <PageLoading />
               </CardContent>
             </Card>
           </TabsContent>
+          {/* rest of code here */}
         </Tabs>
       </main>
     </div>

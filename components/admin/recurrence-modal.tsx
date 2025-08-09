@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,50 +16,124 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2 } from "lucide-react"
-import type { RecurrenceFormData } from "@/types/recurrence"
+import type { Recurrence, RecurrenceFormData } from "@/types/recurrence"
+import { recurrencesApi } from "@/lib/api/recurrences"
 
 interface RecurrenceModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: any) => void
-  recurrence?: any
+  recurrence?: Recurrence | null
 }
 
 export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: RecurrenceModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingDropdowns, setLoadingDropdowns] = useState(false)
+  const [companies, setCompanies] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
+
   const [formData, setFormData] = useState<RecurrenceFormData>({
     title: "",
-    customerId: "",
+    customerId: 0,
     address: "",
-    teamId: "",
-    companyId: "", // This would come from the company context in a real app
-    frequency: "weekly",
+    teamId: 0,
+    companyId: 0,
+    frequency: 1, // weekly
     day: 1, // Monday
-    time: "",
+    time: "09:00",
     duration: 60,
-    status: "active",
-    type: "regular",
+    status: 1, // active
+    type: 1, // regular
     startDate: "",
     endDate: "",
     notes: "",
   })
 
+  // Load dropdown data
+  const loadDropdownData = async () => {
+    setLoadingDropdowns(true)
+
+    try {
+      console.log("Loading dropdown data for recurrence modal...")
+
+      const [companiesResult, customersResult, teamsResult] = await Promise.allSettled([
+        recurrencesApi.getCompanies(),
+        recurrencesApi.getCustomers(formData.companyId || undefined),
+        recurrencesApi.getTeams(formData.companyId || undefined),
+      ])
+
+      if (companiesResult.status === "fulfilled") {
+        console.log("Companies loaded:", companiesResult.value)
+        setCompanies(companiesResult.value)
+      } else {
+        console.error("Failed to load companies:", companiesResult.reason)
+      }
+
+      if (customersResult.status === "fulfilled") {
+        console.log("Customers loaded:", customersResult.value)
+        setCustomers(customersResult.value)
+      } else {
+        console.error("Failed to load customers:", customersResult.reason)
+      }
+
+      if (teamsResult.status === "fulfilled") {
+        console.log("Teams loaded:", teamsResult.value)
+        setTeams(teamsResult.value)
+      } else {
+        console.error("Failed to load teams:", teamsResult.reason)
+      }
+    } catch (error) {
+      console.error("Error loading dropdown data:", error)
+    } finally {
+      setLoadingDropdowns(false)
+    }
+  }
+
+  // Load customers and teams when company changes
+  const loadCompanyRelatedData = async (companyId: number) => {
+    if (!companyId) return
+
+    try {
+      const [customersResult, teamsResult] = await Promise.allSettled([
+        recurrencesApi.getCustomers(companyId),
+        recurrencesApi.getTeams(companyId),
+      ])
+
+      if (customersResult.status === "fulfilled") {
+        setCustomers(customersResult.value)
+      }
+
+      if (teamsResult.status === "fulfilled") {
+        setTeams(teamsResult.value)
+      }
+    } catch (error) {
+      console.error("Error loading company related data:", error)
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      loadDropdownData()
+    }
+  }, [isOpen])
+
   useEffect(() => {
     if (recurrence) {
       setFormData({
         title: recurrence.title || "",
-        customerId: recurrence.customerId || "",
+        customerId: recurrence.customerId || 0,
         address: recurrence.address || "",
-        teamId: recurrence.teamId || "",
-        companyId: recurrence.companyId || "",
-        frequency: recurrence.frequency || "weekly",
-        day: recurrence.day !== undefined ? recurrence.day : 1,
-        time: recurrence.time || "",
+        teamId: recurrence.teamId || 0,
+        companyId: recurrence.companyId || 0,
+        frequency: recurrence.frequency || 1,
+        day: recurrence.day || 1,
+        time: recurrence.time || "09:00",
         duration: recurrence.duration || 60,
-        status: recurrence.status || "active",
-        type: recurrence.type || "regular",
-        startDate: recurrence.startDate || "",
-        endDate: recurrence.endDate || "",
+        status: recurrence.status || 1,
+        type: recurrence.type || 1,
+        startDate: recurrence.startDate ? recurrence.startDate.split("T")[0] : "",
+        endDate: recurrence.endDate ? recurrence.endDate.split("T")[0] : "",
         notes: recurrence.notes || "",
       })
     } else {
@@ -70,16 +143,16 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
 
       setFormData({
         title: "",
-        customerId: "",
+        customerId: 0,
         address: "",
-        teamId: "",
-        companyId: "", // This would come from the company context in a real app
-        frequency: "weekly",
-        day: 1, // Monday
-        time: "",
+        teamId: 0,
+        companyId: 0,
+        frequency: 1,
+        day: 1,
+        time: "09:00",
         duration: 60,
-        status: "active",
-        type: "regular",
+        status: 1,
+        type: 1,
         startDate: today.toISOString().split("T")[0],
         endDate: nextYear.toISOString().split("T")[0],
         notes: "",
@@ -89,98 +162,102 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Calculate next execution date if not provided
-    const data = { ...formData }
-    if (!data.nextExecution && data.startDate) {
-      data.nextExecution = data.startDate
+    // Validate required fields
+    if (!formData.title.trim()) {
+      alert("Title is required")
+      return
     }
 
-    onSubmit({
-      ...data,
-      duration: Number.parseInt(data.duration.toString()),
-    })
-    setIsLoading(false)
+    if (!formData.address.trim()) {
+      alert("Address is required")
+      return
+    }
+
+    if (!formData.customerId || formData.customerId === 0) {
+      alert("Customer is required")
+      return
+    }
+
+    if (!formData.companyId || formData.companyId === 0) {
+      alert("Company is required")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const submitData = {
+        ...formData,
+        startDate: formData.startDate ? new Date(formData.startDate).toISOString() : "",
+        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : "",
+      }
+
+      console.log("Submitting recurrence data:", submitData)
+      await onSubmit(submitData)
+    } catch (error) {
+      console.error("Error submitting recurrence:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: keyof RecurrenceFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+
+    // Load related data when company changes
+    if (field === "companyId" && value) {
+      loadCompanyRelatedData(Number.parseInt(value))
+      // Reset dependent fields
+      setFormData((prev) => ({ ...prev, customerId: 0, teamId: 0 }))
+    }
   }
 
   // Get day options based on frequency
   const getDayOptions = () => {
     switch (formData.frequency) {
-      case "daily":
+      case 1: // weekly
         return [
-          { value: "Every day", label: "Every day" },
-          { value: "Every weekday", label: "Every weekday (Mon-Fri)" },
-          { value: "Every weekend", label: "Every weekend (Sat-Sun)" },
+          { value: 1, label: "Monday" },
+          { value: 2, label: "Tuesday" },
+          { value: 3, label: "Wednesday" },
+          { value: 4, label: "Thursday" },
+          { value: 5, label: "Friday" },
+          { value: 6, label: "Saturday" },
+          { value: 7, label: "Sunday" },
         ]
-      case "weekly":
+      case 2: // biweekly
         return [
-          { value: "Monday", label: "Monday" },
-          { value: "Tuesday", label: "Tuesday" },
-          { value: "Wednesday", label: "Wednesday" },
-          { value: "Thursday", label: "Thursday" },
-          { value: "Friday", label: "Friday" },
-          { value: "Saturday", label: "Saturday" },
-          { value: "Sunday", label: "Sunday" },
+          { value: 1, label: "Monday" },
+          { value: 2, label: "Tuesday" },
+          { value: 3, label: "Wednesday" },
+          { value: 4, label: "Thursday" },
+          { value: 5, label: "Friday" },
+          { value: 6, label: "Saturday" },
+          { value: 7, label: "Sunday" },
         ]
-      case "biweekly":
+      case 3: // monthly
         return [
-          { value: "Monday", label: "Monday" },
-          { value: "Tuesday", label: "Tuesday" },
-          { value: "Wednesday", label: "Wednesday" },
-          { value: "Thursday", label: "Thursday" },
-          { value: "Friday", label: "Friday" },
-          { value: "Saturday", label: "Saturday" },
-          { value: "Sunday", label: "Sunday" },
-        ]
-      case "monthly":
-        return [
-          { value: "First Monday", label: "First Monday" },
-          { value: "First Tuesday", label: "First Tuesday" },
-          { value: "First Wednesday", label: "First Wednesday" },
-          { value: "First Thursday", label: "First Thursday" },
-          { value: "First Friday", label: "First Friday" },
-          { value: "Last Monday", label: "Last Monday" },
-          { value: "Last Friday", label: "Last Friday" },
-          { value: "1", label: "1st day" },
-          { value: "15", label: "15th day" },
-          { value: "Last day", label: "Last day" },
-        ]
-      case "quarterly":
-        return [
-          { value: "First Monday of quarter", label: "First Monday of quarter" },
-          { value: "First day of quarter", label: "First day of quarter" },
-          { value: "Last day of quarter", label: "Last day of quarter" },
+          { value: 1, label: "1st day" },
+          { value: 15, label: "15th day" },
+          { value: 31, label: "Last day" },
         ]
       default:
         return []
     }
   }
 
-  // Sample customers for the dropdown
-  const customers = [
-    "Tech Solutions Ltd",
-    "ABC Consulting",
-    "XYZ Commerce",
-    "Delta Industries",
-    "Omega Services",
-    "Global Tech",
-    "Innovate Inc",
-    "First Financial",
-    "Build Right Construction",
-    "Legal Partners",
-    "Health Clinic",
-  ]
+  const getCompanyName = (company: any) => {
+    return company.name || company.companyName || `Company ${company.id}`
+  }
 
-  // Sample teams for the dropdown
-  const teams = ["Team Alpha", "Team Beta", "Team Gamma"]
+  const getCustomerName = (customer: any) => {
+    return customer.name || customer.customerName || `Customer ${customer.id}`
+  }
+
+  const getTeamName = (team: any) => {
+    return team.name || team.teamName || `Team ${team.id}`
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -196,7 +273,7 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="title">Service Title</Label>
+              <Label htmlFor="title">Service Title *</Label>
               <Input
                 id="title"
                 value={formData.title}
@@ -208,23 +285,75 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="customer">Customer</Label>
-              <Select value={formData.customerId} onValueChange={(value) => handleChange("customerId", value)}>
+              <Label htmlFor="company">Company *</Label>
+              <Select
+                value={formData.companyId.toString()}
+                onValueChange={(value) => handleChange("companyId", Number.parseInt(value))}
+                required
+              >
                 <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder="Select a customer" />
+                  <SelectValue placeholder={loadingDropdowns ? "Loading companies..." : "Select a company"} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
-                  {customers.map((customer) => (
-                    <SelectItem key={customer} value={customer} className="hover:bg-[#2a3349]">
-                      {customer}
+                  {loadingDropdowns ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading companies...
+                      </div>
                     </SelectItem>
-                  ))}
+                  ) : companies.length > 0 ? (
+                    companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id.toString()} className="hover:bg-[#2a3349]">
+                        {getCompanyName(company)}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-companies" disabled>
+                      No companies available
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="address">Service Address</Label>
+              <Label htmlFor="customer">Customer *</Label>
+              <Select
+                value={formData.customerId.toString()}
+                onValueChange={(value) => handleChange("customerId", Number.parseInt(value))}
+                disabled={!formData.companyId}
+                required
+              >
+                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                  <SelectValue
+                    placeholder={
+                      !formData.companyId
+                        ? "Select a company first"
+                        : loadingDropdowns
+                          ? "Loading customers..."
+                          : "Select a customer"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                  {customers.length > 0 ? (
+                    customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id.toString()} className="hover:bg-[#2a3349]">
+                        {getCustomerName(customer)}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-customers" disabled>
+                      {!formData.companyId ? "Select a company first" : "No customers available"}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="address">Service Address *</Label>
               <Input
                 id="address"
                 value={formData.address}
@@ -237,16 +366,37 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
 
             <div className="grid gap-2">
               <Label htmlFor="team">Assigned Team</Label>
-              <Select value={formData.teamId} onValueChange={(value) => handleChange("teamId", value)}>
+              <Select
+                value={formData.teamId?.toString() || ""}
+                onValueChange={(value) => handleChange("teamId", Number.parseInt(value))}
+                disabled={!formData.companyId}
+              >
                 <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder="Select a team" />
+                  <SelectValue
+                    placeholder={
+                      !formData.companyId
+                        ? "Select a company first"
+                        : loadingDropdowns
+                          ? "Loading teams..."
+                          : "Select a team (optional)"
+                    }
+                  />
                 </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {teams.map((team) => (
-                    <SelectItem key={team} value={team} className="hover:bg-[#2a3349]">
-                      {team}
+                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                  <SelectItem value="0" className="hover:bg-[#2a3349]">
+                    No team assigned
+                  </SelectItem>
+                  {teams.length > 0 ? (
+                    teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id.toString()} className="hover:bg-[#2a3349]">
+                        {getTeamName(team)}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-teams" disabled>
+                      {!formData.companyId ? "Select a company first" : "No teams available"}
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -254,38 +404,38 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="frequency">Frequency</Label>
-                <Select value={formData.frequency} onValueChange={(value) => handleChange("frequency", value)}>
+                <Select
+                  value={formData.frequency.toString()}
+                  onValueChange={(value) => handleChange("frequency", Number.parseInt(value))}
+                >
                   <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                    <SelectItem value="daily" className="hover:bg-[#2a3349]">
-                      Daily
-                    </SelectItem>
-                    <SelectItem value="weekly" className="hover:bg-[#2a3349]">
+                    <SelectItem value="1" className="hover:bg-[#2a3349]">
                       Weekly
                     </SelectItem>
-                    <SelectItem value="biweekly" className="hover:bg-[#2a3349]">
+                    <SelectItem value="2" className="hover:bg-[#2a3349]">
                       Bi-weekly
                     </SelectItem>
-                    <SelectItem value="monthly" className="hover:bg-[#2a3349]">
+                    <SelectItem value="3" className="hover:bg-[#2a3349]">
                       Monthly
-                    </SelectItem>
-                    <SelectItem value="quarterly" className="hover:bg-[#2a3349]">
-                      Quarterly
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="day">Day</Label>
-                <Select value={formData.day.toString()} onValueChange={(value) => handleChange("day", value)}>
+                <Select
+                  value={formData.day.toString()}
+                  onValueChange={(value) => handleChange("day", Number.parseInt(value))}
+                >
                   <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
                     <SelectValue placeholder="Select day" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
                     {getDayOptions().map((option) => (
-                      <SelectItem key={option.value} value={option.value} className="hover:bg-[#2a3349]">
+                      <SelectItem key={option.value} value={option.value.toString()} className="hover:bg-[#2a3349]">
                         {option.label}
                       </SelectItem>
                     ))}
@@ -312,7 +462,7 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
                   id="duration"
                   type="number"
                   value={formData.duration.toString()}
-                  onChange={(e) => handleChange("duration", e.target.value)}
+                  onChange={(e) => handleChange("duration", Number.parseInt(e.target.value))}
                   min="30"
                   step="30"
                   className="bg-[#0f172a] border-[#2a3349] text-white"
@@ -341,7 +491,6 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
                   value={formData.endDate}
                   onChange={(e) => handleChange("endDate", e.target.value)}
                   className="bg-[#0f172a] border-[#2a3349] text-white"
-                  required
                 />
               </div>
             </div>
@@ -349,18 +498,21 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="type">Service Type</Label>
-                <Select value={formData.type} onValueChange={(value) => handleChange("type", value)}>
+                <Select
+                  value={formData.type.toString()}
+                  onValueChange={(value) => handleChange("type", Number.parseInt(value))}
+                >
                   <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
                     <SelectValue placeholder="Select service type" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                    <SelectItem value="regular" className="hover:bg-[#2a3349]">
+                    <SelectItem value="1" className="hover:bg-[#2a3349]">
                       Regular Cleaning
                     </SelectItem>
-                    <SelectItem value="deep" className="hover:bg-[#2a3349]">
+                    <SelectItem value="2" className="hover:bg-[#2a3349]">
                       Deep Cleaning
                     </SelectItem>
-                    <SelectItem value="specialized" className="hover:bg-[#2a3349]">
+                    <SelectItem value="3" className="hover:bg-[#2a3349]">
                       Specialized Service
                     </SelectItem>
                   </SelectContent>
@@ -368,19 +520,19 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => handleChange("status", value)}>
+                <Select
+                  value={formData.status.toString()}
+                  onValueChange={(value) => handleChange("status", Number.parseInt(value))}
+                >
                   <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                    <SelectItem value="active" className="hover:bg-[#2a3349]">
+                    <SelectItem value="1" className="hover:bg-[#2a3349]">
                       Active
                     </SelectItem>
-                    <SelectItem value="paused" className="hover:bg-[#2a3349]">
-                      Paused
-                    </SelectItem>
-                    <SelectItem value="completed" className="hover:bg-[#2a3349]">
-                      Completed
+                    <SelectItem value="0" className="hover:bg-[#2a3349]">
+                      Inactive
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -403,7 +555,7 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
             >
               Cancel
             </Button>

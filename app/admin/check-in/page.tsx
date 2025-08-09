@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -23,153 +23,120 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { format } from "date-fns"
-
-// Sample data
-const initialCheckIns = [
-  {
-    id: 1,
-    professional: "Maria Silva",
-    professionalId: "MS001",
-    company: "Tech Solutions Ltd",
-    customer: "Tech Solutions HQ",
-    address: "123 Main St, Suite 500",
-    checkInTime: new Date(2025, 4, 26, 9, 0),
-    checkOutTime: new Date(2025, 4, 26, 11, 0),
-    status: "completed",
-    serviceType: "regular",
-    notes: "Cleaning completed as scheduled",
-    team: "Team Alpha",
-  },
-  {
-    id: 2,
-    professional: "João Santos",
-    professionalId: "JS002",
-    company: "ABC Consulting",
-    customer: "ABC Consulting HQ",
-    address: "456 Oak Ave, Floor 3",
-    checkInTime: new Date(2025, 4, 26, 13, 0),
-    checkOutTime: null,
-    status: "in_progress",
-    serviceType: "deep",
-    notes: "Deep cleaning in progress",
-    team: "Team Beta",
-  },
-  {
-    id: 3,
-    professional: "Ana Oliveira",
-    professionalId: "AO003",
-    company: "XYZ Commerce",
-    customer: "XYZ Commerce HQ",
-    address: "789 Pine St",
-    checkInTime: new Date(2025, 4, 27, 10, 0),
-    checkOutTime: new Date(2025, 4, 27, 14, 30),
-    status: "completed",
-    serviceType: "specialized",
-    notes: "Window cleaning completed",
-    team: "Team Gamma",
-  },
-  {
-    id: 4,
-    professional: "Carlos Mendes",
-    professionalId: "CM004",
-    company: "Delta Industries",
-    customer: "Delta Industries HQ",
-    address: "101 Maple Dr, Building B",
-    checkInTime: null,
-    checkOutTime: null,
-    status: "pending",
-    serviceType: "regular",
-    notes: "Scheduled for tomorrow",
-    team: "Team Alpha",
-  },
-  {
-    id: 5,
-    professional: "Patricia Costa",
-    professionalId: "PC005",
-    company: "Omega Services",
-    customer: "Omega Services HQ",
-    address: "202 Elm St, Suite 100",
-    checkInTime: new Date(2025, 4, 28, 9, 0),
-    checkOutTime: new Date(2025, 4, 28, 12, 45),
-    status: "completed",
-    serviceType: "specialized",
-    notes: "Carpet cleaning completed",
-    team: "Team Beta",
-  },
-  {
-    id: 6,
-    professional: "Roberto Alves",
-    professionalId: "RA006",
-    company: "Global Tech",
-    customer: "Global Tech HQ",
-    address: "303 Cedar Rd",
-    checkInTime: new Date(2025, 4, 28, 15, 0),
-    checkOutTime: null,
-    status: "in_progress",
-    serviceType: "regular",
-    notes: "Regular cleaning in progress",
-    team: "Team Gamma",
-  },
-  {
-    id: 7,
-    professional: "Fernanda Lima",
-    professionalId: "FL007",
-    company: "Innovate Inc",
-    customer: "Innovate Inc HQ",
-    address: "404 Birch Blvd, Floor 5",
-    checkInTime: null,
-    checkOutTime: null,
-    status: "pending",
-    serviceType: "deep",
-    notes: "Scheduled for next week",
-    team: "Team Alpha",
-  },
-]
+import {
+  getCheckRecords,
+  createCheckRecord,
+  updateCheckRecord,
+  deleteCheckRecord,
+  performCheckOut,
+  getCompanies,
+} from "@/lib/api/check-records"
 
 export default function CheckInPage() {
-  const [checkIns, setCheckIns] = useState(initialCheckIns)
+  const [checkIns, setCheckIns] = useState<any[]>([])
+  const [companies, setCompanies] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [selectedCheckIn, setSelectedCheckIn] = useState<any>(null)
   const [checkInToDelete, setCheckInToDelete] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const { toast } = useToast()
   const [companyFilter, setCompanyFilter] = useState("all")
-  const companies = ["Tech Solutions Ltd", "ABC Consulting", "XYZ Commerce", "Delta Industries", "Omega Services"]
+  const { toast } = useToast()
 
-  const handleAddCheckIn = (data: any) => {
-    const newCheckIn = {
-      id: checkIns.length + 1,
-      ...data,
-    }
-    setCheckIns([...checkIns, newCheckIn])
-    setIsModalOpen(false)
-    toast({
-      title: "Check-in added successfully",
-      description: `Check-in for ${data.professional} at ${data.customer} has been registered.`,
-    })
-  }
+  useEffect(() => {
+    loadCheckIns()
+    loadCompanies()
+  }, [])
 
-  const handleEditCheckIn = (data: any) => {
-    setCheckIns(checkIns.map((checkIn) => (checkIn.id === selectedCheckIn.id ? { ...checkIn, ...data } : checkIn)))
-    setSelectedCheckIn(null)
-    setIsModalOpen(false)
-    toast({
-      title: "Check-in updated successfully",
-      description: `Check-in for ${data.professional} at ${data.customer} has been updated.`,
-    })
-  }
-
-  const handleDeleteCheckIn = () => {
-    if (checkInToDelete) {
-      setCheckIns(checkIns.filter((checkIn) => checkIn.id !== checkInToDelete.id))
+  const loadCheckIns = async () => {
+    try {
+      setIsLoading(true)
+      const data = await getCheckRecords()
+      console.log("Check-ins loaded:", data)
+      setCheckIns(data)
+    } catch (error) {
+      console.error("Error loading check-ins:", error)
       toast({
-        title: "Check-in deleted successfully",
-        description: `Check-in for ${checkInToDelete.professional} at ${checkInToDelete.customer} has been removed.`,
+        title: "Error",
+        description: "Failed to load check-in records",
         variant: "destructive",
       })
-      setCheckInToDelete(null)
+      setCheckIns([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadCompanies = async () => {
+    try {
+      const data = await getCompanies()
+      setCompanies(data)
+    } catch (error) {
+      console.error("Error loading companies:", error)
+      setCompanies([])
+    }
+  }
+
+  const handleAddCheckIn = async (data: any) => {
+    try {
+      const newCheckIn = await createCheckRecord(data)
+      setCheckIns([...checkIns, newCheckIn])
+      setIsModalOpen(false)
+      toast({
+        title: "Check-in added successfully",
+        description: `Check-in for ${data.professionalName} has been registered.`,
+      })
+    } catch (error) {
+      console.error("Error adding check-in:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add check-in record",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditCheckIn = async (data: any) => {
+    try {
+      const updatedCheckIn = await updateCheckRecord(selectedCheckIn.id.toString(), data)
+      setCheckIns(checkIns.map((checkIn) => (checkIn.id === selectedCheckIn.id ? updatedCheckIn : checkIn)))
+      setSelectedCheckIn(null)
+      setIsModalOpen(false)
+      toast({
+        title: "Check-in updated successfully",
+        description: `Check-in for ${data.professionalName} has been updated.`,
+      })
+    } catch (error) {
+      console.error("Error updating check-in:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update check-in record",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteCheckIn = async () => {
+    if (checkInToDelete) {
+      try {
+        await deleteCheckRecord(checkInToDelete.id.toString())
+        setCheckIns(checkIns.filter((checkIn) => checkIn.id !== checkInToDelete.id))
+        toast({
+          title: "Check-in deleted successfully",
+          description: `Check-in for ${checkInToDelete.professionalName} has been removed.`,
+          variant: "destructive",
+        })
+        setCheckInToDelete(null)
+      } catch (error) {
+        console.error("Error deleting check-in:", error)
+        toast({
+          title: "Error",
+          description: "Failed to delete check-in record",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -183,57 +150,55 @@ export default function CheckInPage() {
     setIsModalOpen(true)
   }
 
-  const handleQuickCheckOut = (checkIn: any) => {
-    if (checkIn.status === "in_progress") {
-      const updatedCheckIn = {
-        ...checkIn,
-        checkOutTime: new Date(),
-        status: "completed",
+  const handleQuickCheckOut = async (checkIn: any) => {
+    if (checkIn.status === 1) {
+      // checked_in
+      try {
+        const updatedCheckIn = await performCheckOut(checkIn.id.toString())
+        setCheckIns(checkIns.map((item) => (item.id === checkIn.id ? updatedCheckIn : item)))
+        toast({
+          title: "Check-out completed",
+          description: `${checkIn.professionalName} has checked out.`,
+        })
+      } catch (error) {
+        console.error("Error performing check-out:", error)
+        toast({
+          title: "Error",
+          description: "Failed to perform check-out",
+          variant: "destructive",
+        })
       }
-
-      setCheckIns(checkIns.map((item) => (item.id === checkIn.id ? updatedCheckIn : item)))
-
-      toast({
-        title: "Check-out completed",
-        description: `${checkIn.professional} has checked out from ${checkIn.customer}.`,
-      })
     }
   }
 
   const filteredCheckIns = checkIns.filter((checkIn) => {
     const matchesSearch =
-      checkIn.professional.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      checkIn.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      checkIn.professionalId.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || checkIn.status === statusFilter
-    const matchesCompany = companyFilter === "all" || checkIn.company === companyFilter
+      (checkIn.professionalName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (checkIn.customerName || "").toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === "all" || checkIn.status.toString() === statusFilter
+    const matchesCompany = companyFilter === "all" || checkIn.companyId.toString() === companyFilter
     return matchesSearch && matchesStatus && matchesCompany
   })
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: number) => {
     switch (status) {
-      case "pending":
+      case 0:
         return { label: "Pending", className: "border-yellow-500 text-yellow-500" }
-      case "in_progress":
-        return { label: "In Progress", className: "border-blue-500 text-blue-500" }
-      case "completed":
-        return { label: "Completed", className: "border-green-500 text-green-500" }
+      case 1:
+        return { label: "Checked In", className: "border-blue-500 text-blue-500" }
+      case 2:
+        return { label: "Checked Out", className: "border-green-500 text-green-500" }
       default:
-        return { label: status, className: "border-gray-500 text-gray-500" }
+        return { label: "Unknown", className: "border-gray-500 text-gray-500" }
     }
   }
 
-  const getServiceTypeBadge = (type: string) => {
-    switch (type) {
-      case "regular":
-        return { label: "Regular", className: "border-blue-400 text-blue-400" }
-      case "deep":
-        return { label: "Deep", className: "border-purple-400 text-purple-400" }
-      case "specialized":
-        return { label: "Specialized", className: "border-orange-400 text-orange-400" }
-      default:
-        return { label: type, className: "border-gray-400 text-gray-400" }
-    }
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading check-in records...</div>
+      </div>
+    )
   }
 
   return (
@@ -260,7 +225,7 @@ export default function CheckInPage() {
           <div className="relative w-full md:w-auto">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by professional, ID or customer..."
+              placeholder="Search by professional or customer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 w-full md:w-[300px] bg-[#1a2234] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
@@ -276,14 +241,14 @@ export default function CheckInPage() {
                 <SelectItem value="all" className="hover:bg-[#2a3349]">
                   All Statuses
                 </SelectItem>
-                <SelectItem value="pending" className="hover:bg-[#2a3349]">
+                <SelectItem value="0" className="hover:bg-[#2a3349]">
                   Pending
                 </SelectItem>
-                <SelectItem value="in_progress" className="hover:bg-[#2a3349]">
-                  In Progress
+                <SelectItem value="1" className="hover:bg-[#2a3349]">
+                  Checked In
                 </SelectItem>
-                <SelectItem value="completed" className="hover:bg-[#2a3349]">
-                  Completed
+                <SelectItem value="2" className="hover:bg-[#2a3349]">
+                  Checked Out
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -297,8 +262,8 @@ export default function CheckInPage() {
                   All Companies
                 </SelectItem>
                 {companies.map((company) => (
-                  <SelectItem key={company} value={company} className="hover:bg-[#2a3349]">
-                    {company}
+                  <SelectItem key={company.id} value={company.id.toString()} className="hover:bg-[#2a3349]">
+                    {company.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -311,7 +276,6 @@ export default function CheckInPage() {
             <TableHeader className="bg-[#1a2234]">
               <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
                 <TableHead className="text-white">Professional</TableHead>
-                <TableHead className="text-white">Company</TableHead>
                 <TableHead className="text-white">Customer</TableHead>
                 <TableHead className="text-white">Check-in</TableHead>
                 <TableHead className="text-white">Check-out</TableHead>
@@ -327,22 +291,21 @@ export default function CheckInPage() {
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8 border border-[#2a3349]">
                         <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
-                          {checkIn.professional
+                          {(checkIn.professionalName || "")
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: string) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div>{checkIn.professional}</div>
+                        <div>{checkIn.professionalName || "N/A"}</div>
                         <div className="text-xs text-gray-400">ID: {checkIn.professionalId}</div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-gray-400">{checkIn.company}</TableCell>
                   <TableCell>
                     <div>
-                      <div className="text-white">{checkIn.customer}</div>
+                      <div className="text-white">{checkIn.customerName || "N/A"}</div>
                       <div className="text-xs text-gray-400">{checkIn.address}</div>
                     </div>
                   </TableCell>
@@ -350,7 +313,9 @@ export default function CheckInPage() {
                     {checkIn.checkInTime ? (
                       <div className="flex items-center gap-1">
                         <LogIn className="h-3 w-3 text-green-500" />
-                        <span className="text-gray-400">{format(checkIn.checkInTime, "MMM d, yyyy HH:mm")}</span>
+                        <span className="text-gray-400">
+                          {format(new Date(checkIn.checkInTime), "MMM d, yyyy HH:mm")}
+                        </span>
                       </div>
                     ) : (
                       <span className="text-gray-500">Pending</span>
@@ -360,18 +325,18 @@ export default function CheckInPage() {
                     {checkIn.checkOutTime ? (
                       <div className="flex items-center gap-1">
                         <LogOut className="h-3 w-3 text-red-500" />
-                        <span className="text-gray-400">{format(checkIn.checkOutTime, "MMM d, yyyy HH:mm")}</span>
+                        <span className="text-gray-400">
+                          {format(new Date(checkIn.checkOutTime), "MMM d, yyyy HH:mm")}
+                        </span>
                       </div>
-                    ) : checkIn.status === "in_progress" ? (
+                    ) : checkIn.status === 1 ? (
                       <span className="text-gray-500">In progress</span>
                     ) : (
                       <span className="text-gray-500">-</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={getServiceTypeBadge(checkIn.serviceType).className}>
-                      {getServiceTypeBadge(checkIn.serviceType).label}
-                    </Badge>
+                    <span className="text-gray-400">{checkIn.serviceType}</span>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={getStatusBadge(checkIn.status).className}>
@@ -412,7 +377,7 @@ export default function CheckInPage() {
                         </TooltipContent>
                       </Tooltip>
 
-                      {checkIn.status === "in_progress" && (
+                      {checkIn.status === 1 && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -462,7 +427,7 @@ export default function CheckInPage() {
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               Previous
             </Button>
@@ -476,14 +441,14 @@ export default function CheckInPage() {
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               2
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               Next
             </Button>
@@ -517,9 +482,7 @@ export default function CheckInPage() {
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription className="text-gray-400">
                 This action cannot be undone. This will permanently delete the check-in record for
-                <span className="font-semibold text-white block mt-1">
-                  {checkInToDelete?.professional} at {checkInToDelete?.customer}
-                </span>
+                <span className="font-semibold text-white block mt-1">{checkInToDelete?.professionalName}</span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

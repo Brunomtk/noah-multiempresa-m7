@@ -1,8 +1,15 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import type React from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { cancellationsApi } from "@/lib/api/cancellations"
-import type { Cancellation, CancellationFormData, CancellationFilters } from "@/types/cancellation"
+import type {
+  Cancellation,
+  CancellationFilters,
+  CancellationFormData,
+  CancellationUpdateData,
+  RefundProcessData,
+} from "@/types/cancellation"
 import { useToast } from "@/hooks/use-toast"
 
 interface CancellationsContextType {
@@ -10,39 +17,47 @@ interface CancellationsContextType {
   loading: boolean
   error: string | null
   filters: CancellationFilters
-  fetchCancellations: () => Promise<void>
-  fetchCancellationById: (id: string) => Promise<Cancellation | null>
-  addCancellation: (data: CancellationFormData) => Promise<void>
-  updateCancellation: (id: string, data: Partial<CancellationFormData>) => Promise<void>
-  deleteCancellation: (id: string) => Promise<void>
-  fetchCancellationsByCompany: (companyId: string) => Promise<void>
-  fetchCancellationsByCustomer: (customerId: string) => Promise<void>
-  fetchCancellationsByRefundStatus: (status: string) => Promise<void>
-  processRefund: (id: string, status: "processed" | "rejected", notes?: string) => Promise<void>
   setFilters: (filters: CancellationFilters) => void
-  resetFilters: () => void
+  refreshCancellations: () => Promise<void>
+  createCancellation: (data: CancellationFormData) => Promise<Cancellation>
+  updateCancellation: (id: number, data: CancellationUpdateData) => Promise<Cancellation>
+  deleteCancellation: (id: number) => Promise<void>
+  processRefund: (id: number, refundData: RefundProcessData) => Promise<Cancellation>
+  getCancellationById: (id: number) => Promise<Cancellation>
 }
 
 const CancellationsContext = createContext<CancellationsContextType | undefined>(undefined)
 
-export function CancellationsProvider({ children }: { children: ReactNode }) {
+export function useCancellationsContext() {
+  const context = useContext(CancellationsContext)
+  if (!context) {
+    throw new Error("useCancellationsContext must be used within a CancellationsProvider")
+  }
+  return context
+}
+
+interface CancellationsProviderProps {
+  children: React.ReactNode
+}
+
+export function CancellationsProvider({ children }: CancellationsProviderProps) {
   const [cancellations, setCancellations] = useState<Cancellation[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<CancellationFilters>({})
   const { toast } = useToast()
 
-  const fetchCancellations = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const refreshCancellations = useCallback(async () => {
     try {
+      setLoading(true)
+      setError(null)
       const data = await cancellationsApi.getCancellations(filters)
       setCancellations(data)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch cancellations"
+      const errorMessage = err instanceof Error ? err.message : "Erro ao carregar cancelamentos"
       setError(errorMessage)
       toast({
-        title: "Error",
+        title: "Erro",
         description: errorMessage,
         variant: "destructive",
       })
@@ -51,227 +66,132 @@ export function CancellationsProvider({ children }: { children: ReactNode }) {
     }
   }, [filters, toast])
 
-  const fetchCancellationById = useCallback(
-    async (id: string) => {
-      try {
-        const data = await cancellationsApi.getCancellationById(id)
-        return data
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch cancellation"
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-        return null
-      }
-    },
-    [toast],
-  )
-
-  const addCancellation = useCallback(
-    async (data: CancellationFormData) => {
-      setLoading(true)
-      setError(null)
+  const createCancellation = useCallback(
+    async (data: CancellationFormData): Promise<Cancellation> => {
       try {
         const newCancellation = await cancellationsApi.createCancellation(data)
-        setCancellations((prev) => [...prev, newCancellation])
+        setCancellations((prev) => [newCancellation, ...prev])
         toast({
-          title: "Success",
-          description: "Cancellation created successfully",
+          title: "Sucesso",
+          description: "Cancelamento registrado com sucesso",
         })
+        return newCancellation
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to create cancellation"
-        setError(errorMessage)
+        const errorMessage = err instanceof Error ? err.message : "Erro ao criar cancelamento"
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
         throw err
-      } finally {
-        setLoading(false)
       }
     },
     [toast],
   )
 
   const updateCancellation = useCallback(
-    async (id: string, data: Partial<CancellationFormData>) => {
-      setLoading(true)
-      setError(null)
+    async (id: number, data: CancellationUpdateData): Promise<Cancellation> => {
       try {
         const updatedCancellation = await cancellationsApi.updateCancellation(id, data)
         setCancellations((prev) => prev.map((c) => (c.id === id ? updatedCancellation : c)))
         toast({
-          title: "Success",
-          description: "Cancellation updated successfully",
+          title: "Sucesso",
+          description: "Cancelamento atualizado com sucesso",
         })
+        return updatedCancellation
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to update cancellation"
-        setError(errorMessage)
+        const errorMessage = err instanceof Error ? err.message : "Erro ao atualizar cancelamento"
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
         throw err
-      } finally {
-        setLoading(false)
       }
     },
     [toast],
   )
 
   const deleteCancellation = useCallback(
-    async (id: string) => {
-      setLoading(true)
-      setError(null)
+    async (id: number): Promise<void> => {
       try {
         await cancellationsApi.deleteCancellation(id)
         setCancellations((prev) => prev.filter((c) => c.id !== id))
         toast({
-          title: "Success",
-          description: "Cancellation deleted successfully",
+          title: "Sucesso",
+          description: "Cancelamento removido com sucesso",
         })
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to delete cancellation"
-        setError(errorMessage)
+        const errorMessage = err instanceof Error ? err.message : "Erro ao remover cancelamento"
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
         throw err
-      } finally {
-        setLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  const fetchCancellationsByCompany = useCallback(
-    async (companyId: string) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await cancellationsApi.getCancellationsByCompany(companyId)
-        setCancellations(data)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch cancellations by company"
-        setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  const fetchCancellationsByCustomer = useCallback(
-    async (customerId: string) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await cancellationsApi.getCancellationsByCustomer(customerId)
-        setCancellations(data)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch cancellations by customer"
-        setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  const fetchCancellationsByRefundStatus = useCallback(
-    async (status: string) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await cancellationsApi.getCancellationsByRefundStatus(status)
-        setCancellations(data)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch cancellations by refund status"
-        setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
       }
     },
     [toast],
   )
 
   const processRefund = useCallback(
-    async (id: string, status: "processed" | "rejected", notes?: string) => {
-      setLoading(true)
-      setError(null)
+    async (id: number, refundData: RefundProcessData): Promise<Cancellation> => {
       try {
-        const updatedCancellation = await cancellationsApi.processRefund(id, status, notes)
+        const updatedCancellation = await cancellationsApi.processRefund(id, refundData)
         setCancellations((prev) => prev.map((c) => (c.id === id ? updatedCancellation : c)))
         toast({
-          title: "Success",
-          description: `Refund ${status === "processed" ? "processed" : "rejected"} successfully`,
+          title: "Sucesso",
+          description: "Reembolso processado com sucesso",
         })
+        return updatedCancellation
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to process refund"
-        setError(errorMessage)
+        const errorMessage = err instanceof Error ? err.message : "Erro ao processar reembolso"
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
         throw err
-      } finally {
-        setLoading(false)
       }
     },
     [toast],
   )
 
-  const resetFilters = useCallback(() => {
-    setFilters({})
-  }, [])
+  const getCancellationById = useCallback(
+    async (id: number): Promise<Cancellation> => {
+      try {
+        return await cancellationsApi.getCancellationById(id)
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Erro ao carregar cancelamento"
+        toast({
+          title: "Erro",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        throw err
+      }
+    },
+    [toast],
+  )
 
-  const value = {
+  // Load cancellations on mount and when filters change
+  useEffect(() => {
+    refreshCancellations()
+  }, [refreshCancellations])
+
+  const value: CancellationsContextType = {
     cancellations,
     loading,
     error,
     filters,
-    fetchCancellations,
-    fetchCancellationById,
-    addCancellation,
+    setFilters,
+    refreshCancellations,
+    createCancellation,
     updateCancellation,
     deleteCancellation,
-    fetchCancellationsByCompany,
-    fetchCancellationsByCustomer,
-    fetchCancellationsByRefundStatus,
     processRefund,
-    setFilters,
-    resetFilters,
+    getCancellationById,
   }
 
   return <CancellationsContext.Provider value={value}>{children}</CancellationsContext.Provider>
-}
-
-export function useCancellationsContext() {
-  const context = useContext(CancellationsContext)
-  if (context === undefined) {
-    throw new Error("useCancellationsContext must be used within a CancellationsProvider")
-  }
-  return context
 }

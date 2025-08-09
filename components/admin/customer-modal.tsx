@@ -2,238 +2,204 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { useCustomers } from "@/hooks/use-customers"
+import { useCompanies } from "@/hooks/use-companies"
+import type { Customer } from "@/types/customer"
 
 interface CustomerModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onSubmit: (data: any) => void
-  customer?: any
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  customer?: Customer | null
 }
 
-export function CustomerModal({ isOpen, onClose, onSubmit, customer }: CustomerModalProps) {
-  const [isLoading, setIsLoading] = useState(false)
+export function CustomerModal({ open, onOpenChange, customer }: CustomerModalProps) {
+  const { createCustomer, updateCustomer, state } = useCustomers()
+  const { companies } = useCompanies()
+
   const [formData, setFormData] = useState({
     name: "",
-    document: "",
-    company: "",
-    phone: "",
     email: "",
+    document: "",
+    phone: "",
     address: "",
-    city: "",
-    state: "",
-    observations: "",
+    companyId: "",
+    status: 1,
   })
 
   useEffect(() => {
     if (customer) {
       setFormData({
-        name: customer.name || "",
-        document: customer.document || "",
-        company: customer.company || "",
+        name: customer.name,
+        email: customer.email,
+        document: customer.document,
         phone: customer.phone || "",
-        email: customer.email || "",
         address: customer.address || "",
-        city: customer.city || "",
-        state: customer.state || "",
-        observations: customer.observations || "",
+        companyId: customer.companyId,
+        status: customer.status,
       })
     } else {
       setFormData({
         name: "",
-        document: "",
-        company: "",
-        phone: "",
         email: "",
+        document: "",
+        phone: "",
         address: "",
-        city: "",
-        state: "",
-        observations: "",
+        companyId: "",
+        status: 1,
       })
     }
-  }, [customer])
+  }, [customer, open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const selectedCompany = companies.find((c) => c.id === formData.companyId)
 
-    onSubmit(formData)
-    setIsLoading(false)
+      const customerData = {
+        ...formData,
+        company: selectedCompany || null,
+      }
+
+      if (customer) {
+        await updateCustomer(customer.id, customerData)
+      } else {
+        await createCustomer(customerData)
+      }
+
+      onOpenChange(false)
+    } catch (error) {
+      console.error("Error saving customer:", error)
+    }
   }
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Sample companies for the dropdown
-  const companies = ["Tech Solutions Ltd", "ABC Consulting", "XYZ Commerce", "Delta Industries", "Omega Services"]
-
-  // Sample states for the dropdown
-  const states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA"]
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-[#1a2234] border-[#2a3349] text-white">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-md">
         <DialogHeader>
-          <DialogTitle>{customer ? "Edit Customer" : "New Customer"}</DialogTitle>
-          <DialogDescription className="text-gray-400">
-            {customer
-              ? "Update the customer information below."
-              : "Fill in the information to register a new customer."}
-          </DialogDescription>
+          <DialogTitle className="text-white">{customer ? "Edit Customer" : "New Customer"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleChange("name", e.target.value)}
-                  className="bg-[#0f172a] border-[#2a3349] text-white"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="document">CPF/CNPJ</Label>
-                <Input
-                  id="document"
-                  value={formData.document}
-                  onChange={(e) => handleChange("document", e.target.value)}
-                  placeholder="000.000.000-00"
-                  className="bg-[#0f172a] border-[#2a3349] text-white"
-                  required
-                />
-              </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="company">Company</Label>
-              <Select value={formData.company} onValueChange={(value) => handleChange("company", value)}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder="Select a company" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {companies.map((company) => (
-                    <SelectItem key={company} value={company} className="hover:bg-[#2a3349]">
-                      {company}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  className="bg-[#0f172a] border-[#2a3349] text-white"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
-                  placeholder="(00) 00000-0000"
-                  className="bg-[#0f172a] border-[#2a3349] text-white"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="address">Main Address</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
-                className="bg-[#0f172a] border-[#2a3349] text-white"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  value={formData.city}
-                  onChange={(e) => handleChange("city", e.target.value)}
-                  className="bg-[#0f172a] border-[#2a3349] text-white"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="state">State</Label>
-                <Select value={formData.state} onValueChange={(value) => handleChange("state", value)}>
-                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                    <SelectValue placeholder="Select a state" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
-                    {states.map((state) => (
-                      <SelectItem key={state} value={state} className="hover:bg-[#2a3349]">
-                        {state}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="observations">Observations</Label>
-              <Textarea
-                id="observations"
-                value={formData.observations}
-                onChange={(e) => handleChange("observations", e.target.value)}
-                className="bg-[#0f172a] border-[#2a3349] text-white min-h-[80px]"
-                placeholder="Additional information about the customer"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-gray-300">
+              Name
+            </Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleChange("name", e.target.value)}
+              className="bg-[#0f172a] border-[#2a3349] text-white"
+              required
+            />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-gray-300">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleChange("email", e.target.value)}
+              className="bg-[#0f172a] border-[#2a3349] text-white"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="document" className="text-gray-300">
+              Document
+            </Label>
+            <Input
+              id="document"
+              value={formData.document}
+              onChange={(e) => handleChange("document", e.target.value)}
+              className="bg-[#0f172a] border-[#2a3349] text-white"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone" className="text-gray-300">
+              Phone
+            </Label>
+            <Input
+              id="phone"
+              value={formData.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              className="bg-[#0f172a] border-[#2a3349] text-white"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address" className="text-gray-300">
+              Address
+            </Label>
+            <Input
+              id="address"
+              value={formData.address}
+              onChange={(e) => handleChange("address", e.target.value)}
+              className="bg-[#0f172a] border-[#2a3349] text-white"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="companyId" className="text-gray-300">
+              Company
+            </Label>
+            <select
+              id="companyId"
+              value={formData.companyId}
+              onChange={(e) => handleChange("companyId", e.target.value)}
+              className="flex h-10 w-full rounded-md border border-[#2a3349] bg-[#0f172a] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              required
+            >
+              <option value="">Select a company</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="status" className="text-gray-300">
+              Status
+            </Label>
+            <select
+              id="status"
+              value={formData.status}
+              onChange={(e) => handleChange("status", Number(e.target.value))}
+              className="flex h-10 w-full rounded-md border border-[#2a3349] bg-[#0f172a] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value={1}>Active</option>
+              <option value={0}>Inactive</option>
+            </select>
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              onClick={() => onOpenChange(false)}
+              className="bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save"
-              )}
+            <Button type="submit" disabled={state.loading} className="bg-[#06b6d4] hover:bg-[#0891b2]">
+              {state.loading ? "Saving..." : customer ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

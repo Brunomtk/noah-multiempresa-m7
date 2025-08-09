@@ -1,111 +1,143 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Clock, User, Route } from "lucide-react"
+import { MapPin, Clock, Route, Plus, Search, Filter } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
+import { useCompanyGpsTracking } from "@/contexts/company-gps-tracking-context"
+import { CompanyGpsTrackingProvider } from "@/contexts/company-gps-tracking-context"
+import { GpsTrackingModal } from "@/components/company/company-gps-tracking-modal"
+import { GpsTrackingDetailsModal } from "@/components/company/company-gps-tracking-details-modal"
+import type { GPSTracking } from "@/types/gps-tracking"
 
-// Mock data for professionals
-const mockProfessionals = [
-  {
-    id: 1,
-    name: "Maria Santos",
-    team: "Alpha Team",
-    avatar: "/placeholder.svg?height=40&width=40&query=MS",
-    status: "on-service",
-    location: "123 Main St, Suite 500",
-    client: "Acme Corporation",
-    lastUpdate: "2 min ago",
-    coordinates: { lat: 40.7128, lng: -74.006 },
-  },
-  {
-    id: 2,
-    name: "João Silva",
-    team: "Beta Team",
-    avatar: "/placeholder.svg?height=40&width=40&query=JS",
-    status: "on-service",
-    location: "456 Oak Ave",
-    client: "John Smith",
-    lastUpdate: "5 min ago",
-    coordinates: { lat: 40.7148, lng: -74.013 },
-  },
-  {
-    id: 3,
-    name: "Ana Oliveira",
-    team: "Gamma Team",
-    avatar: "/placeholder.svg?height=40&width=40&query=AO",
-    status: "traveling",
-    location: "En route to 789 Business Blvd",
-    client: "Tech Solutions Inc",
-    lastUpdate: "1 min ago",
-    coordinates: { lat: 40.7218, lng: -74.009 },
-  },
-  {
-    id: 4,
-    name: "Carlos Pereira",
-    team: "Alpha Team",
-    avatar: "/placeholder.svg?height=40&width=40&query=CP",
-    status: "off-duty",
-    location: "Office",
-    client: "-",
-    lastUpdate: "30 min ago",
-    coordinates: { lat: 40.7158, lng: -74.001 },
-  },
-  {
-    id: 5,
-    name: "Fernanda Lima",
-    team: "Delta Team",
-    avatar: "/placeholder.svg?height=40&width=40&query=FL",
-    status: "on-service",
-    location: "321 Pine St",
-    client: "Sarah Johnson",
-    lastUpdate: "8 min ago",
-    coordinates: { lat: 40.7198, lng: -74.003 },
-  },
-]
+function CompanyGpsTrackingContent() {
+  const {
+    gpsRecords,
+    selectedGpsRecord,
+    isLoading,
+    filters,
+    pagination,
+    fetchGpsRecords,
+    fetchGpsRecord,
+    createGpsRecord,
+    updateGpsRecord,
+    deleteGpsRecord,
+    updateGpsStatus,
+    setFilters,
+    resetFilters,
+    setSelectedGpsRecord,
+  } = useCompanyGpsTracking()
 
-export default function GPSTrackingPage() {
-  const [teamFilter, setTeamFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedProfessional, setSelectedProfessional] = useState(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<GPSTracking | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [selectedProfessional, setSelectedProfessional] = useState<number | null>(null)
 
-  const filteredProfessionals = mockProfessionals.filter((professional) => {
-    const matchesTeam = teamFilter === "all" || professional.team === teamFilter
-    const matchesStatus = statusFilter === "all" || professional.status === statusFilter
+  // Mock company ID - in real app, get from auth context
+  const companyId = "1"
 
-    return matchesTeam && matchesStatus
-  })
+  useEffect(() => {
+    fetchGpsRecords(companyId)
+  }, [])
 
-  // Get unique teams for filter
-  const teams = Array.from(new Set(mockProfessionals.map((p) => p.team)))
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setFilters({
+        ...filters,
+        searchQuery,
+        status: statusFilter === "all" ? "all" : Number.parseInt(statusFilter),
+        pageNumber: 1,
+      })
+    }, 500)
 
-  const getStatusColor = (status) => {
+    return () => clearTimeout(delayedSearch)
+  }, [searchQuery, statusFilter])
+
+  const handleCreateRecord = async (data: any) => {
+    try {
+      await createGpsRecord(companyId, data)
+      setIsCreateModalOpen(false)
+    } catch (error) {
+      console.error("Error creating GPS tracking record:", error)
+    }
+  }
+
+  const handleUpdateRecord = async (data: any) => {
+    if (!editingRecord) return
+
+    try {
+      await updateGpsRecord(companyId, editingRecord.id.toString(), data)
+      setIsEditModalOpen(false)
+      setEditingRecord(null)
+    } catch (error) {
+      console.error("Error updating GPS tracking record:", error)
+    }
+  }
+
+  const handleDeleteRecord = async (id: number) => {
+    try {
+      await deleteGpsRecord(companyId, id.toString())
+    } catch (error) {
+      console.error("Error deleting GPS tracking record:", error)
+    }
+  }
+
+  const handleViewDetails = async (record: GPSTracking) => {
+    setSelectedGpsRecord(record)
+    setIsDetailsModalOpen(true)
+  }
+
+  const handleEditRecord = (record: GPSTracking) => {
+    setEditingRecord(record)
+    setIsEditModalOpen(true)
+  }
+
+  const handleStatusToggle = async (record: GPSTracking) => {
+    const newStatus = record.status === 1 ? 2 : 1
+    try {
+      await updateGpsStatus(companyId, record.id.toString(), newStatus)
+    } catch (error) {
+      console.error("Error updating GPS tracking status:", error)
+    }
+  }
+
+  const getStatusColor = (status: number) => {
     switch (status) {
-      case "on-service":
+      case 1:
         return "bg-green-500/20 text-green-500 border-green-500"
-      case "traveling":
-        return "bg-blue-500/20 text-blue-500 border-blue-500"
-      case "off-duty":
-        return "bg-gray-500/20 text-gray-400 border-gray-500"
+      case 2:
+        return "bg-red-500/20 text-red-500 border-red-500"
       default:
         return "bg-gray-500/20 text-gray-400 border-gray-500"
     }
   }
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: number) => {
     switch (status) {
-      case "on-service":
-        return "On Service"
-      case "traveling":
-        return "Traveling"
-      case "off-duty":
-        return "Off Duty"
+      case 1:
+        return "Active"
+      case 2:
+        return "Inactive"
       default:
-        return status
+        return "Unknown"
     }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date)
   }
 
   return (
@@ -115,32 +147,43 @@ export default function GPSTrackingPage() {
           <h1 className="text-2xl font-bold text-white mb-1">GPS Tracking</h1>
           <p className="text-gray-400">Track your cleaning professionals in real-time</p>
         </div>
-        <div className="flex gap-2">
-          <Select value={teamFilter} onValueChange={setTeamFilter}>
-            <SelectTrigger className="w-full md:w-40 bg-[#2a3349] border-0 text-white focus:ring-[#06b6d4]">
-              <SelectValue placeholder="Filter by team" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-              <SelectItem value="all">All Teams</SelectItem>
-              {teams.map((team) => (
-                <SelectItem key={team} value={team}>
-                  {team}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-40 bg-[#2a3349] border-0 text-white focus:ring-[#06b6d4]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="on-service">On Service</SelectItem>
-              <SelectItem value="traveling">Traveling</SelectItem>
-              <SelectItem value="off-duty">Off Duty</SelectItem>
-            </SelectContent>
-          </Select>
+        <Button onClick={() => setIsCreateModalOpen(true)} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
+          <Plus className="h-4 w-4 mr-2" />
+          Add GPS Record
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search by professional, vehicle, or location..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-[#2a3349] border-0 text-white focus:ring-[#06b6d4]"
+            />
+          </div>
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-40 bg-[#2a3349] border-0 text-white focus:ring-[#06b6d4]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="1">Active</SelectItem>
+            <SelectItem value="2">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          onClick={resetFilters}
+          className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Reset
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -153,7 +196,7 @@ export default function GPSTrackingPage() {
               <div className="text-center text-gray-400">
                 <MapPin className="h-12 w-12 mx-auto mb-4 text-[#06b6d4]" />
                 <p>Map view would be displayed here</p>
-                <p className="text-sm mt-2">Showing {filteredProfessionals.length} professionals</p>
+                <p className="text-sm mt-2">Showing {gpsRecords.length} professionals</p>
               </div>
             </CardContent>
           </Card>
@@ -162,75 +205,128 @@ export default function GPSTrackingPage() {
         <div>
           <Card className="bg-[#1a2234] border-[#2a3349]">
             <CardHeader>
-              <CardTitle className="text-white text-lg">Professionals</CardTitle>
+              <CardTitle className="text-white text-lg">Professionals ({pagination.totalItems})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 max-h-[420px] overflow-y-auto">
-              {filteredProfessionals.length > 0 ? (
-                filteredProfessionals.map((professional) => (
+              {isLoading ? (
+                <div className="text-center py-6 text-gray-400">Loading...</div>
+              ) : gpsRecords.length > 0 ? (
+                gpsRecords.map((record) => (
                   <div
-                    key={professional.id}
+                    key={record.id}
                     className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                      selectedProfessional === professional.id
+                      selectedProfessional === record.id
                         ? "bg-[#2a3349] border border-[#06b6d4]"
                         : "bg-[#2a3349] hover:bg-[#343e59]"
                     }`}
-                    onClick={() => setSelectedProfessional(professional.id)}
+                    onClick={() => setSelectedProfessional(record.id)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Avatar>
-                          <AvatarImage src={professional.avatar || "/placeholder.svg"} alt={professional.name} />
+                          <AvatarImage src="/placeholder.svg" alt={record.professionalName || "Professional"} />
                           <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
-                            {professional.name
+                            {(record.professionalName || "P")
                               .split(" ")
                               .map((n) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium text-white">{professional.name}</div>
-                          <div className="text-xs text-gray-400">{professional.team}</div>
+                          <div className="font-medium text-white">
+                            {record.professionalName || `Professional ${record.professionalId}`}
+                          </div>
+                          <div className="text-xs text-gray-400">{record.vehicle}</div>
                         </div>
                       </div>
-                      <Badge className={getStatusColor(professional.status)}>
-                        {getStatusLabel(professional.status)}
-                      </Badge>
+                      <Badge className={getStatusColor(record.status)}>{getStatusLabel(record.status)}</Badge>
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex items-center gap-1 text-gray-400">
                         <MapPin className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                        <span className="truncate">{professional.location}</span>
+                        <span className="truncate">{record.location.address}</span>
                       </div>
-                      {professional.status !== "off-duty" && (
-                        <div className="flex items-center gap-1 text-gray-400">
-                          <User className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                          <span>{professional.client}</span>
-                        </div>
-                      )}
                       <div className="flex items-center gap-1 text-gray-400">
                         <Clock className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                        <span>Updated {professional.lastUpdate}</span>
+                        <span>Updated {formatDate(record.timestamp)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-400">
+                        <Route className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                        <span>
+                          {record.speed} km/h • {record.battery}% battery
+                        </span>
                       </div>
                     </div>
-                    {professional.status !== "off-duty" && (
+                    <div className="flex gap-2 mt-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full mt-2 h-8 border-[#2a3349] text-white hover:bg-[#343e59]"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleViewDetails(record)
+                        }}
+                        className="flex-1 h-8 border-[#2a3349] text-white hover:bg-[#343e59]"
                       >
-                        <Route className="h-3 w-3 mr-1" />
-                        View Route
+                        View Details
                       </Button>
-                    )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditRecord(record)
+                        }}
+                        className="flex-1 h-8 border-[#2a3349] text-white hover:bg-[#343e59]"
+                      >
+                        Edit
+                      </Button>
+                    </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-6 text-gray-400">No professionals found matching your filters</div>
+                <div className="text-center py-6 text-gray-400">No GPS tracking records found</div>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Modals */}
+      <GpsTrackingModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateRecord}
+      />
+
+      <GpsTrackingModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEditingRecord(null)
+        }}
+        onSubmit={handleUpdateRecord}
+        gpsData={editingRecord}
+      />
+
+      <GpsTrackingDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false)
+          setSelectedGpsRecord(null)
+        }}
+        gpsData={selectedGpsRecord}
+        onEdit={handleEditRecord}
+        onDelete={handleDeleteRecord}
+        onStatusToggle={handleStatusToggle}
+      />
     </div>
+  )
+}
+
+export default function CompanyGpsTrackingPage() {
+  return (
+    <CompanyGpsTrackingProvider>
+      <CompanyGpsTrackingContent />
+    </CompanyGpsTrackingProvider>
   )
 }

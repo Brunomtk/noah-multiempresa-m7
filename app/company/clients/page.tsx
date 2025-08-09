@@ -1,197 +1,46 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, User, Users, Building, Calendar, Phone, Mail, Filter, Download, ArrowUpDown } from "lucide-react"
+import {
+  Plus,
+  Search,
+  User,
+  Users,
+  Building,
+  Calendar,
+  Phone,
+  Mail,
+  Filter,
+  Download,
+  ArrowUpDown,
+  Trash2,
+} from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import ClientModal from "@/components/company/client-modal"
 import ClientDetailsModal from "@/components/company/client-details-modal"
-
-// Mock data for clients
-const mockClients = [
-  {
-    id: 1,
-    name: "John Smith",
-    type: "individual",
-    document: "123.456.789-00",
-    email: "john.smith@example.com",
-    phone: "(555) 123-4567",
-    addresses: [
-      {
-        id: 1,
-        street: "123 Main St",
-        city: "New York",
-        state: "NY",
-        zipCode: "10001",
-        isDefault: true,
-      },
-    ],
-    appointments: 8,
-    totalSpent: 1250.75,
-    lastService: "2023-05-15",
-    status: "active",
-    createdAt: "2022-10-05",
-  },
-  {
-    id: 2,
-    name: "Acme Corporation",
-    type: "business",
-    document: "12.345.678/0001-90",
-    email: "contact@acmecorp.com",
-    phone: "(555) 987-6543",
-    addresses: [
-      {
-        id: 2,
-        street: "100 Corporate Ave",
-        city: "New York",
-        state: "NY",
-        zipCode: "10010",
-        isDefault: true,
-      },
-      {
-        id: 3,
-        street: "200 Branch St",
-        city: "Boston",
-        state: "MA",
-        zipCode: "02108",
-        isDefault: false,
-      },
-    ],
-    appointments: 15,
-    totalSpent: 4500.0,
-    lastService: "2023-06-01",
-    status: "active",
-    createdAt: "2022-08-15",
-  },
-  {
-    id: 3,
-    name: "Sarah Johnson",
-    type: "individual",
-    document: "987.654.321-00",
-    email: "sarah.j@example.com",
-    phone: "(555) 555-5555",
-    addresses: [
-      {
-        id: 4,
-        street: "789 Park Ave",
-        city: "Chicago",
-        state: "IL",
-        zipCode: "60601",
-        isDefault: true,
-      },
-    ],
-    appointments: 3,
-    totalSpent: 450.25,
-    lastService: "2023-05-28",
-    status: "active",
-    createdAt: "2023-01-10",
-  },
-  {
-    id: 4,
-    name: "Tech Solutions Inc",
-    type: "business",
-    document: "98.765.432/0001-10",
-    email: "info@techsolutions.com",
-    phone: "(555) 333-2222",
-    addresses: [
-      {
-        id: 5,
-        street: "500 Tech Blvd",
-        city: "San Francisco",
-        state: "CA",
-        zipCode: "94105",
-        isDefault: true,
-      },
-    ],
-    appointments: 0,
-    totalSpent: 0,
-    lastService: null,
-    status: "inactive",
-    createdAt: "2023-02-20",
-  },
-  {
-    id: 5,
-    name: "Michael Brown",
-    type: "individual",
-    document: "456.789.123-00",
-    email: "michael.b@example.com",
-    phone: "(555) 444-3333",
-    addresses: [
-      {
-        id: 6,
-        street: "321 Oak St",
-        city: "Miami",
-        state: "FL",
-        zipCode: "33101",
-        isDefault: true,
-      },
-    ],
-    appointments: 5,
-    totalSpent: 875.5,
-    lastService: "2023-04-10",
-    status: "active",
-    createdAt: "2022-11-15",
-  },
-  {
-    id: 6,
-    name: "Global Enterprises LLC",
-    type: "business",
-    document: "45.678.901/0001-23",
-    email: "contact@globalent.com",
-    phone: "(555) 777-8888",
-    addresses: [
-      {
-        id: 7,
-        street: "800 Global Way",
-        city: "Los Angeles",
-        state: "CA",
-        zipCode: "90001",
-        isDefault: true,
-      },
-      {
-        id: 8,
-        street: "900 Branch Rd",
-        city: "San Diego",
-        state: "CA",
-        zipCode: "92101",
-        isDefault: false,
-      },
-    ],
-    appointments: 12,
-    totalSpent: 6800.0,
-    lastService: "2023-06-05",
-    status: "active",
-    createdAt: "2022-07-01",
-  },
-  {
-    id: 7,
-    name: "Emily Wilson",
-    type: "individual",
-    document: "789.123.456-00",
-    email: "emily.w@example.com",
-    phone: "(555) 222-1111",
-    addresses: [
-      {
-        id: 9,
-        street: "456 Pine St",
-        city: "Seattle",
-        state: "WA",
-        zipCode: "98101",
-        isDefault: true,
-      },
-    ],
-    appointments: 2,
-    totalSpent: 320.0,
-    lastService: "2023-03-15",
-    status: "inactive",
-    createdAt: "2023-02-01",
-  },
-]
+import { useAuth } from "@/contexts/auth-context"
+import { customersApi } from "@/lib/api/customers"
+import { toast } from "@/components/ui/use-toast"
+import type { Customer } from "@/types/customer"
 
 export default function ClientsPage() {
+  const { user } = useAuth()
+  const [clients, setClients] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -202,10 +51,69 @@ export default function ClientsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [selectedClient, setSelectedClient] = useState(null)
+  const [selectedClient, setSelectedClient] = useState<Customer | null>(null)
+
+  // Delete confirmation dialog
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [clientToDelete, setClientToDelete] = useState<any>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Fetch clients from API
+  useEffect(() => {
+    const fetchClients = async () => {
+      if (!user?.companyId) return
+
+      try {
+        setLoading(true)
+        const response = await customersApi.getAll({
+          companyId: user.companyId.toString(),
+          pageNumber: 1,
+          pageSize: 100,
+        })
+        setClients(response.data || [])
+      } catch (error) {
+        console.error("Error fetching clients:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load clients",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchClients()
+  }, [user?.companyId])
+
+  // Transform Customer to Client format for compatibility
+  const transformedClients = clients.map((customer) => ({
+    id: Number.parseInt(customer.id),
+    name: customer.name,
+    type: customer.document.includes("/") ? "business" : "individual",
+    document: customer.document,
+    email: customer.email,
+    phone: customer.phone,
+    addresses: [
+      {
+        id: 1,
+        street: customer.address,
+        city: "City", // API doesn't provide separate city
+        state: "State", // API doesn't provide separate state
+        zipCode: "00000", // API doesn't provide zipCode
+        isDefault: true,
+      },
+    ],
+    appointments: 0, // Would need to fetch from appointments API
+    totalSpent: 0, // Would need to calculate from appointments
+    lastService: null, // Would need to fetch from appointments API
+    status: customer.status === 1 ? "active" : "inactive",
+    createdAt: customer.createdDate,
+    notes: "",
+  }))
 
   // Filter and sort clients
-  const filteredClients = mockClients
+  const filteredClients = transformedClients
     .filter((client) => {
       // Search filter
       const matchesSearch =
@@ -244,22 +152,22 @@ export default function ClientsPage() {
         if (!b.lastService) return sortDirection === "asc" ? 1 : -1
 
         return sortDirection === "asc"
-          ? new Date(a.lastService) - new Date(b.lastService)
-          : new Date(b.lastService) - new Date(a.lastService)
+          ? new Date(a.lastService).getTime() - new Date(b.lastService).getTime()
+          : new Date(b.lastService).getTime() - new Date(a.lastService).getTime()
       }
       return 0
     })
 
   // Statistics
-  const totalClients = mockClients.length
-  const activeClients = mockClients.filter((c) => c.status === "active").length
-  const businessClients = mockClients.filter((c) => c.type === "business").length
-  const individualClients = mockClients.filter((c) => c.type === "individual").length
-  const totalAppointments = mockClients.reduce((sum, client) => sum + client.appointments, 0)
-  const totalRevenue = mockClients.reduce((sum, client) => sum + client.totalSpent, 0)
+  const totalClients = transformedClients.length
+  const activeClients = transformedClients.filter((c) => c.status === "active").length
+  const businessClients = transformedClients.filter((c) => c.type === "business").length
+  const individualClients = transformedClients.filter((c) => c.type === "individual").length
+  const totalAppointments = transformedClients.reduce((sum, client) => sum + client.appointments, 0)
+  const totalRevenue = transformedClients.reduce((sum, client) => sum + client.totalSpent, 0)
 
   // Handle sort
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -269,12 +177,12 @@ export default function ClientsPage() {
   }
 
   // Handle client selection for details or edit
-  const handleViewDetails = (client) => {
+  const handleViewDetails = (client: any) => {
     setSelectedClient(client)
     setIsDetailsModalOpen(true)
   }
 
-  const handleEditClient = (client) => {
+  const handleEditClient = (client: any) => {
     setSelectedClient(client)
     setIsEditModalOpen(true)
   }
@@ -282,6 +190,65 @@ export default function ClientsPage() {
   const handleAddClient = () => {
     setSelectedClient(null)
     setIsAddModalOpen(true)
+  }
+
+  // Handle delete client
+  const handleDeleteClient = (client: any) => {
+    setClientToDelete(client)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete) return
+
+    try {
+      setIsDeleting(true)
+      await customersApi.delete(clientToDelete.id)
+
+      // Remove client from local state
+      setClients((prev) => prev.filter((c) => Number.parseInt(c.id) !== clientToDelete.id))
+
+      toast({
+        title: "Client deleted",
+        description: `${clientToDelete.name} has been deleted successfully.`,
+      })
+    } catch (error) {
+      console.error("Error deleting client:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete client. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
+      setClientToDelete(null)
+    }
+  }
+
+  // Handle client creation/update
+  const handleClientSaved = async () => {
+    // Refresh clients list
+    if (!user?.companyId) return
+
+    try {
+      const response = await customersApi.getAll({
+        companyId: user.companyId.toString(),
+        pageNumber: 1,
+        pageSize: 100,
+      })
+      setClients(response.data || [])
+    } catch (error) {
+      console.error("Error refreshing clients:", error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-white">Loading clients...</div>
+      </div>
+    )
   }
 
   return (
@@ -321,8 +288,21 @@ export default function ClientsPage() {
           <CardContent>
             <div className="text-3xl font-bold text-white">{activeClients}</div>
             <p className="text-gray-400 text-sm">
-              {Math.round((activeClients / totalClients) * 100)}% of total clients
+              {totalClients > 0 ? Math.round((activeClients / totalClients) * 100) : 0}% of total clients
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#1a2234] border-[#2a3349]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-white text-lg flex items-center">
+              <Building className="h-5 w-5 mr-2 text-amber-500" />
+              Business Clients
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-white">{businessClients}</div>
+            <p className="text-gray-400 text-sm">{individualClients} individual clients</p>
           </CardContent>
         </Card>
 
@@ -335,20 +315,9 @@ export default function ClientsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">{totalAppointments}</div>
-            <p className="text-gray-400 text-sm">Avg {(totalAppointments / totalClients).toFixed(1)} per client</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-white text-lg flex items-center">
-              <Building className="h-5 w-5 mr-2 text-amber-500" />
-              Total Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">${totalRevenue.toFixed(2)}</div>
-            <p className="text-gray-400 text-sm">Avg ${(totalRevenue / activeClients).toFixed(2)} per active client</p>
+            <p className="text-gray-400 text-sm">
+              Avg {totalClients > 0 ? (totalAppointments / totalClients).toFixed(1) : 0} per client
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -510,7 +479,7 @@ export default function ClientsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349]"
+                            className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
                             onClick={() => handleViewDetails(client)}
                           >
                             View
@@ -518,10 +487,18 @@ export default function ClientsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349]"
+                            className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
                             onClick={() => handleEditClient(client)}
                           >
                             Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-red-500 text-red-500 hover:bg-red-500/10 hover:text-red-500 bg-transparent"
+                            onClick={() => handleDeleteClient(client)}
+                          >
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </td>
@@ -550,6 +527,7 @@ export default function ClientsPage() {
           }}
           client={selectedClient}
           isEditing={isEditModalOpen}
+          onSaved={handleClientSaved}
         />
       )}
 
@@ -565,6 +543,34 @@ export default function ClientsPage() {
           }}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="bg-[#1a2234] border-[#2a3349]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Delete Client</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              Are you sure you want to delete <span className="font-medium text-white">{clientToDelete?.name}</span>?
+              This action cannot be undone and will permanently remove all client data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+              disabled={isDeleting}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteClient}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? "Deleting..." : "Delete Client"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

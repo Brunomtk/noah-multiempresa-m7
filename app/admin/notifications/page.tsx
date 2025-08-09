@@ -11,198 +11,158 @@ import { NotificationDetailsModal } from "@/components/admin/notification-detail
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Bell, BellRing, CheckCheck, Clock, Eye, Search, Send, Users } from "lucide-react"
-
-// Mock data for notifications
-const mockNotifications = [
-  {
-    id: "NOT-001",
-    title: "System Update",
-    content: "A new system update is available. Check out the new features!",
-    type: "system",
-    status: "sent",
-    readCount: 45,
-    totalRecipients: 63,
-    createdAt: "2023-05-15T10:30:00",
-    sentAt: "2023-05-15T14:00:00",
-    targetType: "all",
-    targetIds: [],
-  },
-  {
-    id: "NOT-002",
-    title: "Scheduled Maintenance",
-    content: "We inform you that there will be scheduled maintenance on the system on 05/20/2023 from 10 PM to 2 AM.",
-    type: "maintenance",
-    status: "sent",
-    readCount: 38,
-    totalRecipients: 63,
-    createdAt: "2023-05-12T09:15:00",
-    sentAt: "2023-05-12T10:00:00",
-    targetType: "all",
-    targetIds: [],
-  },
-  {
-    id: "NOT-003",
-    title: "Plan Promotion",
-    content: "Take advantage of our special promotion! Upgrade to Premium plan with 20% discount until 05/30/2023.",
-    type: "marketing",
-    status: "scheduled",
-    readCount: 0,
-    totalRecipients: 28,
-    createdAt: "2023-05-16T11:45:00",
-    sentAt: null,
-    scheduledFor: "2023-05-20T09:00:00",
-    targetType: "plan",
-    targetIds: ["PLAN-001", "PLAN-002"],
-  },
-  {
-    id: "NOT-004",
-    title: "New Features Available",
-    content: "We've launched new features for the Enterprise plan. Check it out now!",
-    type: "feature",
-    status: "draft",
-    readCount: 0,
-    totalRecipients: 8,
-    createdAt: "2023-05-17T14:20:00",
-    sentAt: null,
-    targetType: "plan",
-    targetIds: ["PLAN-004"],
-  },
-  {
-    id: "NOT-005",
-    title: "Feedback Requested",
-    content: "We would like to hear your opinion about our services. Please respond to our satisfaction survey.",
-    type: "feedback",
-    status: "sent",
-    readCount: 12,
-    totalRecipients: 63,
-    createdAt: "2023-05-10T08:30:00",
-    sentAt: "2023-05-10T09:00:00",
-    targetType: "all",
-    targetIds: [],
-  },
-  {
-    id: "NOT-006",
-    title: "Terms of Service Update",
-    content: "We have updated our terms of service. Please read and accept the new terms.",
-    type: "legal",
-    status: "scheduled",
-    readCount: 0,
-    totalRecipients: 63,
-    createdAt: "2023-05-18T16:45:00",
-    sentAt: null,
-    scheduledFor: "2023-05-25T10:00:00",
-    targetType: "all",
-    targetIds: [],
-  },
-]
-
-// Stats data
-const statsData = {
-  totalNotifications: mockNotifications.length,
-  sentNotifications: mockNotifications.filter((n) => n.status === "sent").length,
-  scheduledNotifications: mockNotifications.filter((n) => n.status === "scheduled").length,
-  draftNotifications: mockNotifications.filter((n) => n.status === "draft").length,
-  averageReadRate: Math.round(
-    (mockNotifications.filter((n) => n.status === "sent").reduce((acc, n) => acc + n.readCount / n.totalRecipients, 0) /
-      mockNotifications.filter((n) => n.status === "sent").length) *
-      100,
-  ),
-}
+import { Bell, BellRing, CheckCheck, Clock, Eye, Search, Send, Users, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { useNotifications } from "@/hooks/use-notifications"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export default function NotificationsPage() {
+  const {
+    notifications,
+    selectedNotification,
+    loading,
+    error,
+    filters,
+    fetchNotifications,
+    fetchNotificationById,
+    addNotification,
+    updateNotificationById,
+    removeNotification,
+    markAsRead,
+    updateFilters,
+    resetFilters,
+    setSelectedNotification,
+    getNotificationTypeLabel,
+    getRecipientRoleLabel,
+    getStatusLabel,
+  } = useNotifications()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState("all")
+  const [selectedRole, setSelectedRole] = useState("all")
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedNotification, setSelectedNotification] = useState<any>(null)
+  const [notificationToEdit, setNotificationToEdit] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("all")
 
-  // Filter notifications based on search query, type, and tab
-  const filteredNotifications = mockNotifications.filter((notification) => {
+  // Filter notifications based on search query, type, role, and tab
+  const filteredNotifications = notifications.filter((notification) => {
+    // Safely check if properties exist before calling methods on them
+    const title = notification?.title || ""
+    const message = notification?.message || ""
+
     const matchesSearch =
-      notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      notification.content.toLowerCase().includes(searchQuery.toLowerCase())
+      title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      message.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const matchesType = selectedType === "all" || notification.type === selectedType
+    const notificationType = notification?.type?.toString() || ""
+    const matchesType = selectedType === "all" || notificationType === selectedType
 
+    const recipientRole = notification?.recipientRole?.toString() || ""
+    const matchesRole = selectedRole === "all" || recipientRole === selectedRole
+
+    const status = notification?.status
     const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "sent" && notification.status === "sent") ||
-      (activeTab === "scheduled" && notification.status === "scheduled") ||
-      (activeTab === "draft" && notification.status === "draft")
+      activeTab === "all" || (activeTab === "unread" && status === 0) || (activeTab === "read" && status === 1)
 
-    return matchesSearch && matchesType && matchesTab
+    return matchesSearch && matchesType && matchesRole && matchesTab
   })
 
-  const handleOpenDetailsModal = (notification: any) => {
-    setSelectedNotification(notification)
-    setIsDetailsModalOpen(true)
+  const handleOpenDetailsModal = async (notification: any) => {
+    try {
+      await fetchNotificationById(notification.id)
+      setIsDetailsModalOpen(true)
+    } catch (error) {
+      console.error("Failed to fetch notification details:", error)
+    }
   }
 
-  const handleSendNow = (notificationId: string) => {
-    // In a real application, this would send the notification immediately
-    console.log(`Sending notification ${notificationId} now`)
-    // For now, we'll just show an alert
-    alert(`Notification ${notificationId} sent`)
+  const handleEditNotification = async (notification: any) => {
+    try {
+      await fetchNotificationById(notification.id)
+      setNotificationToEdit(selectedNotification)
+      setIsNotificationModalOpen(true)
+    } catch (error) {
+      console.error("Failed to fetch notification for editing:", error)
+    }
   }
 
-  const handleDuplicate = (notification: any) => {
-    // In a real application, this would duplicate the notification
-    console.log(`Duplicating notification ${notification.id}`)
-    // For now, we'll just show an alert
-    alert(`Notification ${notification.id} duplicated`)
+  const handleDeleteNotification = async (id: number) => {
+    try {
+      await removeNotification(id)
+    } catch (error) {
+      console.error("Failed to delete notification:", error)
+    }
   }
 
-  const getStatusBadge = (status: string) => {
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await markAsRead(id)
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error)
+    }
+  }
+
+  const getStatusBadge = (status: number) => {
     switch (status) {
-      case "sent":
-        return <Badge className="bg-green-500">Sent</Badge>
-      case "scheduled":
-        return <Badge className="bg-blue-500">Scheduled</Badge>
-      case "draft":
-        return <Badge variant="outline">Draft</Badge>
+      case 0:
+        return <Badge variant="destructive">Unread</Badge>
+      case 1:
+        return <Badge className="bg-green-500">Read</Badge>
       default:
-        return <Badge>{status}</Badge>
+        return <Badge variant="outline">{getStatusLabel(status)}</Badge>
     }
   }
 
-  const getTypeLabel = (type: string) => {
+  const getTypeIcon = (type: number) => {
     switch (type) {
-      case "system":
-        return "System"
-      case "maintenance":
-        return "Maintenance"
-      case "marketing":
-        return "Marketing"
-      case "feature":
-        return "New Features"
-      case "feedback":
-        return "Feedback"
-      case "legal":
-        return "Legal"
-      default:
-        return type
-    }
-  }
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "system":
+      case 1:
         return <Bell className="h-4 w-4 text-blue-500" />
-      case "maintenance":
-        return <Clock className="h-4 w-4 text-yellow-500" />
-      case "marketing":
-        return <Users className="h-4 w-4 text-purple-500" />
-      case "feature":
-        return <BellRing className="h-4 w-4 text-green-500" />
-      case "feedback":
+      case 2:
+        return <Clock className="h-4 w-4 text-green-500" />
+      case 3:
+        return <BellRing className="h-4 w-4 text-purple-500" />
+      case 4:
         return <CheckCheck className="h-4 w-4 text-orange-500" />
-      case "legal":
-        return <Bell className="h-4 w-4 text-red-500" />
       default:
         return <Bell className="h-4 w-4" />
     }
+  }
+
+  // Stats calculation with safe checks
+  const stats = {
+    total: notifications?.length || 0,
+    unread: notifications?.filter((n) => n?.status === 0)?.length || 0,
+    read: notifications?.filter((n) => n?.status === 1)?.length || 0,
+    averageReadRate:
+      notifications?.length > 0
+        ? Math.round((notifications.filter((n) => n?.status === 1)?.length / notifications.length) * 100)
+        : 0,
+  }
+
+  const handleSearch = (value: string) => {
+    setSearchQuery(value)
+    updateFilters({ search: value })
+  }
+
+  const handleTypeFilter = (value: string) => {
+    setSelectedType(value)
+    updateFilters({ type: value === "all" ? undefined : value })
+  }
+
+  const handleRoleFilter = (value: string) => {
+    setSelectedRole(value)
+    updateFilters({ recipientRole: value === "all" ? undefined : value })
   }
 
   return (
@@ -211,7 +171,7 @@ export default function NotificationsPage() {
         <h1 className="text-2xl font-bold">Notification Management</h1>
         <Button
           onClick={() => {
-            setSelectedNotification(null)
+            setNotificationToEdit(null)
             setIsNotificationModalOpen(true)
           }}
         >
@@ -220,37 +180,29 @@ export default function NotificationsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Notifications</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.totalNotifications}</div>
+            <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Sent</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Unread</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.sentNotifications}</div>
+            <div className="text-2xl font-bold">{stats.unread}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Scheduled</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Read</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.scheduledNotifications}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Drafts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{statsData.draftNotifications}</div>
+            <div className="text-2xl font-bold">{stats.read}</div>
           </CardContent>
         </Card>
         <Card>
@@ -258,7 +210,7 @@ export default function NotificationsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Read Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.averageReadRate}%</div>
+            <div className="text-2xl font-bold">{stats.averageReadRate}%</div>
           </CardContent>
         </Card>
       </div>
@@ -272,21 +224,30 @@ export default function NotificationsPage() {
               placeholder="Search notifications..."
               className="pl-8"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
-          <Select value={selectedType} onValueChange={setSelectedType}>
+          <Select value={selectedType} onValueChange={handleTypeFilter}>
             <SelectTrigger className="w-full md:w-48">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="system">System</SelectItem>
-              <SelectItem value="maintenance">Maintenance</SelectItem>
-              <SelectItem value="marketing">Marketing</SelectItem>
-              <SelectItem value="feature">New Features</SelectItem>
-              <SelectItem value="feedback">Feedback</SelectItem>
-              <SelectItem value="legal">Legal</SelectItem>
+              <SelectItem value="1">System</SelectItem>
+              <SelectItem value="2">Appointment</SelectItem>
+              <SelectItem value="3">Message</SelectItem>
+              <SelectItem value="4">Alert</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedRole} onValueChange={handleRoleFilter}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="1">Admin</SelectItem>
+              <SelectItem value="2">Company</SelectItem>
+              <SelectItem value="3">Professional</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -296,9 +257,8 @@ export default function NotificationsPage() {
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="sent">Sent</TabsTrigger>
-          <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
-          <TabsTrigger value="draft">Drafts</TabsTrigger>
+          <TabsTrigger value="unread">Unread</TabsTrigger>
+          <TabsTrigger value="read">Read</TabsTrigger>
         </TabsList>
         <TabsContent value={activeTab} className="mt-4">
           <Card>
@@ -308,17 +268,22 @@ export default function NotificationsPage() {
                   <TableRow>
                     <TableHead>Title</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Recipient Role</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Recipients</TableHead>
-                    <TableHead>Read Rate</TableHead>
-                    <TableHead>Created Date</TableHead>
+                    <TableHead>Sent At</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredNotifications.length === 0 ? (
+                  {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-4">
+                      <TableCell colSpan={6} className="text-center py-4">
+                        Loading notifications...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredNotifications.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">
                         No notifications found
                       </TableCell>
                     </TableRow>
@@ -329,53 +294,65 @@ export default function NotificationsPage() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             {getTypeIcon(notification.type)}
-                            <span>{getTypeLabel(notification.type)}</span>
+                            <span>{getNotificationTypeLabel(notification.type)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            {getRecipientRoleLabel(notification.recipientRole)}
                           </div>
                         </TableCell>
                         <TableCell>{getStatusBadge(notification.status)}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            {notification.totalRecipients}
-                          </div>
+                          {notification.sentAt ? new Date(notification.sentAt).toLocaleDateString("en-US") : "N/A"}
                         </TableCell>
-                        <TableCell>
-                          {notification.status === "sent" ? (
-                            <div className="flex items-center gap-1">
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-                              {Math.round((notification.readCount / notification.totalRecipients) * 100)}%
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{new Date(notification.createdAt).toLocaleDateString("pt-BR")}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => handleOpenDetailsModal(notification)}>
-                              View
-                            </Button>
-                            {(notification.status === "draft" || notification.status === "scheduled") && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedNotification(notification)
-                                  setIsNotificationModalOpen(true)
-                                }}
-                              >
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenDetailsModal(notification)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              {notification.status === 0 && (
+                                <DropdownMenuItem onClick={() => handleMarkAsRead(notification.id)}>
+                                  <CheckCheck className="mr-2 h-4 w-4" />
+                                  Mark as Read
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={() => handleEditNotification(notification)}>
+                                <Edit className="mr-2 h-4 w-4" />
                                 Edit
-                              </Button>
-                            )}
-                            {notification.status === "scheduled" && (
-                              <Button variant="outline" size="sm" onClick={() => handleSendNow(notification.id)}>
-                                Send
-                              </Button>
-                            )}
-                            <Button variant="outline" size="sm" onClick={() => handleDuplicate(notification)}>
-                              Duplicate
-                            </Button>
-                          </div>
+                              </DropdownMenuItem>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the notification.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteNotification(notification.id)}>
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
@@ -389,15 +366,25 @@ export default function NotificationsPage() {
 
       <NotificationModal
         isOpen={isNotificationModalOpen}
-        onClose={() => setIsNotificationModalOpen(false)}
-        notificationToEdit={selectedNotification}
+        onClose={() => {
+          setIsNotificationModalOpen(false)
+          setNotificationToEdit(null)
+        }}
+        notificationToEdit={notificationToEdit}
+        onSubmit={notificationToEdit ? updateNotificationById : addNotification}
       />
 
       {selectedNotification && (
         <NotificationDetailsModal
           isOpen={isDetailsModalOpen}
-          onClose={() => setIsDetailsModalOpen(false)}
+          onClose={() => {
+            setIsDetailsModalOpen(false)
+            setSelectedNotification(null)
+          }}
           notification={selectedNotification}
+          onMarkAsRead={handleMarkAsRead}
+          onEdit={handleEditNotification}
+          onDelete={handleDeleteNotification}
         />
       )}
     </div>

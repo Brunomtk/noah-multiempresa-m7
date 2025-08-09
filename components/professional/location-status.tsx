@@ -29,7 +29,7 @@ export function LocationStatus({ targetAddress, onLocationUpdate }: LocationStat
     setError(null)
 
     if (!navigator.geolocation) {
-      setError("Geolocalização não é suportada neste dispositivo")
+      setError("Geolocation is not supported on this device")
       setLoading(false)
       return
     }
@@ -51,7 +51,7 @@ export function LocationStatus({ targetAddress, onLocationUpdate }: LocationStat
         onLocationUpdate?.(newLocation)
       },
       (error) => {
-        setError("Não foi possível obter sua localização")
+        setError("Could not get your location")
         setLoading(false)
         console.error("Geolocation error:", error)
       },
@@ -64,16 +64,16 @@ export function LocationStatus({ targetAddress, onLocationUpdate }: LocationStat
   }
 
   const getLocationStatus = () => {
-    if (loading) return { status: "loading", message: "Obtendo localização..." }
+    if (loading) return { status: "loading", message: "Getting location..." }
     if (error) return { status: "error", message: error }
-    if (distance === null) return { status: "unknown", message: "Localização desconhecida" }
+    if (distance === null) return { status: "unknown", message: "Unknown location" }
 
     if (distance <= 50) {
-      return { status: "success", message: "Você está no local correto" }
+      return { status: "success", message: "You are at the correct location" }
     } else if (distance <= 100) {
-      return { status: "warning", message: `Você está a ${Math.round(distance)}m do local` }
+      return { status: "warning", message: `You are ${Math.round(distance)}m from the location` }
     } else {
-      return { status: "error", message: `Você está muito longe (${Math.round(distance)}m)` }
+      return { status: "error", message: `You are too far away (${Math.round(distance)}m)` }
     }
   }
 
@@ -86,7 +86,7 @@ export function LocationStatus({ targetAddress, onLocationUpdate }: LocationStat
           <div className="flex items-center justify-between">
             <h3 className="font-medium flex items-center gap-2">
               <MapPin className="h-4 w-4" />
-              Status da Localização
+              Location Status
             </h3>
             <Badge
               variant={
@@ -105,17 +105,17 @@ export function LocationStatus({ targetAddress, onLocationUpdate }: LocationStat
                 <AlertTriangle className="h-3 w-3 mr-1" />
               )}
               {locationStatus.status === "success"
-                ? "No local"
+                ? "At Location"
                 : locationStatus.status === "warning"
-                  ? "Próximo"
+                  ? "Nearby"
                   : locationStatus.status === "loading"
-                    ? "Carregando"
-                    : "Distante"}
+                    ? "Loading"
+                    : "Far Away"}
             </Badge>
           </div>
 
           <div className="text-sm text-muted-foreground">
-            <p className="font-medium">Endereço do serviço:</p>
+            <p className="font-medium">Service Address:</p>
             <p>{targetAddress}</p>
           </div>
 
@@ -129,12 +129,12 @@ export function LocationStatus({ targetAddress, onLocationUpdate }: LocationStat
             }`}
           >
             <p className="text-sm font-medium">{locationStatus.message}</p>
-            {location && <p className="text-xs mt-1 opacity-75">Precisão: ±{Math.round(location.accuracy)}m</p>}
+            {location && <p className="text-xs mt-1 opacity-75">Accuracy: ±{Math.round(location.accuracy)}m</p>}
           </div>
 
           {error && (
             <button onClick={getCurrentLocation} className="text-sm text-primary hover:underline">
-              Tentar novamente
+              Try again
             </button>
           )}
         </div>

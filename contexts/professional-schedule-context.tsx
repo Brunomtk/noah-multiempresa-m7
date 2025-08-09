@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import type { Appointment } from "@/types/appointment"
+import type { Appointment, AppointmentFilters } from "@/types/appointment"
 import {
   getProfessionalAppointments,
   getProfessionalAppointmentById,
@@ -21,9 +21,9 @@ interface ProfessionalScheduleContextType {
   currentAppointment: Appointment | null
   isLoading: boolean
   error: string | null
-  fetchAppointments: (filters?: Record<string, any>) => Promise<void>
+  fetchAppointments: (filters?: AppointmentFilters) => Promise<void>
   fetchAppointmentById: (id: string) => Promise<Appointment | null>
-  fetchAppointmentsByDateRange: (startDate: string, endDate: string, filters?: Record<string, any>) => Promise<void>
+  fetchAppointmentsByDateRange: (startDate: string, endDate: string, filters?: AppointmentFilters) => Promise<void>
   checkIn: (appointmentId: string, data: { location: { lat: number; lng: number }; notes?: string }) => Promise<boolean>
   checkOut: (
     appointmentId: string,
@@ -79,7 +79,7 @@ export function ProfessionalScheduleProvider({ children }: { children: ReactNode
     return appointments.map(formatAppointment)
   }
 
-  const fetchAppointments = async (filters?: Record<string, any>) => {
+  const fetchAppointments = async (filters?: AppointmentFilters) => {
     setIsLoading(true)
     setError(null)
     try {
@@ -123,7 +123,7 @@ export function ProfessionalScheduleProvider({ children }: { children: ReactNode
     }
   }
 
-  const fetchAppointmentsByDateRange = async (startDate: string, endDate: string, filters?: Record<string, any>) => {
+  const fetchAppointmentsByDateRange = async (startDate: string, endDate: string, filters?: AppointmentFilters) => {
     setIsLoading(true)
     setError(null)
     try {

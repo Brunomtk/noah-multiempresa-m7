@@ -4,29 +4,11 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  LayoutDashboard,
-  Calendar,
-  Users,
-  UserCheck,
-  MessageSquare,
-  MapPin,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-  Bell,
-  LogIn,
-  LogOut,
-  XCircle,
-  Star,
-  CreditCard,
-  Package,
-  BarChart,
-  Package2,
-  User,
-} from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { LayoutDashboard, Calendar, Users, UserCheck, MapPin, ChevronLeft, ChevronRight, Bell, XCircle, CreditCard, Package, User, CheckSquare, MessageSquare } from 'lucide-react'
 import { NoahLogo } from "@/components/noah-logo"
 import { useCompanySidebar } from "./company-sidebar-context"
+import { useAuth } from "@/contexts/auth-context"
 
 const menuItems = [
   {
@@ -40,19 +22,9 @@ const menuItems = [
     icon: Calendar,
   },
   {
-    title: "Reschedule",
-    href: "/company/reschedule",
-    icon: RefreshCw,
-  },
-  {
-    title: "Check-in",
-    href: "/company/check-in",
-    icon: LogIn,
-  },
-  {
-    title: "Check-out",
-    href: "/company/check-out",
-    icon: LogOut,
+    title: "Check Management",
+    href: "/company/check-management",
+    icon: CheckSquare,
   },
   {
     title: "Clients",
@@ -80,16 +52,6 @@ const menuItems = [
     icon: Package,
   },
   {
-    title: "Materials",
-    href: "/company/materials",
-    icon: Package2,
-  },
-  {
-    title: "Reports",
-    href: "/company/reports",
-    icon: BarChart,
-  },
-  {
     title: "Cancellations",
     href: "/company/cancellations",
     icon: XCircle,
@@ -98,16 +60,6 @@ const menuItems = [
     title: "Feedback",
     href: "/company/feedback",
     icon: MessageSquare,
-  },
-  {
-    title: "Chat",
-    href: "/company/chat",
-    icon: MessageSquare,
-  },
-  {
-    title: "Reviews",
-    href: "/company/reviews",
-    icon: Star,
   },
   {
     title: "GPS Tracking",
@@ -129,6 +81,17 @@ const menuItems = [
 export function CompanySidebar() {
   const pathname = usePathname()
   const { collapsed, setCollapsed } = useCompanySidebar()
+  const { user } = useAuth()
+
+  // Get user initials for avatar fallback
+  const getUserInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((word) => word.charAt(0))
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
 
   return (
     <div
@@ -186,13 +149,16 @@ export function CompanySidebar() {
 
       <div className="border-t border-[#2a3349] p-4">
         <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-          <div className="h-8 w-8 rounded-full bg-[#06b6d4] flex items-center justify-center text-white font-semibold">
-            C
-          </div>
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={user?.avatar || ""} alt={user?.name || "User"} />
+            <AvatarFallback className="bg-[#06b6d4] text-white text-xs font-semibold">
+              {user?.name ? getUserInitials(user.name) : "U"}
+            </AvatarFallback>
+          </Avatar>
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">Company Admin</p>
-              <p className="text-xs text-gray-400 truncate">admin@company.com</p>
+              <p className="text-sm font-medium text-white truncate">{user?.name || "User"}</p>
+              <p className="text-xs text-gray-400 truncate">{user?.email || "user@company.com"}</p>
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Search, Eye, Edit, Trash2, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,154 +20,154 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { GpsTrackingModal } from "@/components/admin/gps-tracking-modal"
 import { GpsTrackingDetailsModal } from "@/components/admin/gps-tracking-details-modal"
-
-// Sample data
-const initialGpsData = [
-  {
-    id: "GPS001",
-    professional: "John Smith",
-    company: "CleanCo Services",
-    latitude: 40.7128,
-    longitude: -74.006,
-    address: "123 Broadway, New York, NY 10001",
-    speed: 0,
-    status: "active",
-    lastUpdate: "2023-05-15T09:30:00",
-    vehicle: "Toyota Corolla - ABC1234",
-    battery: 85,
-    accuracy: 5,
-    notes: "On route to client",
-  },
-  {
-    id: "GPS002",
-    professional: "Emily Johnson",
-    company: "GreenThumb Landscaping",
-    latitude: 34.0522,
-    longitude: -118.2437,
-    address: "456 Hollywood Blvd, Los Angeles, CA 90028",
-    speed: 35,
-    status: "active",
-    lastUpdate: "2023-05-15T10:15:00",
-    vehicle: "Ford F-150 - XYZ5678",
-    battery: 72,
-    accuracy: 8,
-    notes: "Heading to next job site",
-  },
-  {
-    id: "GPS003",
-    professional: "Michael Brown",
-    company: "CleanCo Services",
-    latitude: 41.8781,
-    longitude: -87.6298,
-    address: "789 Michigan Ave, Chicago, IL 60611",
-    speed: 0,
-    status: "inactive",
-    lastUpdate: "2023-05-15T11:00:00",
-    vehicle: "Honda Civic - DEF9012",
-    battery: 45,
-    accuracy: 10,
-    notes: "Lunch break",
-  },
-  {
-    id: "GPS004",
-    professional: "Sarah Wilson",
-    company: "ElectroPro Solutions",
-    latitude: 29.7604,
-    longitude: -95.3698,
-    address: "101 Main St, Houston, TX 77002",
-    speed: 28,
-    status: "active",
-    lastUpdate: "2023-05-15T13:45:00",
-    vehicle: "Chevrolet Express - GHI3456",
-    battery: 90,
-    accuracy: 3,
-    notes: "Emergency call",
-  },
-  {
-    id: "GPS005",
-    professional: "David Martinez",
-    company: "GreenThumb Landscaping",
-    latitude: 33.4484,
-    longitude: -112.074,
-    address: "202 Central Ave, Phoenix, AZ 85004",
-    speed: 0,
-    status: "active",
-    lastUpdate: "2023-05-15T14:30:00",
-    vehicle: "Nissan Frontier - JKL7890",
-    battery: 65,
-    accuracy: 7,
-    notes: "At client location",
-  },
-]
+import { gpsTrackingApi } from "@/lib/api/gps-tracking"
+import type {
+  GPSTracking,
+  GPSTrackingCreateRequest,
+  GPSTrackingUpdateRequest,
+  GPSTrackingFilters,
+} from "@/types/gps-tracking"
 
 export default function GpsTrackingPage() {
-  const [gpsData, setGpsData] = useState(initialGpsData)
+  const [gpsData, setGpsData] = useState<GPSTracking[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedGps, setSelectedGps] = useState<any>(null)
-  const [gpsToDelete, setGpsToDelete] = useState<any>(null)
+  const [selectedGps, setSelectedGps] = useState<GPSTracking | null>(null)
+  const [gpsToDelete, setGpsToDelete] = useState<GPSTracking | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [companyFilter, setCompanyFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<string | number>("all")
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+  })
   const { toast } = useToast()
 
-  const handleAddGps = (data: any) => {
-    const newGps = {
-      id: `GPS${String(gpsData.length + 1).padStart(3, "0")}`,
-      ...data,
-      lastUpdate: new Date().toISOString(),
+  const fetchGpsData = async () => {
+    try {
+      setIsLoading(true)
+      const filters: GPSTrackingFilters = {
+        searchQuery: searchQuery || undefined,
+        status: statusFilter === "all" ? undefined : Number(statusFilter),
+        pageNumber: pagination.currentPage,
+        pageSize: pagination.itemsPerPage,
+      }
+
+      const { data: response, error } = await gpsTrackingApi.getRecords(filters)
+
+      if (error) {
+        throw new Error(error)
+      }
+
+      if (response) {
+        setGpsData(response.data)
+        setPagination(response.meta)
+      }
+    } catch (error) {
+      console.error("Error fetching GPS data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch GPS tracking records",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
-    setGpsData([...gpsData, newGps])
-    setIsModalOpen(false)
-    toast({
-      title: "GPS tracking added successfully",
-      description: `GPS tracking for ${data.professional} has been added.`,
-    })
   }
 
-  const handleEditGps = (data: any) => {
-    setGpsData(gpsData.map((gps) => (gps.id === selectedGps.id ? { ...gps, ...data } : gps)))
-    setSelectedGps(null)
-    setIsModalOpen(false)
-    toast({
-      title: "GPS tracking updated successfully",
-      description: `GPS tracking for ${data.professional} has been updated.`,
-    })
+  useEffect(() => {
+    fetchGpsData()
+  }, [searchQuery, statusFilter, pagination.currentPage])
+
+  const handleAddGps = async (data: GPSTrackingCreateRequest) => {
+    try {
+      const { data: newRecord, error } = await gpsTrackingApi.create(data)
+
+      if (error) {
+        throw new Error(error)
+      }
+
+      setIsModalOpen(false)
+      fetchGpsData()
+      toast({
+        title: "GPS tracking added successfully",
+        description: `GPS tracking for ${data.professionalName || `Professional ${data.professionalId}`} has been added.`,
+      })
+    } catch (error) {
+      console.error("Error creating GPS record:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create GPS tracking record",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleDeleteGps = () => {
-    if (gpsToDelete) {
-      setGpsData(gpsData.filter((gps) => gps.id !== gpsToDelete.id))
+  const handleEditGps = async (data: GPSTrackingUpdateRequest) => {
+    if (!selectedGps) return
+
+    try {
+      const { data: updatedRecord, error } = await gpsTrackingApi.update(selectedGps.id, data)
+
+      if (error) {
+        throw new Error(error)
+      }
+
+      setSelectedGps(null)
+      setIsModalOpen(false)
+      fetchGpsData()
+      toast({
+        title: "GPS tracking updated successfully",
+        description: `GPS tracking for ${data.professionalName || `Professional ${data.professionalId}`} has been updated.`,
+      })
+    } catch (error) {
+      console.error("Error updating GPS record:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update GPS tracking record",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteGps = async () => {
+    if (!gpsToDelete) return
+
+    try {
+      const { success, error } = await gpsTrackingApi.delete(gpsToDelete.id)
+
+      if (error) {
+        throw new Error(error)
+      }
+
+      fetchGpsData()
       toast({
         title: "GPS tracking deleted successfully",
-        description: `GPS tracking for ${gpsToDelete.professional} has been removed.`,
+        description: `GPS tracking for ${gpsToDelete.professionalName || `Professional ${gpsToDelete.professionalId}`} has been removed.`,
         variant: "destructive",
       })
       setGpsToDelete(null)
+    } catch (error) {
+      console.error("Error deleting GPS record:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete GPS tracking record",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleViewDetails = (gps: any) => {
+  const handleViewDetails = (gps: GPSTracking) => {
     setSelectedGps(gps)
     setIsDetailsModalOpen(true)
   }
 
-  const handleEdit = (gps: any) => {
+  const handleEdit = (gps: GPSTracking) => {
     setSelectedGps(gps)
     setIsModalOpen(true)
   }
-
-  const filteredGpsData = gpsData.filter((gps) => {
-    const matchesSearch =
-      gps.professional.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      gps.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      gps.vehicle.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || gps.status === statusFilter
-    const matchesCompany = companyFilter === "all" || gps.company === companyFilter
-    return matchesSearch && matchesStatus && matchesCompany
-  })
-
-  const companies = [...new Set(gpsData.map((gps) => gps.company))]
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -178,6 +178,22 @@ export default function GpsTrackingPage() {
       hour: "2-digit",
       minute: "2-digit",
     }).format(date)
+  }
+
+  const getStatusText = (status: number) => {
+    return status === 1 ? "Active" : "Inactive"
+  }
+
+  const getStatusColor = (status: number) => {
+    return status === 1 ? "border-green-500 text-green-500" : "border-red-500 text-red-500"
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading GPS tracking records...</div>
+      </div>
+    )
   }
 
   return (
@@ -218,29 +234,29 @@ export default function GpsTrackingPage() {
               className={
                 statusFilter === "all"
                   ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               }
             >
               All
             </Button>
             <Button
-              variant={statusFilter === "active" ? "default" : "outline"}
-              onClick={() => setStatusFilter("active")}
+              variant={statusFilter === 1 ? "default" : "outline"}
+              onClick={() => setStatusFilter(1)}
               className={
-                statusFilter === "active"
+                statusFilter === 1
                   ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               }
             >
               Active
             </Button>
             <Button
-              variant={statusFilter === "inactive" ? "default" : "outline"}
-              onClick={() => setStatusFilter("inactive")}
+              variant={statusFilter === 2 ? "default" : "outline"}
+              onClick={() => setStatusFilter(2)}
               className={
-                statusFilter === "inactive"
+                statusFilter === 2
                   ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
               }
             >
               Inactive
@@ -262,107 +278,112 @@ export default function GpsTrackingPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredGpsData.map((gps) => (
-                <TableRow key={gps.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
-                  <TableCell className="font-medium text-white">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-[#2a3349] p-1.5 rounded-md">
-                        <MapPin className="h-4 w-4 text-[#06b6d4]" />
-                      </div>
-                      <div>
-                        <div>{gps.professional}</div>
-                        <div className="text-xs text-gray-400">{gps.vehicle}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-400">{gps.company}</TableCell>
-                  <TableCell className="text-gray-400">
-                    <div className="max-w-[200px]">
-                      <div className="truncate">{gps.address}</div>
-                      <div className="text-xs">
-                        {gps.latitude.toFixed(4)}, {gps.longitude.toFixed(4)}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-400">{gps.speed} km/h</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        gps.status === "active" ? "border-green-500 text-green-500" : "border-red-500 text-red-500"
-                      }
-                    >
-                      {gps.status === "active" ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-gray-400">{formatDate(gps.lastUpdate)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewDetails(gps)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View Details</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(gps)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Edit</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setGpsToDelete(gps)}
-                            className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+              {gpsData.length === 0 ? (
+                <TableRow className="border-[#2a3349] bg-[#0f172a]">
+                  <TableCell colSpan={7} className="text-center text-gray-400 py-8">
+                    No GPS tracking records found
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                gpsData.map((gps) => (
+                  <TableRow key={gps.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
+                    <TableCell className="font-medium text-white">
+                      <div className="flex items-center gap-2">
+                        <div className="bg-[#2a3349] p-1.5 rounded-md">
+                          <MapPin className="h-4 w-4 text-[#06b6d4]" />
+                        </div>
+                        <div>
+                          <div>{gps.professionalName || `Professional ${gps.professionalId}`}</div>
+                          <div className="text-xs text-gray-400">{gps.vehicle}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-400">{gps.companyName || `Company ${gps.companyId}`}</TableCell>
+                    <TableCell className="text-gray-400">
+                      <div className="max-w-[200px]">
+                        <div className="truncate">{gps.location.address}</div>
+                        <div className="text-xs">
+                          {gps.location.latitude.toFixed(4)}, {gps.location.longitude.toFixed(4)}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-400">{gps.speed} km/h</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={getStatusColor(gps.status)}>
+                        {getStatusText(gps.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-gray-400">{formatDate(gps.timestamp)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewDetails(gps)}
+                              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View Details</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(gps)}
+                              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setGpsToDelete(gps)}
+                              className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Delete</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-400">
-            Showing <span className="font-medium text-white">{filteredGpsData.length}</span> of{" "}
-            <span className="font-medium text-white">{gpsData.length}</span> GPS tracking records
+            Showing <span className="font-medium text-white">{gpsData.length}</span> of{" "}
+            <span className="font-medium text-white">{pagination.totalItems}</span> GPS tracking records
           </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              onClick={() => setPagination((prev) => ({ ...prev, currentPage: Math.max(1, prev.currentPage - 1) }))}
+              disabled={pagination.currentPage <= 1}
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               Previous
             </Button>
@@ -371,12 +392,16 @@ export default function GpsTrackingPage() {
               size="sm"
               className="border-[#2a3349] bg-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
             >
-              1
+              {pagination.currentPage}
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              onClick={() =>
+                setPagination((prev) => ({ ...prev, currentPage: Math.min(prev.totalPages, prev.currentPage + 1) }))
+              }
+              disabled={pagination.currentPage >= pagination.totalPages}
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
             >
               Next
             </Button>
@@ -408,7 +433,10 @@ export default function GpsTrackingPage() {
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription className="text-gray-400">
                 This action cannot be undone. This will permanently delete the GPS tracking record for{" "}
-                <span className="font-semibold text-white">{gpsToDelete?.professional}</span>.
+                <span className="font-semibold text-white">
+                  {gpsToDelete?.professionalName || `Professional ${gpsToDelete?.professionalId}`}
+                </span>
+                .
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

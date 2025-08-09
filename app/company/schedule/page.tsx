@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,94 +9,29 @@ import { Calendar, Plus } from "lucide-react"
 import { CompanyScheduleCalendar } from "@/components/company/company-schedule-calendar"
 import { CompanyAppointmentModal } from "@/components/company/company-appointment-modal"
 import { CompanyAppointmentDetailsModal } from "@/components/company/company-appointment-details-modal"
-import { addHours } from "date-fns"
+import { CompanyAppointmentsProvider, useCompanyAppointments } from "@/contexts/company-appointments-context"
+import type { Appointment } from "@/types/appointment"
 
-// Sample data for appointments
-const generateSampleAppointments = () => {
-  const now = new Date()
-  const appointments = []
-
-  // Generate 20 appointments over the next 30 days
-  for (let i = 0; i < 20; i++) {
-    const startDate = new Date(now)
-    startDate.setDate(now.getDate() + Math.floor(Math.random() * 30))
-    startDate.setHours(8 + Math.floor(Math.random() * 8), 0, 0, 0) // Between 8 AM and 4 PM
-
-    const endDate = new Date(startDate)
-    endDate.setHours(startDate.getHours() + 1 + Math.floor(Math.random() * 3)) // 1-3 hours duration
-
-    const statusOptions = ["scheduled", "in_progress", "completed", "cancelled"]
-    const statusIndex = Math.floor(Math.random() * (i > 15 ? 4 : 3)) // More likely to be scheduled for recent ones
-
-    const typeOptions = ["regular", "deep", "specialized"]
-    const typeIndex = Math.floor(Math.random() * 3)
-
-    const customerNames = [
-      "John Smith",
-      "Emma Johnson",
-      "Michael Brown",
-      "Sophia Davis",
-      "William Miller",
-      "Olivia Wilson",
-      "James Moore",
-      "Ava Taylor",
-      "Alexander Anderson",
-      "Charlotte Thomas",
-      "Benjamin Jackson",
-      "Mia White",
-    ]
-
-    appointments.push({
-      id: i + 1,
-      title: `${typeOptions[typeIndex].charAt(0).toUpperCase() + typeOptions[typeIndex].slice(1)} Cleaning Service`,
-      customer: customerNames[Math.floor(Math.random() * customerNames.length)],
-      address: `${Math.floor(Math.random() * 999) + 1} ${
-        ["Main St", "Oak Ave", "Pine Rd", "Maple Dr", "Cedar Ln"][Math.floor(Math.random() * 5)]
-      }, ${["Apt", "Suite", "Unit"][Math.floor(Math.random() * 3)]} ${Math.floor(Math.random() * 100) + 1}`,
-      team: `Team ${["Alpha", "Beta", "Gamma", "Delta"][Math.floor(Math.random() * 4)]}`,
-      start: startDate,
-      end: endDate,
-      status: statusOptions[statusIndex],
-      type: typeOptions[typeIndex],
-      notes:
-        Math.random() > 0.7
-          ? "Special instructions: " +
-            [
-              "Please focus on kitchen area",
-              "Client has pets",
-              "Use eco-friendly products only",
-              "Entry code: 1234",
-              "Please call 15 minutes before arrival",
-            ][Math.floor(Math.random() * 5)]
-          : "",
-    })
-  }
-
-  return appointments
-}
-
-export default function SchedulePage() {
+function CompanyScheduleContent() {
   const [viewMode, setViewMode] = useState<"day" | "week" | "month">("week")
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterType, setFilterType] = useState("all")
-  const [appointments, setAppointments] = useState<any[]>([])
+  const [filterProfessional, setFilterProfessional] = useState("all")
+  const { appointments, isLoading, fetchAppointments, addAppointment, editAppointment, removeAppointment } =
+    useCompanyAppointments()
+
+  const filteredAppointments = appointments.filter((appointment) => {
+    if (filterStatus !== "all" && appointment.status.toString() !== filterStatus) return false
+    if (filterType !== "all" && appointment.type.toString() !== filterType) return false
+    if (filterProfessional !== "all" && appointment.professionalId?.toString() !== filterProfessional) return false
+    return true
+  })
 
   // Modal states
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-
-  useEffect(() => {
-    // Load sample data
-    setAppointments(generateSampleAppointments())
-  }, [])
-
-  const filteredAppointments = appointments.filter((appointment) => {
-    if (filterStatus !== "all" && appointment.status !== filterStatus) return false
-    if (filterType !== "all" && appointment.type !== filterType) return false
-    return true
-  })
 
   const handleAddAppointment = (date?: Date) => {
     setSelectedAppointment(null)
@@ -105,53 +40,71 @@ export default function SchedulePage() {
 
     // If a date is provided, we'll use it as the default start time
     if (date) {
-      const endDate = addHours(date, 2)
+      const endDate = new Date(date.getTime() + 2 * 60 * 60 * 1000) // Add 2 hours
       setSelectedAppointment({
         start: date,
         end: endDate,
-      })
+      } as Appointment)
     }
   }
 
-  const handleViewDetails = (appointment: any) => {
+  const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setIsDetailsModalOpen(true)
   }
 
-  const handleEditAppointment = (appointment: any) => {
+  const handleEditAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setIsEditing(true)
     setIsAppointmentModalOpen(true)
     setIsDetailsModalOpen(false)
   }
 
-  const handleDeleteAppointment = (appointment: any) => {
-    // In a real app, you would call an API to delete the appointment
-    setAppointments((prev) => prev.filter((a) => a.id !== appointment.id))
+  const handleDeleteAppointment = async (appointment: Appointment) => {
+    if (appointment.id) {
+      await removeAppointment(appointment.id)
+    }
   }
 
-  const handleSubmitAppointment = (data: any) => {
-    if (isEditing && selectedAppointment) {
-      // Update existing appointment
-      setAppointments((prev) =>
-        prev.map((appointment) =>
-          appointment.id === selectedAppointment.id ? { ...data, id: appointment.id } : appointment,
-        ),
-      )
+  const handleSubmitAppointment = async (data: any) => {
+    if (isEditing && selectedAppointment?.id) {
+      await editAppointment(selectedAppointment.id, data)
     } else {
-      // Add new appointment
-      const newId = Math.max(0, ...appointments.map((a) => a.id)) + 1
-      setAppointments((prev) => [...prev, { ...data, id: newId }])
+      await addAppointment(data)
     }
-
     setIsAppointmentModalOpen(false)
+  }
+
+  const handleClearFilters = () => {
+    setFilterStatus("all")
+    setFilterType("all")
+    setFilterProfessional("all")
+  }
+
+  // Get unique professionals from appointments for filter
+  const uniqueProfessionals = appointments.reduce(
+    (acc, appointment) => {
+      if (appointment.professional && !acc.find((p) => p.id === appointment.professional!.id)) {
+        acc.push(appointment.professional)
+      }
+      return acc
+    },
+    [] as Array<{ id: number; name: string; email: string }>,
+  )
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading appointments...</div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Cleaning Schedule</h1>
+          <h1 className="text-2xl font-bold text-white mb-1">Schedule</h1>
           <p className="text-gray-400">View and manage your scheduled services</p>
         </div>
         <Button onClick={() => handleAddAppointment()} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
@@ -163,51 +116,77 @@ export default function SchedulePage() {
       {/* Filters */}
       <Card className="bg-[#1a2234] border-[#2a3349]">
         <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full sm:w-[200px] bg-[#0f172a] border-[#2a3349] text-white">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                <SelectItem value="all" className="hover:bg-[#2a3349]">
-                  All Status
-                </SelectItem>
-                <SelectItem value="scheduled" className="hover:bg-[#2a3349]">
-                  Scheduled
-                </SelectItem>
-                <SelectItem value="in_progress" className="hover:bg-[#2a3349]">
-                  In Progress
-                </SelectItem>
-                <SelectItem value="completed" className="hover:bg-[#2a3349]">
-                  Completed
-                </SelectItem>
-                <SelectItem value="cancelled" className="hover:bg-[#2a3349]">
-                  Cancelled
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+            <div className="flex flex-col sm:flex-row gap-4 flex-1">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full sm:w-[160px] bg-[#0f172a] border-[#2a3349] text-white">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="all" className="hover:bg-[#2a3349]">
+                    All Status
+                  </SelectItem>
+                  <SelectItem value="0" className="hover:bg-[#2a3349]">
+                    Scheduled
+                  </SelectItem>
+                  <SelectItem value="1" className="hover:bg-[#2a3349]">
+                    In Progress
+                  </SelectItem>
+                  <SelectItem value="2" className="hover:bg-[#2a3349]">
+                    Completed
+                  </SelectItem>
+                  <SelectItem value="3" className="hover:bg-[#2a3349]">
+                    Cancelled
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-full sm:w-[200px] bg-[#0f172a] border-[#2a3349] text-white">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                <SelectItem value="all" className="hover:bg-[#2a3349]">
-                  All Types
-                </SelectItem>
-                <SelectItem value="regular" className="hover:bg-[#2a3349]">
-                  Regular Cleaning
-                </SelectItem>
-                <SelectItem value="deep" className="hover:bg-[#2a3349]">
-                  Deep Cleaning
-                </SelectItem>
-                <SelectItem value="specialized" className="hover:bg-[#2a3349]">
-                  Specialized Service
-                </SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full sm:w-[160px] bg-[#0f172a] border-[#2a3349] text-white">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="all" className="hover:bg-[#2a3349]">
+                    All Types
+                  </SelectItem>
+                  <SelectItem value="0" className="hover:bg-[#2a3349]">
+                    Residential
+                  </SelectItem>
+                  <SelectItem value="1" className="hover:bg-[#2a3349]">
+                    Commercial
+                  </SelectItem>
+                  <SelectItem value="2" className="hover:bg-[#2a3349]">
+                    Industrial
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
-            <div className="flex-1"></div>
+              <Select value={filterProfessional} onValueChange={setFilterProfessional}>
+                <SelectTrigger className="w-full sm:w-[180px] bg-[#0f172a] border-[#2a3349] text-white">
+                  <SelectValue placeholder="Filter by professional" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="all" className="hover:bg-[#2a3349]">
+                    All Professionals
+                  </SelectItem>
+                  {uniqueProfessionals.map((professional) => (
+                    <SelectItem key={professional.id} value={professional.id.toString()} className="hover:bg-[#2a3349]">
+                      {professional.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {(filterStatus !== "all" || filterType !== "all" || filterProfessional !== "all") && (
+                <Button
+                  variant="outline"
+                  onClick={handleClearFilters}
+                  className="border-[#2a3349] text-white bg-transparent hover:bg-[#2a3349] whitespace-nowrap"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
 
             <Tabs defaultValue="week" className="w-full sm:w-auto" onValueChange={(value) => setViewMode(value as any)}>
               <TabsList className="bg-[#0f172a] border border-[#2a3349]">
@@ -259,5 +238,13 @@ export default function SchedulePage() {
         onDelete={handleDeleteAppointment}
       />
     </div>
+  )
+}
+
+export default function SchedulePage() {
+  return (
+    <CompanyAppointmentsProvider>
+      <CompanyScheduleContent />
+    </CompanyAppointmentsProvider>
   )
 }

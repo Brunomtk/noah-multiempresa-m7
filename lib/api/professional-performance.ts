@@ -1,208 +1,135 @@
 import { apiRequest } from "./utils"
-import type {
-  PerformanceMetrics,
-  PerformanceGoal,
-  Achievement,
-  PerformanceRanking,
-  PerformanceReport,
-  PerformanceComparison,
-} from "@/types/performance"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
-
-export interface GetPerformanceMetricsParams {
-  period?: "daily" | "weekly" | "monthly" | "yearly"
-  startDate?: string
-  endDate?: string
+interface ReviewsResponse {
+  data: Review[]
+  meta: {
+    currentPage: number
+    totalPages: number
+    totalItems: number
+    itemsPerPage: number
+  }
 }
 
-export interface CreateGoalData {
-  title: string
-  description: string
-  targetValue: number
-  unit: string
-  category: "rating" | "punctuality" | "productivity" | "revenue" | "efficiency"
-  deadline: string
+interface Review {
+  id: number
+  customerId: string
+  customerName: string
+  professionalId: string
+  professionalName: string
+  teamId: string
+  teamName: string
+  companyId: string
+  companyName: string
+  appointmentId: string
+  rating: number
+  comment: string
+  date: string
+  serviceType: string
+  status: number
+  response?: string
+  responseDate?: string
+  createdDate: string
+  updatedDate: string
 }
 
-export interface UpdateGoalData extends Partial<CreateGoalData> {
-  currentValue?: number
-  status?: "active" | "completed" | "overdue" | "cancelled"
+interface PerformanceMetrics {
+  totalReviews: number
+  averageRating: number
+  weeklyReviews: number
+  monthlyReviews: number
+  recentReviews: Review[]
 }
 
-// Métricas de Performance
-export async function getPerformanceMetrics(
-  professionalId: string,
-  params?: GetPerformanceMetricsParams,
-): Promise<PerformanceMetrics[]> {
-  const queryParams = new URLSearchParams()
-  if (params?.period) queryParams.append("period", params.period)
-  if (params?.startDate) queryParams.append("startDate", params.startDate)
-  if (params?.endDate) queryParams.append("endDate", params.endDate)
+// Get user ID from token
+function getUserIdFromToken(): string {
+  const token = localStorage.getItem("noah_token")
+  if (!token) {
+    throw new Error("No authentication token found")
+  }
 
-  const response = await apiRequest(
-    `${API_BASE}/api/professionals/${professionalId}/performance/metrics?${queryParams}`,
-  )
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    const userId = payload.UserId || payload.userId
+    if (!userId) {
+      throw new Error("User ID not found in token")
+    }
+    return userId
+  } catch (error) {
+    throw new Error("Invalid token format")
+  }
+}
 
-  return response.map((metric: any) => ({
-    ...metric,
-    startDate: new Date(metric.startDate),
-    endDate: new Date(metric.endDate),
-    createdAt: new Date(metric.createdAt),
-    updatedAt: new Date(metric.updatedAt),
-  }))
+export async function getProfessionalReviews(params: {
+  page?: number
+  pageSize?: number
+}): Promise<ReviewsResponse> {
+  try {
+    const userId = getUserIdFromToken()
+    const queryParams = new URLSearchParams({
+      page: (params.page || 1).toString(),
+      pageSize: (params.pageSize || 10).toString(),
+      professionalId: userId,
+    })
+
+    const response = await apiRequest(`/Reviews/paged?${queryParams}`)
+    return response
+  } catch (error) {
+    console.error("Error fetching professional reviews:", error)
+    return {
+      data: [],
+      meta: {
+        currentPage: 1,
+        totalPages: 0,
+        totalItems: 0,
+        itemsPerPage: 10,
+      },
+    }
+  }
+}
+
+export async function respondToReview(reviewId: number, response: string): Promise<Review> {
+  try {
+    const result = await apiRequest(`/Reviews/${reviewId}/response`, {
+      method: "POST",
+      body: JSON.stringify(response),
+    })
+    return result
+  } catch (error) {
+    console.error("Error responding to review:", error)
+    throw error
+  }
 }
 
 export async function getCurrentPerformanceMetrics(professionalId: string): Promise<PerformanceMetrics> {
-  const response = await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/current`)
+  try {
+    const reviewsData = await getProfessionalReviews({ pageSize: 100 })
+    const reviews = reviewsData.data
 
-  return {
-    ...response,
-    startDate: new Date(response.startDate),
-    endDate: new Date(response.endDate),
-    createdAt: new Date(response.createdAt),
-    updatedAt: new Date(response.updatedAt),
+    const now = new Date()
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    const weeklyReviews = reviews.filter((review) => new Date(review.date) >= oneWeekAgo).length
+    const monthlyReviews = reviews.filter((review) => new Date(review.date) >= oneMonthAgo).length
+
+    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0)
+    const averageRating = reviews.length > 0 ? Number((totalRating / reviews.length).toFixed(1)) : 0
+
+    return {
+      totalReviews: reviews.length,
+      averageRating,
+      weeklyReviews,
+      monthlyReviews,
+      recentReviews: reviews.slice(0, 5),
+    }
+  } catch (error) {
+    console.error("Error calculating performance metrics:", error)
+    return {
+      totalReviews: 0,
+      averageRating: 0,
+      weeklyReviews: 0,
+      monthlyReviews: 0,
+      recentReviews: [],
+    }
   }
-}
-
-// Metas e Objetivos
-export async function getPerformanceGoals(professionalId: string): Promise<PerformanceGoal[]> {
-  const response = await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/goals`)
-
-  return response.map((goal: any) => ({
-    ...goal,
-    deadline: new Date(goal.deadline),
-    createdAt: new Date(goal.createdAt),
-    updatedAt: new Date(goal.updatedAt),
-  }))
-}
-
-export async function createPerformanceGoal(
-  professionalId: string,
-  goalData: CreateGoalData,
-): Promise<PerformanceGoal> {
-  const response = await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/goals`, {
-    method: "POST",
-    body: JSON.stringify(goalData),
-  })
-
-  return {
-    ...response,
-    deadline: new Date(response.deadline),
-    createdAt: new Date(response.createdAt),
-    updatedAt: new Date(response.updatedAt),
-  }
-}
-
-export async function updatePerformanceGoal(
-  professionalId: string,
-  goalId: string,
-  goalData: UpdateGoalData,
-): Promise<PerformanceGoal> {
-  const response = await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/goals/${goalId}`, {
-    method: "PUT",
-    body: JSON.stringify(goalData),
-  })
-
-  return {
-    ...response,
-    deadline: new Date(response.deadline),
-    createdAt: new Date(response.createdAt),
-    updatedAt: new Date(response.updatedAt),
-  }
-}
-
-export async function deletePerformanceGoal(professionalId: string, goalId: string): Promise<void> {
-  await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/goals/${goalId}`, { method: "DELETE" })
-}
-
-// Conquistas
-export async function getAchievements(professionalId: string): Promise<Achievement[]> {
-  const response = await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/achievements`)
-
-  return response.map((achievement: any) => ({
-    ...achievement,
-    earnedAt: new Date(achievement.earnedAt),
-  }))
-}
-
-// Rankings
-export async function getPerformanceRanking(
-  professionalId: string,
-  category: "overall" | "rating" | "punctuality" | "productivity" = "overall",
-  period: "weekly" | "monthly" | "yearly" = "monthly",
-): Promise<PerformanceRanking[]> {
-  const response = await apiRequest(
-    `${API_BASE}/api/professionals/${professionalId}/performance/ranking?category=${category}&period=${period}`,
-  )
-
-  return response
-}
-
-// Comparações
-export async function getPerformanceComparisons(
-  professionalId: string,
-  period: "weekly" | "monthly" | "yearly" = "monthly",
-): Promise<PerformanceComparison[]> {
-  const response = await apiRequest(
-    `${API_BASE}/api/professionals/${professionalId}/performance/comparisons?period=${period}`,
-  )
-
-  return response
-}
-
-// Relatórios
-export async function generatePerformanceReport(professionalId: string, period: string): Promise<PerformanceReport> {
-  const response = await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/reports`, {
-    method: "POST",
-    body: JSON.stringify({ period }),
-  })
-
-  return {
-    ...response,
-    metrics: {
-      ...response.metrics,
-      startDate: new Date(response.metrics.startDate),
-      endDate: new Date(response.metrics.endDate),
-      createdAt: new Date(response.metrics.createdAt),
-      updatedAt: new Date(response.metrics.updatedAt),
-    },
-    goals: response.goals.map((goal: any) => ({
-      ...goal,
-      deadline: new Date(goal.deadline),
-      createdAt: new Date(goal.createdAt),
-      updatedAt: new Date(goal.updatedAt),
-    })),
-    achievements: response.achievements.map((achievement: any) => ({
-      ...achievement,
-      earnedAt: new Date(achievement.earnedAt),
-    })),
-    generatedAt: new Date(response.generatedAt),
-  }
-}
-
-export async function getPerformanceReports(professionalId: string): Promise<PerformanceReport[]> {
-  const response = await apiRequest(`${API_BASE}/api/professionals/${professionalId}/performance/reports`)
-
-  return response.map((report: any) => ({
-    ...report,
-    metrics: {
-      ...report.metrics,
-      startDate: new Date(report.metrics.startDate),
-      endDate: new Date(report.metrics.endDate),
-      createdAt: new Date(report.metrics.createdAt),
-      updatedAt: new Date(report.metrics.updatedAt),
-    },
-    goals: report.goals.map((goal: any) => ({
-      ...goal,
-      deadline: new Date(goal.deadline),
-      createdAt: new Date(goal.createdAt),
-      updatedAt: new Date(goal.updatedAt),
-    })),
-    achievements: report.achievements.map((achievement: any) => ({
-      ...achievement,
-      earnedAt: new Date(achievement.earnedAt),
-    })),
-    generatedAt: new Date(report.generatedAt),
-  }))
 }

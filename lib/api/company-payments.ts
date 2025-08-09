@@ -1,28 +1,23 @@
-import type { Payment } from "@/types/payment"
+import type { Payment, PaymentFormData, PaymentFilters } from "@/types/payment"
 import { getPayments, getPaymentById, createPayment, updatePayment, updatePaymentStatus } from "@/lib/api/payments"
 
 // Get all payments for a specific company with optional filters
 export const getCompanyPayments = async (
-  companyId: string,
-  filters?: {
-    status?: "pending" | "paid" | "overdue" | "cancelled"
-    search?: string
-    startDate?: string
-    endDate?: string
-    planId?: string
-  },
+  companyId: number,
+  filters?: Omit<PaymentFilters, "companyId">,
 ): Promise<Payment[]> => {
   try {
-    // Use the existing getPayments function but always include the companyId
-    return await getPayments({ ...filters, companyId })
+    // Always include the companyId in the filters
+    const result = await getPayments({ ...filters, companyId })
+    return Array.isArray(result) ? result : []
   } catch (error) {
     console.error("Error fetching company payments:", error)
-    throw error
+    return []
   }
 }
 
 // Get a single payment by ID (with company verification)
-export const getCompanyPaymentById = async (companyId: string, id: string): Promise<Payment | null> => {
+export const getCompanyPaymentById = async (companyId: number, id: number): Promise<Payment | null> => {
   try {
     const payment = await getPaymentById(id)
 
@@ -40,8 +35,8 @@ export const getCompanyPaymentById = async (companyId: string, id: string): Prom
 
 // Create a new payment for a company
 export const createCompanyPayment = async (
-  companyId: string,
-  paymentData: Omit<Payment, "id" | "companyId" | "createdAt" | "updatedAt">,
+  companyId: number,
+  paymentData: Omit<PaymentFormData, "companyId">,
 ): Promise<Payment> => {
   try {
     // Always set the companyId to ensure the payment is associated with the company
@@ -57,9 +52,9 @@ export const createCompanyPayment = async (
 
 // Update an existing payment (with company verification)
 export const updateCompanyPayment = async (
-  companyId: string,
-  id: string,
-  paymentData: Partial<Payment>,
+  companyId: number,
+  id: number,
+  paymentData: Partial<PaymentFormData>,
 ): Promise<Payment> => {
   try {
     // First verify the payment belongs to the company
@@ -78,9 +73,9 @@ export const updateCompanyPayment = async (
 
 // Update payment status (with company verification)
 export const updateCompanyPaymentStatus = async (
-  companyId: string,
-  id: string,
-  status: "pending" | "paid" | "overdue" | "cancelled",
+  companyId: number,
+  id: number,
+  status: 0 | 1 | 2 | 3,
   paymentDate?: string,
 ): Promise<Payment> => {
   try {
@@ -99,16 +94,13 @@ export const updateCompanyPaymentStatus = async (
 }
 
 // Get payments by status for a company
-export const getCompanyPaymentsByStatus = async (
-  companyId: string,
-  status: "pending" | "paid" | "overdue" | "cancelled",
-): Promise<Payment[]> => {
+export const getCompanyPaymentsByStatus = async (companyId: number, status: 0 | 1 | 2 | 3): Promise<Payment[]> => {
   return getCompanyPayments(companyId, { status })
 }
 
 // Get payments by date range for a company
 export const getCompanyPaymentsByDateRange = async (
-  companyId: string,
+  companyId: number,
   startDate: string,
   endDate: string,
 ): Promise<Payment[]> => {
@@ -116,13 +108,13 @@ export const getCompanyPaymentsByDateRange = async (
 }
 
 // Get payments by plan for a company
-export const getCompanyPaymentsByPlan = async (companyId: string, planId: string): Promise<Payment[]> => {
+export const getCompanyPaymentsByPlan = async (companyId: number, planId: number): Promise<Payment[]> => {
   return getCompanyPayments(companyId, { planId })
 }
 
 // Get payment statistics for a company
 export const getCompanyPaymentStatistics = async (
-  companyId: string,
+  companyId: number,
 ): Promise<{
   totalAmount: number
   pendingAmount: number
@@ -135,6 +127,9 @@ export const getCompanyPaymentStatistics = async (
   try {
     const payments = await getCompanyPayments(companyId)
 
+    // Garantir que payments é um array
+    const safePayments = Array.isArray(payments) ? payments : []
+
     let totalAmount = 0
     let pendingAmount = 0
     let overdueAmount = 0
@@ -143,17 +138,20 @@ export const getCompanyPaymentStatistics = async (
     let overdueCount = 0
     let completedCount = 0
 
-    payments.forEach((payment) => {
-      totalAmount += payment.amount
+    safePayments.forEach((payment) => {
+      totalAmount += payment.amount || 0
 
-      if (payment.status === "pending") {
-        pendingAmount += payment.amount
+      if (payment.status === 0) {
+        // Pending
+        pendingAmount += payment.amount || 0
         pendingCount++
-      } else if (payment.status === "overdue") {
-        overdueAmount += payment.amount
+      } else if (payment.status === 2) {
+        // Overdue
+        overdueAmount += payment.amount || 0
         overdueCount++
-      } else if (payment.status === "paid") {
-        completedAmount += payment.amount
+      } else if (payment.status === 1) {
+        // Paid
+        completedAmount += payment.amount || 0
         completedCount++
       }
     })
@@ -169,6 +167,14 @@ export const getCompanyPaymentStatistics = async (
     }
   } catch (error) {
     console.error("Error calculating company payment statistics:", error)
-    throw error
+    return {
+      totalAmount: 0,
+      pendingAmount: 0,
+      overdueAmount: 0,
+      completedAmount: 0,
+      pendingCount: 0,
+      overdueCount: 0,
+      completedCount: 0,
+    }
   }
 }

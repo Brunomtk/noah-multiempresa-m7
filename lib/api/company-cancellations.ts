@@ -1,253 +1,189 @@
 import { apiRequest } from "./utils"
-import type { Cancellation, CancellationFormData, CancellationFilters } from "@/types/cancellation"
-
-// Mock data for development
-const mockCancellations: Cancellation[] = [
-  {
-    id: "1",
-    appointmentId: "apt-1",
-    customerId: "cust-1",
-    customerName: "João Silva",
-    companyId: "comp-1",
-    reason: "Cliente não pode comparecer",
-    cancelledById: "user-1",
-    cancelledByRole: "customer",
-    cancelledAt: "2024-01-15T10:30:00Z",
-    refundStatus: "pending",
-    notes: "Cliente solicitou reagendamento",
-    createdAt: "2024-01-15T10:30:00Z",
-    updatedAt: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "2",
-    appointmentId: "apt-2",
-    customerId: "cust-2",
-    customerName: "Maria Santos",
-    companyId: "comp-1",
-    reason: "Profissional não disponível",
-    cancelledById: "prof-1",
-    cancelledByRole: "professional",
-    cancelledAt: "2024-01-14T14:00:00Z",
-    refundStatus: "processed",
-    notes: "Reembolso processado automaticamente",
-    createdAt: "2024-01-14T14:00:00Z",
-    updatedAt: "2024-01-14T15:00:00Z",
-  },
-]
+import type {
+  Cancellation,
+  CancellationFormData,
+  CancellationFilters,
+  CancellationUpdateData,
+  RefundProcessData,
+  CancellationStats,
+} from "@/types/cancellation"
 
 export const companyCancellationsApi = {
   // Get all cancellations for the company
-  async getCancellations(companyId: string, filters?: CancellationFilters): Promise<Cancellation[]> {
+  async getCancellations(companyId: number, filters?: CancellationFilters): Promise<Cancellation[]> {
     try {
-      const response = await apiRequest<Cancellation[]>(`/api/companies/${companyId}/cancellations`, {
+      const params = new URLSearchParams()
+
+      if (companyId) params.append("CompanyId", companyId.toString())
+      if (filters?.search) params.append("Search", filters.search)
+      if (filters?.customerId) params.append("CustomerId", filters.customerId.toString())
+      if (filters?.startDate) params.append("StartDate", filters.startDate)
+      if (filters?.endDate) params.append("EndDate", filters.endDate)
+      if (filters?.refundStatus && filters.refundStatus !== "all") {
+        params.append("RefundStatus", filters.refundStatus.toString())
+      }
+
+      const response = await apiRequest<Cancellation[]>(`/Cancellations?${params.toString()}`, {
         method: "GET",
-        params: filters,
       })
-      return response
+
+      return response.filter((c) => c.companyId === companyId)
     } catch (error) {
       console.error("Error fetching company cancellations:", error)
-      // Return mock data in development
-      if (process.env.NODE_ENV === "development") {
-        let filtered = mockCancellations.filter((c) => c.companyId === companyId)
-
-        if (filters?.refundStatus && filters.refundStatus !== "all") {
-          filtered = filtered.filter((c) => c.refundStatus === filters.refundStatus)
-        }
-
-        if (filters?.search) {
-          const searchLower = filters.search.toLowerCase()
-          filtered = filtered.filter(
-            (c) =>
-              c.customerName?.toLowerCase().includes(searchLower) ||
-              c.reason.toLowerCase().includes(searchLower) ||
-              c.notes?.toLowerCase().includes(searchLower),
-          )
-        }
-
-        if (filters?.startDate) {
-          filtered = filtered.filter((c) => new Date(c.cancelledAt) >= new Date(filters.startDate!))
-        }
-
-        if (filters?.endDate) {
-          filtered = filtered.filter((c) => new Date(c.cancelledAt) <= new Date(filters.endDate!))
-        }
-
-        return filtered
-      }
       throw error
     }
   },
 
-  // Get cancellation by ID for the company
-  async getCancellationById(companyId: string, id: string): Promise<Cancellation> {
+  // Get cancellation by ID
+  async getCancellationById(id: number): Promise<Cancellation> {
     try {
-      const response = await apiRequest<Cancellation>(`/api/companies/${companyId}/cancellations/${id}`, {
+      const response = await apiRequest<Cancellation>(`/Cancellations/${id}`, {
         method: "GET",
       })
       return response
     } catch (error) {
-      console.error("Error fetching company cancellation:", error)
-      // Return mock data in development
-      if (process.env.NODE_ENV === "development") {
-        const cancellation = mockCancellations.find((c) => c.id === id && c.companyId === companyId)
-        if (cancellation) return cancellation
-      }
+      console.error("Error fetching cancellation:", error)
       throw error
     }
   },
 
-  // Create new cancellation for the company
-  async createCancellation(companyId: string, data: CancellationFormData): Promise<Cancellation> {
+  // Create new cancellation
+  async createCancellation(data: CancellationFormData): Promise<Cancellation> {
     try {
-      const response = await apiRequest<Cancellation>(`/api/companies/${companyId}/cancellations`, {
+      const response = await apiRequest<Cancellation>(`/Cancellations`, {
         method: "POST",
-        body: JSON.stringify({ ...data, companyId }),
+        body: JSON.stringify(data),
       })
       return response
     } catch (error) {
-      console.error("Error creating company cancellation:", error)
-      // Return mock data in development
-      if (process.env.NODE_ENV === "development") {
-        const newCancellation: Cancellation = {
-          id: `${mockCancellations.length + 1}`,
-          ...data,
-          companyId,
-          customerName: "Novo Cliente",
-          cancelledAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        mockCancellations.push(newCancellation)
-        return newCancellation
-      }
+      console.error("Error creating cancellation:", error)
       throw error
     }
   },
 
-  // Update cancellation for the company
-  async updateCancellation(companyId: string, id: string, data: Partial<CancellationFormData>): Promise<Cancellation> {
+  // Update cancellation
+  async updateCancellation(id: number, data: CancellationUpdateData): Promise<Cancellation> {
     try {
-      const response = await apiRequest<Cancellation>(`/api/companies/${companyId}/cancellations/${id}`, {
+      const response = await apiRequest<Cancellation>(`/Cancellations/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       })
       return response
     } catch (error) {
-      console.error("Error updating company cancellation:", error)
-      // Return mock data in development
-      if (process.env.NODE_ENV === "development") {
-        const index = mockCancellations.findIndex((c) => c.id === id && c.companyId === companyId)
-        if (index !== -1) {
-          mockCancellations[index] = {
-            ...mockCancellations[index],
-            ...data,
-            updatedAt: new Date().toISOString(),
-          }
-          return mockCancellations[index]
-        }
-      }
+      console.error("Error updating cancellation:", error)
       throw error
     }
   },
 
-  // Process refund for the company
-  async processRefund(
-    companyId: string,
-    id: string,
-    status: "processed" | "rejected",
-    notes?: string,
-  ): Promise<Cancellation> {
+  // Delete cancellation
+  async deleteCancellation(id: number): Promise<void> {
     try {
-      const response = await apiRequest<Cancellation>(`/api/companies/${companyId}/cancellations/${id}/refund`, {
+      await apiRequest<void>(`/Cancellations/${id}`, {
+        method: "DELETE",
+      })
+    } catch (error) {
+      console.error("Error deleting cancellation:", error)
+      throw error
+    }
+  },
+
+  // Process refund
+  async processRefund(id: number, data: RefundProcessData): Promise<Cancellation> {
+    try {
+      const response = await apiRequest<Cancellation>(`/Cancellations/${id}/refund`, {
         method: "POST",
-        body: JSON.stringify({ status, notes }),
+        body: JSON.stringify(data),
       })
       return response
     } catch (error) {
-      console.error("Error processing company refund:", error)
-      // Return mock data in development
-      if (process.env.NODE_ENV === "development") {
-        const index = mockCancellations.findIndex((c) => c.id === id && c.companyId === companyId)
-        if (index !== -1) {
-          mockCancellations[index] = {
-            ...mockCancellations[index],
-            refundStatus: status,
-            notes: notes || mockCancellations[index].notes,
-            updatedAt: new Date().toISOString(),
-          }
-          return mockCancellations[index]
-        }
-      }
+      console.error("Error processing refund:", error)
       throw error
     }
   },
 
-  // Get cancellation statistics for the company
-  async getCancellationStats(
-    companyId: string,
-    filters?: CancellationFilters,
-  ): Promise<{
-    total: number
-    pending: number
-    processed: number
-    rejected: number
-    totalRefunded: number
-    averageRefundTime: number
-    topReasons: Array<{ reason: string; count: number }>
-  }> {
+  // Get cancellation statistics (mock implementation)
+  async getCancellationStats(companyId: number, filters?: CancellationFilters): Promise<CancellationStats> {
     try {
-      const response = await apiRequest<{
-        total: number
-        pending: number
-        processed: number
-        rejected: number
-        totalRefunded: number
-        averageRefundTime: number
-        topReasons: Array<{ reason: string; count: number }>
-      }>(`/api/companies/${companyId}/cancellations/stats`, {
-        method: "GET",
-        params: filters,
-      })
-      return response
-    } catch (error) {
-      console.error("Error fetching company cancellation stats:", error)
-      // Return mock data in development
-      if (process.env.NODE_ENV === "development") {
-        const companyCancellations = mockCancellations.filter((c) => c.companyId === companyId)
-        return {
-          total: companyCancellations.length,
-          pending: companyCancellations.filter((c) => c.refundStatus === "pending").length,
-          processed: companyCancellations.filter((c) => c.refundStatus === "processed").length,
-          rejected: companyCancellations.filter((c) => c.refundStatus === "rejected").length,
-          totalRefunded: 1250.0,
-          averageRefundTime: 2.5,
-          topReasons: [
-            { reason: "Cliente não pode comparecer", count: 5 },
-            { reason: "Profissional não disponível", count: 3 },
-            { reason: "Condições climáticas", count: 2 },
-          ],
-        }
+      // Since there's no specific stats endpoint, we'll calculate from the main data
+      const cancellations = await this.getCancellations(companyId, filters)
+
+      const stats: CancellationStats = {
+        total: cancellations.length,
+        pending: cancellations.filter((c) => c.refundStatus === 0).length,
+        processed: cancellations.filter((c) => c.refundStatus === 1).length,
+        rejected: cancellations.filter((c) => c.refundStatus === 2).length,
+        totalRefunded: cancellations.filter((c) => c.refundStatus === 1).length * 100, // Mock calculation
+        averageRefundTime: 2.5, // Mock value
+        topReasons: this.calculateTopReasons(cancellations),
       }
+
+      return stats
+    } catch (error) {
+      console.error("Error fetching cancellation stats:", error)
       throw error
     }
   },
 
-  // Export cancellations for the company
+  // Helper method to calculate top reasons
+  calculateTopReasons(cancellations: Cancellation[]): Array<{ reason: string; count: number }> {
+    const reasonCounts: Record<string, number> = {}
+
+    cancellations.forEach((c) => {
+      reasonCounts[c.reason] = (reasonCounts[c.reason] || 0) + 1
+    })
+
+    return Object.entries(reasonCounts)
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+  },
+
+  // Export cancellations (mock implementation)
   async exportCancellations(
-    companyId: string,
+    companyId: number,
     format: "csv" | "excel" | "pdf",
     filters?: CancellationFilters,
   ): Promise<Blob> {
     try {
-      const response = await apiRequest<Blob>(`/api/companies/${companyId}/cancellations/export`, {
-        method: "POST",
-        body: JSON.stringify({ format, filters }),
-        responseType: "blob",
-      })
-      return response
+      const cancellations = await this.getCancellations(companyId, filters)
+
+      // Mock CSV export
+      if (format === "csv") {
+        const headers = ["ID", "Customer", "Reason", "Status", "Date", "Notes"]
+        const rows = cancellations.map((c) => [
+          c.id.toString(),
+          c.customerName || "N/A",
+          c.reason,
+          this.getRefundStatusLabel(c.refundStatus),
+          new Date(c.cancelledAt).toLocaleDateString("en-US"),
+          c.notes || "",
+        ])
+
+        const csvContent = [headers, ...rows].map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
+
+        return new Blob([csvContent], { type: "text/csv" })
+      }
+
+      throw new Error(`Export format ${format} not implemented`)
     } catch (error) {
-      console.error("Error exporting company cancellations:", error)
+      console.error("Error exporting cancellations:", error)
       throw error
+    }
+  },
+
+  // Helper method to get refund status label
+  getRefundStatusLabel(status: number): string {
+    switch (status) {
+      case 0:
+        return "Pending"
+      case 1:
+        return "Processed"
+      case 2:
+        return "Rejected"
+      case 3:
+        return "Not Applicable"
+      default:
+        return "Unknown"
     }
   },
 }

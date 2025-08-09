@@ -1,542 +1,163 @@
 import type { ApiResponse } from "@/types/api"
 import type { Payment } from "@/types/payment"
-import { fetchWithAuth } from "./utils"
+import { fetchApi } from "./utils"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.example.com"
+// --- Helper Functions ---
 
-// Mock data for development
-const mockCurrentPlan = {
-  id: "plan-003",
-  name: "Premium",
-  description: "For growing businesses with advanced needs",
-  price: 299.99,
-  billingCycle: "monthly",
-  startDate: "2023-10-15",
-  expiryDate: "2024-10-15",
-  status: "active",
-  autoRenew: true,
-  features: [
-    "Up to 50 users",
-    "Advanced scheduling",
-    "Daily reports",
-    "Priority support",
-    "Calendar integration",
-    "Performance analytics",
-    "API integration",
-  ],
-  usedUsers: 32,
-  maxUsers: 50,
-  usedStorage: 7.5,
-  maxStorage: 20,
+function decodeJWT(token: string): any | null {
+  try {
+    const base64Url = token.split(".")[1]
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    )
+    return JSON.parse(jsonPayload)
+  } catch (error) {
+    console.error("Error decoding JWT:", error)
+    return null
+  }
 }
 
-// Mock data for available plans
-const mockAvailablePlans = [
-  {
-    id: "plan-001",
-    name: "Basic",
-    description: "For small businesses just getting started",
-    price: 149.99,
-    billingCycle: "monthly",
-    features: ["Up to 5 users", "Basic scheduling", "Monthly reports", "Email support"],
-    popular: false,
-  },
-  {
-    id: "plan-002",
-    name: "Standard",
-    description: "For established businesses with growing needs",
-    price: 199.99,
-    billingCycle: "monthly",
-    features: [
-      "Up to 15 users",
-      "Advanced scheduling",
-      "Weekly reports",
-      "Email and chat support",
-      "Calendar integration",
-    ],
-    popular: false,
-  },
-  {
-    id: "plan-003",
-    name: "Premium",
-    description: "For growing businesses with advanced needs",
-    price: 299.99,
-    billingCycle: "monthly",
-    features: [
-      "Up to 50 users",
-      "Advanced scheduling",
-      "Daily reports",
-      "Priority support",
-      "Calendar integration",
-      "Performance analytics",
-      "API integration",
-    ],
-    popular: true,
-    current: true,
-  },
-  {
-    id: "plan-004",
-    name: "Enterprise",
-    description: "For large organizations with complex requirements",
-    price: 499.99,
-    billingCycle: "monthly",
-    features: [
-      "Unlimited users",
-      "All features",
-      "Custom reports",
-      "24/7 support",
-      "Dedicated account manager",
-      "Advanced API integration",
-      "Custom training",
-    ],
-    popular: false,
-  },
-]
+function getToken(): string {
+  const t =
+    localStorage.getItem("noah_token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("token")
+  if (!t) throw new Error("No authentication token found")
+  return t
+}
 
-// Mock data for payment history
-const mockPaymentHistory = [
-  {
-    id: "pay-001",
-    date: "2023-10-15",
-    amount: 299.99,
-    status: "paid",
-    method: "Credit Card",
-    invoice: "INV-2023-001",
-  },
-  {
-    id: "pay-002",
-    date: "2023-11-15",
-    amount: 299.99,
-    status: "paid",
-    method: "Credit Card",
-    invoice: "INV-2023-002",
-  },
-  {
-    id: "pay-003",
-    date: "2023-12-15",
-    amount: 299.99,
-    status: "paid",
-    method: "Credit Card",
-    invoice: "INV-2023-003",
-  },
-  {
-    id: "pay-004",
-    date: "2024-01-15",
-    amount: 299.99,
-    status: "paid",
-    method: "Credit Card",
-    invoice: "INV-2024-001",
-  },
-  {
-    id: "pay-005",
-    date: "2024-02-15",
-    amount: 299.99,
-    status: "paid",
-    method: "Credit Card",
-    invoice: "INV-2024-002",
-  },
-  {
-    id: "pay-006",
-    date: "2024-03-15",
-    amount: 299.99,
-    status: "paid",
-    method: "Credit Card",
-    invoice: "INV-2024-003",
-  },
-]
+function getUserIdFromToken(): string {
+  const payload = decodeJWT(getToken())
+  return (
+    String(payload?.UserId ?? payload?.userId ?? payload?.id) ||
+    (() => { throw new Error("Could not extract User ID from token") })()
+  )
+}
 
-// Get current company plan
+async function getCompanyId(): Promise<string> {
+  const userId = getUserIdFromToken()
+  const user = await fetchApi<{ companyId: number }>(`/Users/${userId}`)
+  if (!user.companyId) throw new Error("No company associated with user")
+  return String(user.companyId)
+}
+
+// --- API Functions ---
+
 export async function getCurrentCompanyPlan(): Promise<ApiResponse<any>> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: mockCurrentPlan,
-      }
+    const token = getToken()
+    const companyId = await getCompanyId()
+
+    // 1. Get Plan ID
+    const planId = await fetchApi<number>(`/Companies/${companyId}/plan-id`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!planId) {
+      return { success: false, error: "No plan is associated with this company." }
     }
 
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/plan`)
-    const data = await response.json()
+    // 2. Get Plan Details
+    const planData = await fetchApi<any>(`/Plan/${planId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
-    return data
-  } catch (error) {
-    console.error("Error fetching current company plan:", error)
+    // 3. Get Company Details (non-critical)
+    let createdDate = new Date().toISOString()
+    try {
+      const company = await fetchApi<any>(`/Companies/${companyId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      createdDate = company.createdDate || createdDate
+    } catch {
+      console.warn("Could not fetch company details for extra info.")
+    }
+
+    // 4. Transform
+    const transformed = {
+      id: planData.id,
+      name: planData.name,
+      description: planData.features?.join(", ") || "",
+      price: planData.price,
+      billingCycle: "monthly",
+      startDate: createdDate,
+      expiryDate: new Date(
+        Date.now() + (planData.duration ?? 30) * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      status: planData.status === 1 ? "active" : "inactive",
+      autoRenew: true,
+      features: planData.features || [],
+      usedUsers: 0,
+      maxUsers: planData.professionalsLimit,
+      usedTeams: 0,
+      maxTeams: planData.teamsLimit,
+      usedCustomers: 0,
+      maxCustomers: planData.customersLimit,
+      usedAppointments: 0,
+      maxAppointments: planData.appointmentsLimit,
+    }
+
+    return { success: true, data: transformed }
+  } catch (error: any) {
+    console.error("Error in getCurrentCompanyPlan:", error)
     return {
       success: false,
-      error: "Failed to fetch current plan. Please try again.",
+      error: `Failed to fetch current plan. ${error.message || ""}`,
     }
   }
 }
 
-// Get all available plans
 export async function getAvailablePlans(): Promise<ApiResponse<any[]>> {
   try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: mockAvailablePlans,
-      }
-    }
+    const token = getToken()
+    const plans: any[] = await fetchApi(`/Plan`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/plans/available`)
-    const data = await response.json()
+    const active = plans
+      .filter((p) => p.status === 1)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.features?.slice(0, 2).join(", ") || "",
+        price: p.price,
+        billingCycle: "monthly",
+        features: p.features || [],
+        popular: p.name.toLowerCase().includes("corporativo"),
+        professionalsLimit: p.professionalsLimit,
+        teamsLimit: p.teamsLimit,
+        customersLimit: p.customersLimit,
+        appointmentsLimit: p.appointmentsLimit,
+      }))
 
-    return data
+    return { success: true, data: active }
   } catch (error) {
-    console.error("Error fetching available plans:", error)
-    return {
-      success: false,
-      error: "Failed to fetch available plans. Please try again.",
-    }
+    console.error("Error in getAvailablePlans:", error)
+    return { success: false, error: "Failed to fetch available plans." }
   }
 }
 
-// Get plan payment history
 export async function getPlanPaymentHistory(): Promise<ApiResponse<Payment[]>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: mockPaymentHistory,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/plan/payments`)
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error fetching plan payment history:", error)
-    return {
-      success: false,
-      error: "Failed to fetch payment history. Please try again.",
-    }
-  }
-}
-
-// Upgrade or downgrade plan
-export async function changePlan(planId: string, billingCycle: string): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      const selectedPlan = mockAvailablePlans.find((plan) => plan.id === planId)
-
-      if (!selectedPlan) {
-        return {
-          success: false,
-          error: "Plan not found",
-        }
-      }
-
-      // Simulate plan change
-      const updatedPlan = {
-        ...mockCurrentPlan,
-        id: selectedPlan.id,
-        name: selectedPlan.name,
-        description: selectedPlan.description,
-        price: selectedPlan.price,
-        billingCycle,
-        features: selectedPlan.features,
-        startDate: new Date().toISOString(),
-        expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-      }
-
-      return {
-        success: true,
-        data: updatedPlan,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/plan/change`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ planId, billingCycle }),
-    })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error changing plan:", error)
-    return {
-      success: false,
-      error: "Failed to change plan. Please try again.",
-    }
-  }
-}
-
-// Renew current plan
-export async function renewPlan(
-  renewalPeriod: string,
-  autoRenew: boolean,
-  paymentMethod: string,
-): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      // Calculate new expiry date based on renewal period
-      const currentExpiryDate = new Date(mockCurrentPlan.expiryDate)
-      const newExpiryDate = new Date(currentExpiryDate)
-
-      if (renewalPeriod === "1-month") {
-        newExpiryDate.setMonth(newExpiryDate.getMonth() + 1)
-      } else if (renewalPeriod === "6-months") {
-        newExpiryDate.setMonth(newExpiryDate.getMonth() + 6)
-      } else if (renewalPeriod === "1-year") {
-        newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1)
-      } else if (renewalPeriod === "2-years") {
-        newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 2)
-      }
-
-      // Simulate plan renewal
-      const updatedPlan = {
-        ...mockCurrentPlan,
-        expiryDate: newExpiryDate.toISOString(),
-        autoRenew,
-      }
-
-      return {
-        success: true,
-        data: updatedPlan,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/plan/renew`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ renewalPeriod, autoRenew, paymentMethod }),
-    })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error renewing plan:", error)
-    return {
-      success: false,
-      error: "Failed to renew plan. Please try again.",
-    }
-  }
-}
-
-// Update auto-renewal setting
-export async function updateAutoRenewal(autoRenew: boolean): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      // Simulate updating auto-renewal
-      const updatedPlan = {
-        ...mockCurrentPlan,
-        autoRenew,
-      }
-
-      return {
-        success: true,
-        data: updatedPlan,
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/plan/auto-renewal`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ autoRenew }),
-    })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error updating auto-renewal:", error)
-    return {
-      success: false,
-      error: "Failed to update auto-renewal setting. Please try again.",
-    }
-  }
-}
-
-// Get plan usage statistics
-export async function getPlanUsage(): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: {
-          usedUsers: mockCurrentPlan.usedUsers,
-          maxUsers: mockCurrentPlan.maxUsers,
-          usedStorage: mockCurrentPlan.usedStorage,
-          maxStorage: mockCurrentPlan.maxStorage,
-          usedAppointments: 350,
-          maxAppointments: 500,
-          usedTeams: 3,
-          maxTeams: 5,
-        },
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/plan/usage`)
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error fetching plan usage:", error)
-    return {
-      success: false,
-      error: "Failed to fetch plan usage. Please try again.",
-    }
-  }
-}
-
-// Download invoice
-export async function downloadInvoice(invoiceId: string): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: {
-          downloadUrl: `https://example.com/invoices/${invoiceId}.pdf`,
-        },
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/plan/invoices/${invoiceId}`)
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error downloading invoice:", error)
-    return {
-      success: false,
-      error: "Failed to download invoice. Please try again.",
-    }
-  }
-}
-
-// Get billing information
-export async function getBillingInfo(): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: {
-          address: {
-            street: "123 Business Street",
-            city: "São Paulo",
-            state: "SP",
-            zipCode: "01234-567",
-            country: "Brazil",
-          },
-          taxId: "12.345.678/0001-90",
-          paymentMethod: {
-            type: "credit_card",
-            lastFour: "1234",
-            expiryMonth: 12,
-            expiryYear: 25,
-          },
-        },
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/billing`)
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error fetching billing information:", error)
-    return {
-      success: false,
-      error: "Failed to fetch billing information. Please try again.",
-    }
-  }
-}
-
-// Update billing information
-export async function updateBillingInfo(billingData: any): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: {
-          ...billingData,
-        },
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/billing`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(billingData),
-    })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error updating billing information:", error)
-    return {
-      success: false,
-      error: "Failed to update billing information. Please try again.",
-    }
-  }
-}
-
-// Update payment method
-export async function updatePaymentMethod(paymentData: any): Promise<ApiResponse<any>> {
-  try {
-    // For development, use mock data
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return {
-        success: true,
-        data: {
-          paymentMethod: {
-            ...paymentData,
-            lastFour: paymentData.cardNumber ? paymentData.cardNumber.slice(-4) : "1234",
-          },
-        },
-      }
-    }
-
-    // For production, use actual API
-    const response = await fetchWithAuth(`${API_URL}/company/payment-method`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(paymentData),
-    })
-
-    const data = await response.json()
-
-    return data
-  } catch (error) {
-    console.error("Error updating payment method:", error)
-    return {
-      success: false,
-      error: "Failed to update payment method. Please try again.",
-    }
-  }
+  const mock: Payment[] = [
+    {
+      id: "inv-001",
+      date: "2025-07-15T10:00:00Z",
+      invoice: "INV-2025-001",
+      amount: 199.9,
+      status: "paid",
+      method: "Credit Card",
+    },
+    {
+      id: "inv-002",
+      date: "2025-06-15T10:00:00Z",
+      invoice: "INV-2025-002",
+      amount: 199.9,
+      status: "paid",
+      method: "Credit Card",
+    },
+  ]
+  return new Promise((resolve) => setTimeout(() => resolve({ success: true, data: mock }), 500))
 }

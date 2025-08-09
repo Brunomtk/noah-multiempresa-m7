@@ -22,31 +22,59 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useCompanyPayments } from "@/hooks/use-company-payments"
 
 export function CompanyPaymentModal({ children }: { children: React.ReactNode }) {
+  const { addPayment } = useCompanyPayments()
   const [open, setOpen] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState("credit_card")
-  const [status, setStatus] = useState("pending")
-  const [amount, setAmount] = useState("")
-  const [client, setClient] = useState("")
-  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Math.floor(Math.random() * 10000)}`)
-  const [dueDate, setDueDate] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Form state
+  const [amount, setAmount] = useState("")
+  const [dueDate, setDueDate] = useState("")
+  const [paymentDate, setPaymentDate] = useState("")
+  const [status, setStatus] = useState<0 | 1 | 2 | 3>(0)
+  const [method, setMethod] = useState<0 | 1 | 2 | 3>(0)
+  const [reference, setReference] = useState(`REF-PAG-${Date.now()}`)
+  const [planId, setPlanId] = useState("")
+  const [notes, setNotes] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Process payment creation
-    setOpen(false)
-    // Reset form
-    setPaymentMethod("credit_card")
-    setStatus("pending")
-    setAmount("")
-    setClient("")
-    setInvoiceNumber(`INV-${Math.floor(Math.random() * 10000)}`)
-    setDueDate("")
+    if (!amount || !dueDate || !planId) return
+
+    setIsSubmitting(true)
+    try {
+      await addPayment({
+        amount: Number.parseFloat(amount),
+        dueDate,
+        paymentDate: paymentDate || undefined,
+        status,
+        method,
+        reference,
+        planId: Number.parseInt(planId),
+      })
+
+      // Reset form
+      setAmount("")
+      setDueDate("")
+      setPaymentDate("")
+      setStatus(0)
+      setMethod(0)
+      setReference(`REF-PAG-${Date.now()}`)
+      setPlanId("")
+      setNotes("")
+      setOpen(false)
+    } catch (error) {
+      console.error("Error creating payment:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const generateInvoiceNumber = () => {
-    setInvoiceNumber(`INV-${Math.floor(Math.random() * 10000)}`)
+  const generateReference = () => {
+    setReference(`REF-PAG-${Date.now()}`)
   }
 
   const setDueDateToday = () => {
@@ -66,36 +94,33 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[600px] bg-[#1a2234] border-[#2a3349] text-white">
         <DialogHeader>
-          <DialogTitle>Create New Payment</DialogTitle>
+          <DialogTitle>Criar Novo Pagamento</DialogTitle>
           <DialogDescription className="text-gray-400">
-            Enter the payment details below to create a new payment record.
+            Insira os detalhes do pagamento abaixo para criar um novo registro de pagamento.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid grid-cols-3 mb-4 bg-[#0f172a]">
+            <TabsList className="grid grid-cols-2 mb-4 bg-[#0f172a]">
               <TabsTrigger value="details" className="data-[state=active]:bg-[#2a3349]">
-                Payment Details
-              </TabsTrigger>
-              <TabsTrigger value="client" className="data-[state=active]:bg-[#2a3349]">
-                Client Info
+                Detalhes do Pagamento
               </TabsTrigger>
               <TabsTrigger value="options" className="data-[state=active]:bg-[#2a3349]">
-                Options
+                Opções
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="invoice-number">
-                    Invoice Number <span className="text-red-500">*</span>
+                  <Label htmlFor="reference">
+                    Referência <span className="text-red-500">*</span>
                   </Label>
                   <div className="flex gap-2">
                     <Input
-                      id="invoice-number"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
+                      id="reference"
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
                       className="bg-[#0f172a] border-[#2a3349]"
                       required
                     />
@@ -103,16 +128,16 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={generateInvoiceNumber}
+                      onClick={generateReference}
                       className="bg-[#0f172a] border-[#2a3349]"
                     >
-                      <RefreshCcw className="h-4 w-4" />
+                      <CreditCard className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="amount">
-                    Amount <span className="text-red-500">*</span>
+                    Valor <span className="text-red-500">*</span>
                   </Label>
                   <div className="relative">
                     <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
@@ -132,21 +157,9 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="issue-date">
-                    Issue Date <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="issue-date"
-                    type="date"
-                    defaultValue={new Date().toISOString().split("T")[0]}
-                    className="bg-[#0f172a] border-[#2a3349]"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="due-date">
-                      Due Date <span className="text-red-500">*</span>
+                      Data de Vencimento <span className="text-red-500">*</span>
                     </Label>
                     <div className="flex gap-1">
                       <Button
@@ -156,7 +169,7 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
                         onClick={setDueDateToday}
                         className="h-6 text-xs bg-[#0f172a] border-[#2a3349]"
                       >
-                        Today
+                        Hoje
                       </Button>
                       <Button
                         type="button"
@@ -165,7 +178,7 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
                         onClick={setDueDatePlus30}
                         className="h-6 text-xs bg-[#0f172a] border-[#2a3349]"
                       >
-                        +30 days
+                        +30 dias
                       </Button>
                     </div>
                   </div>
@@ -178,29 +191,66 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
                     required
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payment-date">Data do Pagamento</Label>
+                  <Input
+                    id="payment-date"
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    className="bg-[#0f172a] border-[#2a3349]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="plan-id">
+                  Plano <span className="text-red-500">*</span>
+                </Label>
+                <Select value={planId} onValueChange={setPlanId} required>
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349]">
+                    <SelectValue placeholder="Selecione o plano" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349]">
+                    <SelectItem value="1">Plano Básico</SelectItem>
+                    <SelectItem value="2">Plano Profissional</SelectItem>
+                    <SelectItem value="3">Plano Empresarial</SelectItem>
+                    <SelectItem value="4">Plano Premium</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="payment-method">
-                  Payment Method <span className="text-red-500">*</span>
+                  Método de Pagamento <span className="text-red-500">*</span>
                 </Label>
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="flex gap-4">
+                <RadioGroup
+                  value={method.toString()}
+                  onValueChange={(value) => setMethod(Number.parseInt(value) as 0 | 1 | 2 | 3)}
+                  className="flex gap-4"
+                >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="credit_card" id="credit_card" className="border-[#2a3349]" />
+                    <RadioGroupItem value="0" id="credit_card" className="border-[#2a3349]" />
                     <Label htmlFor="credit_card" className="flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" /> Credit Card
+                      <CreditCard className="h-4 w-4" /> Cartão de Crédito
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="bank_transfer" id="bank_transfer" className="border-[#2a3349]" />
+                    <RadioGroupItem value="1" id="debit_card" className="border-[#2a3349]" />
+                    <Label htmlFor="debit_card" className="flex items-center gap-1">
+                      <CreditCard className="h-4 w-4" /> Cartão de Débito
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="2" id="bank_transfer" className="border-[#2a3349]" />
                     <Label htmlFor="bank_transfer" className="flex items-center gap-1">
-                      <Building2 className="h-4 w-4" /> Bank Transfer
+                      <DollarSign className="h-4 w-4" /> Transferência
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="cash" id="cash" className="border-[#2a3349]" />
-                    <Label htmlFor="cash" className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" /> Cash
+                    <RadioGroupItem value="3" id="pix" className="border-[#2a3349]" />
+                    <Label htmlFor="pix" className="flex items-center gap-1">
+                      <DollarSign className="h-4 w-4" /> PIX
                     </Label>
                   </div>
                 </RadioGroup>
@@ -210,101 +260,55 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
                 <Label htmlFor="status">
                   Status <span className="text-red-500">*</span>
                 </Label>
-                <Select value={status} onValueChange={setStatus} required>
+                <Select
+                  value={status.toString()}
+                  onValueChange={(value) => setStatus(Number.parseInt(value) as 0 | 1 | 2 | 3)}
+                  required
+                >
                   <SelectTrigger className="bg-[#0f172a] border-[#2a3349]">
-                    <SelectValue placeholder="Select status" />
+                    <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349]">
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="0">Pendente</SelectItem>
+                    <SelectItem value="1">Pago</SelectItem>
+                    <SelectItem value="2">Vencido</SelectItem>
+                    <SelectItem value="3">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {status === "pending" && (
+              {status === 0 && (
                 <Alert className="bg-[#0f172a] border-amber-500/50 text-amber-500">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>This payment will be marked as pending and can be updated later.</AlertDescription>
+                  <AlertDescription>
+                    Este pagamento será marcado como pendente e pode ser atualizado posteriormente.
+                  </AlertDescription>
                 </Alert>
               )}
 
-              {status === "completed" && (
+              {status === 1 && (
                 <Alert className="bg-[#0f172a] border-green-500/50 text-green-500">
                   <Check className="h-4 w-4" />
-                  <AlertDescription>This payment will be marked as completed.</AlertDescription>
+                  <AlertDescription>Este pagamento será marcado como concluído.</AlertDescription>
                 </Alert>
               )}
-            </TabsContent>
-
-            <TabsContent value="client" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="client">
-                  Client <span className="text-red-500">*</span>
-                </Label>
-                <Select value={client} onValueChange={setClient} required>
-                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349]">
-                    <SelectValue placeholder="Select client" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a2234] border-[#2a3349]">
-                    <SelectItem value="client1">Acme Inc</SelectItem>
-                    <SelectItem value="client2">Globex Corp</SelectItem>
-                    <SelectItem value="client3">Stark Industries</SelectItem>
-                    <SelectItem value="client4">Wayne Enterprises</SelectItem>
-                    <SelectItem value="client5">Umbrella Corp</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="contact-person">Contact Person</Label>
-                <Input id="contact-person" placeholder="John Doe" className="bg-[#0f172a] border-[#2a3349]" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@example.com"
-                  className="bg-[#0f172a] border-[#2a3349]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" placeholder="(123) 456-7890" className="bg-[#0f172a] border-[#2a3349]" />
-              </div>
             </TabsContent>
 
             <TabsContent value="options" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Enter payment description..."
-                  className="min-h-[100px] bg-[#0f172a] border-[#2a3349]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Internal Notes</Label>
+                <Label htmlFor="notes">Observações</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Enter internal notes..."
+                  placeholder="Digite observações sobre o pagamento..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   className="min-h-[100px] bg-[#0f172a] border-[#2a3349]"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reference">Reference Number</Label>
-                <Input id="reference" placeholder="REF-12345" className="bg-[#0f172a] border-[#2a3349]" />
               </div>
 
               <div className="flex items-center space-x-2">
                 <Checkbox id="send-receipt" className="border-[#2a3349] data-[state=checked]:bg-[#06b6d4]" />
-                <Label htmlFor="send-receipt">Send receipt to client</Label>
+                <Label htmlFor="send-receipt">Enviar recibo para o cliente</Label>
               </div>
             </TabsContent>
           </Tabs>
@@ -315,11 +319,12 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
               variant="outline"
               onClick={() => setOpen(false)}
               className="bg-[#0f172a] border-[#2a3349]"
+              disabled={isSubmitting}
             >
-              Cancel
+              Cancelar
             </Button>
-            <Button type="submit" className="bg-[#06b6d4] hover:bg-[#0891b2]">
-              Create Payment
+            <Button type="submit" className="bg-[#06b6d4] hover:bg-[#0891b2]" disabled={isSubmitting}>
+              {isSubmitting ? "Criando..." : "Criar Pagamento"}
             </Button>
           </DialogFooter>
         </form>
@@ -327,7 +332,3 @@ export function CompanyPaymentModal({ children }: { children: React.ReactNode })
     </Dialog>
   )
 }
-
-// Missing imports
-import { Building2, RefreshCcw } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"

@@ -18,48 +18,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { NoahLogo } from "@/components/noah-logo"
+import { useCompanyPayments } from "@/hooks/use-company-payments"
+import type { Payment } from "@/types/payment"
 
-interface PaymentData {
-  id: string
-  invoice: string
-  amount: string
-  date: string
-  status: string
-  method: string
-  client: string
-}
-
-export function CompanyPaymentDetailsModal({
-  children,
-  paymentId,
-  paymentData,
-}: {
+interface PaymentDetailsModalProps {
   children: React.ReactNode
   paymentId: string
-  paymentData: PaymentData
-}) {
+  paymentData: Payment
+}
+
+export function CompanyPaymentDetailsModal({ children, paymentId, paymentData }: PaymentDetailsModalProps) {
   const [open, setOpen] = useState(false)
+  const { formatCurrency, formatDate, getStatusColor, getStatusLabel, getMethodLabel } = useCompanyPayments()
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "border-green-500 text-green-500"
-      case "pending":
-        return "border-amber-500 text-amber-500"
-      case "overdue":
-        return "border-red-500 text-red-500"
-      default:
-        return "border-gray-500 text-gray-500"
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
+  const getStatusIcon = (status: Payment["status"]) => {
+    switch (status) {
+      case 1: // Paid
         return <Check className="h-4 w-4 mr-1" />
-      case "pending":
+      case 0: // Pending
         return <Clock className="h-4 w-4 mr-1" />
-      case "overdue":
+      case 2: // Overdue
+        return <X className="h-4 w-4 mr-1" />
+      case 3: // Cancelled
         return <X className="h-4 w-4 mr-1" />
       default:
         return null
@@ -76,12 +56,12 @@ export function CompanyPaymentDetailsModal({
             <Badge variant="outline" className={getStatusColor(paymentData.status)}>
               <div className="flex items-center">
                 {getStatusIcon(paymentData.status)}
-                {paymentData.status}
+                {getStatusLabel(paymentData.status)}
               </div>
             </Badge>
           </div>
           <DialogDescription className="text-gray-400">
-            View and manage payment information for invoice {paymentData.invoice}.
+            View and manage payment information for reference {paymentData.reference}.
           </DialogDescription>
         </DialogHeader>
 
@@ -110,58 +90,52 @@ export function CompanyPaymentDetailsModal({
                     <span>{paymentData.id}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Invoice:</span>
-                    <span>{paymentData.invoice}</span>
+                    <span className="text-gray-400">Reference:</span>
+                    <span>{paymentData.reference}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Amount:</span>
-                    <span className="font-semibold">${paymentData.amount}</span>
+                    <span className="font-semibold">{formatCurrency(paymentData.amount)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Date:</span>
-                    <span>{paymentData.date}</span>
+                    <span className="text-gray-400">Due Date:</span>
+                    <span>{formatDate(paymentData.dueDate)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Payment Date:</span>
+                    <span>{paymentData.paymentDate ? formatDate(paymentData.paymentDate) : "Not paid"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Method:</span>
-                    <span>{paymentData.method}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Reference:</span>
-                    <span>REF-{Math.floor(Math.random() * 10000)}</span>
+                    <span>{getMethodLabel(paymentData.method)}</span>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-[#0f172a] border-[#2a3349]">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Client Information</CardTitle>
+                  <CardTitle className="text-sm font-medium">Plan Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Client:</span>
-                    <span>{paymentData.client}</span>
+                    <span className="text-gray-400">Plan ID:</span>
+                    <span>{paymentData.planId}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Contact:</span>
-                    <span>John Doe</span>
+                    <span className="text-gray-400">Plan Name:</span>
+                    <span>{paymentData.planName || `Plan ${paymentData.planId}`}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Email:</span>
-                    <span className="text-[#06b6d4]">
-                      contact@{paymentData.client.toLowerCase().replace(/\s+/g, "")}.com
-                    </span>
+                    <span className="text-gray-400">Company:</span>
+                    <span>{paymentData.companyName || `Company ${paymentData.companyId}`}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Phone:</span>
-                    <span>(123) 456-7890</span>
+                    <span className="text-gray-400">Created:</span>
+                    <span>{formatDate(paymentData.createdDate)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Address:</span>
-                    <span className="text-right">
-                      123 Business St.
-                      <br />
-                      New York, NY 10001
-                    </span>
+                    <span className="text-gray-400">Updated:</span>
+                    <span>{formatDate(paymentData.updatedDate)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -173,11 +147,13 @@ export function CompanyPaymentDetailsModal({
               </CardHeader>
               <CardContent>
                 <p className="text-gray-400">
-                  {paymentData.status === "Completed"
+                  {paymentData.status === 1
                     ? "Payment was processed successfully. Receipt has been sent to the client."
-                    : paymentData.status === "Pending"
+                    : paymentData.status === 0
                       ? "Payment is pending processing. Will be updated once the transaction is complete."
-                      : "Payment is overdue. Please follow up with the client."}
+                      : paymentData.status === 2
+                        ? "Payment is overdue. Please follow up with the client."
+                        : "Payment has been cancelled."}
                 </p>
               </CardContent>
             </Card>
@@ -211,41 +187,41 @@ export function CompanyPaymentDetailsModal({
                   </div>
                   <div className="text-right">
                     <h2 className="text-xl font-bold">INVOICE</h2>
-                    <p className="text-[#06b6d4]">{paymentData.invoice}</p>
+                    <p className="text-[#06b6d4]">{paymentData.reference}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-8 mb-8">
                   <div>
                     <h4 className="text-sm font-semibold mb-2 text-gray-400">Bill To:</h4>
-                    <p className="font-medium">{paymentData.client}</p>
+                    <p className="font-medium">{paymentData.companyName || `Company ${paymentData.companyId}`}</p>
                     <p className="text-sm text-gray-400">123 Business St.</p>
                     <p className="text-sm text-gray-400">New York, NY 10001</p>
-                    <p className="text-sm text-gray-400">
-                      contact@{paymentData.client.toLowerCase().replace(/\s+/g, "")}.com
-                    </p>
+                    <p className="text-sm text-gray-400">contact@company.com</p>
                   </div>
                   <div className="text-right">
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-gray-400">Invoice Date:</span>
-                      <span>{paymentData.date}</span>
+                      <span>{formatDate(paymentData.createdDate)}</span>
                     </div>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-gray-400">Due Date:</span>
-                      <span>{paymentData.date}</span>
+                      <span>{formatDate(paymentData.dueDate)}</span>
                     </div>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-gray-400">Status:</span>
                       <span
                         className={
-                          paymentData.status === "Completed"
+                          paymentData.status === 1
                             ? "text-green-500"
-                            : paymentData.status === "Pending"
+                            : paymentData.status === 0
                               ? "text-amber-500"
-                              : "text-red-500"
+                              : paymentData.status === 2
+                                ? "text-red-500"
+                                : "text-gray-500"
                         }
                       >
-                        {paymentData.status}
+                        {getStatusLabel(paymentData.status)}
                       </span>
                     </div>
                   </div>
@@ -262,17 +238,17 @@ export function CompanyPaymentDetailsModal({
                   </thead>
                   <tbody>
                     <tr className="border-b border-[#2a3349]">
-                      <td className="py-3">Professional Services</td>
+                      <td className="py-3">{paymentData.planName || `Plan ${paymentData.planId}`}</td>
                       <td className="py-3 text-right">1</td>
-                      <td className="py-3 text-right">${paymentData.amount}</td>
-                      <td className="py-3 text-right">${paymentData.amount}</td>
+                      <td className="py-3 text-right">{formatCurrency(paymentData.amount)}</td>
+                      <td className="py-3 text-right">{formatCurrency(paymentData.amount)}</td>
                     </tr>
                   </tbody>
                   <tfoot>
                     <tr>
                       <td colSpan={2}></td>
                       <td className="py-3 text-right text-gray-400">Subtotal:</td>
-                      <td className="py-3 text-right">${paymentData.amount}</td>
+                      <td className="py-3 text-right">{formatCurrency(paymentData.amount)}</td>
                     </tr>
                     <tr>
                       <td colSpan={2}></td>
@@ -282,14 +258,14 @@ export function CompanyPaymentDetailsModal({
                     <tr>
                       <td colSpan={2}></td>
                       <td className="py-3 text-right font-semibold">Total:</td>
-                      <td className="py-3 text-right font-bold">${paymentData.amount}</td>
+                      <td className="py-3 text-right font-bold">{formatCurrency(paymentData.amount)}</td>
                     </tr>
                   </tfoot>
                 </table>
 
                 <div className="border-t border-[#2a3349] pt-4">
                   <h4 className="text-sm font-semibold mb-2">Payment Method</h4>
-                  <p className="text-sm text-gray-400">{paymentData.method}</p>
+                  <p className="text-sm text-gray-400">{getMethodLabel(paymentData.method)}</p>
 
                   <h4 className="text-sm font-semibold mt-4 mb-2">Notes</h4>
                   <p className="text-sm text-gray-400">Thank you for your business!</p>
@@ -331,36 +307,17 @@ export function CompanyPaymentDetailsModal({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium">Invoice Created</h4>
+                        <h4 className="font-medium">Payment Created</h4>
                         <Badge variant="outline" className="border-gray-500 text-gray-400">
                           System
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-400 mt-1">Invoice {paymentData.invoice} was created.</p>
-                      <p className="text-xs text-gray-500 mt-1">{paymentData.date} • 10:30 AM</p>
+                      <p className="text-sm text-gray-400 mt-1">Payment {paymentData.reference} was created.</p>
+                      <p className="text-xs text-gray-500 mt-1">{formatDate(paymentData.createdDate)}</p>
                     </div>
                   </div>
 
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
-                        <Mail className="h-4 w-4" />
-                      </div>
-                      <div className="w-px h-full bg-[#2a3349] my-1"></div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium">Invoice Sent</h4>
-                        <Badge variant="outline" className="border-gray-500 text-gray-400">
-                          Admin
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-400 mt-1">Invoice was sent to client via email.</p>
-                      <p className="text-xs text-gray-500 mt-1">{paymentData.date} • 10:35 AM</p>
-                    </div>
-                  </div>
-
-                  {paymentData.status === "Completed" && (
+                  {paymentData.status === 1 && (
                     <div className="flex gap-4">
                       <div className="flex flex-col items-center">
                         <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
@@ -376,14 +333,19 @@ export function CompanyPaymentDetailsModal({
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-400 mt-1">
-                          Payment of ${paymentData.amount} was received via {paymentData.method}.
+                          Payment of {formatCurrency(paymentData.amount)} was received via{" "}
+                          {getMethodLabel(paymentData.method)}.
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">{paymentData.date} • 2:15 PM</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {paymentData.paymentDate
+                            ? formatDate(paymentData.paymentDate)
+                            : formatDate(paymentData.updatedDate)}
+                        </p>
                       </div>
                     </div>
                   )}
 
-                  {paymentData.status === "Pending" && (
+                  {paymentData.status === 0 && (
                     <div className="flex gap-4">
                       <div className="flex flex-col items-center">
                         <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
@@ -398,12 +360,12 @@ export function CompanyPaymentDetailsModal({
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-400 mt-1">Awaiting payment confirmation.</p>
-                        <p className="text-xs text-gray-500 mt-1">{paymentData.date} • 2:15 PM</p>
+                        <p className="text-xs text-gray-500 mt-1">{formatDate(paymentData.updatedDate)}</p>
                       </div>
                     </div>
                   )}
 
-                  {paymentData.status === "Overdue" && (
+                  {paymentData.status === 2 && (
                     <div className="flex gap-4">
                       <div className="flex flex-col items-center">
                         <div className="h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
@@ -418,7 +380,27 @@ export function CompanyPaymentDetailsModal({
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-400 mt-1">Payment is past due date. Reminder sent to client.</p>
-                        <p className="text-xs text-gray-500 mt-1">{paymentData.date} • 2:15 PM</p>
+                        <p className="text-xs text-gray-500 mt-1">{formatDate(paymentData.updatedDate)}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentData.status === 3 && (
+                    <div className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="h-8 w-8 rounded-full bg-gray-500/20 flex items-center justify-center text-gray-500">
+                          <X className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">Payment Cancelled</h4>
+                          <Badge variant="outline" className="border-gray-500 text-gray-400">
+                            System
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-400 mt-1">Payment has been cancelled.</p>
+                        <p className="text-xs text-gray-500 mt-1">{formatDate(paymentData.updatedDate)}</p>
                       </div>
                     </div>
                   )}

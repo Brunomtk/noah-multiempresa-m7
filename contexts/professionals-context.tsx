@@ -1,8 +1,16 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
-import type { Professional, PaginatedResponse } from "@/types"
-import { professionalsApi, type ProfessionalWithDetails } from "@/lib/api/professionals"
+import type React from "react"
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react"
+import type { Professional } from "@/types"
+import {
+  getProfessionals,
+  getProfessionalById,
+  createProfessional,
+  updateProfessional,
+  deleteProfessional,
+  type ProfessionalWithDetails,
+} from "@/lib/api/professionals"
 import { useToast } from "@/hooks/use-toast"
 
 interface ProfessionalsContextType {
@@ -17,36 +25,21 @@ interface ProfessionalsContextType {
   }
   filters: {
     status: string
-    teamId: string
+    company: string
     search: string
   }
-  teams: { id: string; name: string }[]
-  fetchProfessionals: (
-    page?: number,
-    limit?: number,
-    status?: string,
-    teamId?: string,
-    search?: string,
-    companyId?: string,
-  ) => Promise<void>
-  getProfessionalById: (id: string) => Promise<ProfessionalWithDetails | null>
-  createProfessional: (
-    professionalData: Omit<ProfessionalWithDetails, "id" | "createdAt" | "updatedAt" | "rating" | "completedServices">,
-  ) => Promise<Professional | null>
-  updateProfessional: (id: string, professionalData: Partial<ProfessionalWithDetails>) => Promise<Professional | null>
-  deleteProfessional: (id: string) => Promise<boolean>
-  getProfessionalSchedule: (
-    id: string,
-    startDate: string,
-    endDate: string,
-  ) => Promise<{ date: string; appointments: any[] }[] | null>
-  fetchTeams: () => Promise<void>
-  setFilters: (filters: { status?: string; teamId?: string; search?: string }) => void
+  fetchProfessionals: (page?: number) => Promise<void>
+  getProfessional: (id: string) => Promise<ProfessionalWithDetails | null>
+  addProfessional: (professional: Partial<Professional>) => Promise<Professional | null>
+  editProfessional: (id: string, professional: Partial<Professional>) => Promise<Professional | null>
+  removeProfessional: (id: string) => Promise<boolean>
+  setFilters: (filters: Partial<ProfessionalsContextType["filters"]>) => void
+  resetFilters: () => void
 }
 
 const ProfessionalsContext = createContext<ProfessionalsContextType | undefined>(undefined)
 
-export function ProfessionalsProvider({ children }: { children: ReactNode }) {
+export function ProfessionalsProvider({ children }: { children: React.ReactNode }) {
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,26 +51,25 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
   })
   const [filters, setFiltersState] = useState({
     status: "all",
-    teamId: "all",
+    company: "all",
     search: "",
   })
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const { toast } = useToast()
 
   const fetchProfessionals = useCallback(
-    async (
-      page = 1,
-      limit = 10,
-      status = filters.status,
-      teamId = filters.teamId,
-      search = filters.search,
-      companyId?: string,
-    ) => {
+    async (page = 1) => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await professionalsApi.getProfessionals(page, limit, status, teamId, search, companyId)
+        const response = await getProfessionals(
+          page,
+          pagination.itemsPerPage,
+          filters.status,
+          undefined, // teamId
+          filters.search,
+          filters.company,
+        )
 
         if (response.error) {
           setError(response.error)
@@ -90,9 +82,8 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
         }
 
         if (response.data) {
-          const paginatedData = response.data as PaginatedResponse<Professional>
-          setProfessionals(paginatedData.data)
-          setPagination(paginatedData.meta)
+          setProfessionals(response.data.data)
+          setPagination(response.data.meta)
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to fetch professionals"
@@ -106,16 +97,16 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     },
-    [filters, toast],
+    [filters, pagination.itemsPerPage, toast],
   )
 
-  const getProfessionalById = useCallback(
+  const getProfessional = useCallback(
     async (id: string): Promise<ProfessionalWithDetails | null> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await professionalsApi.getProfessionalById(id)
+        const response = await getProfessionalById(id)
 
         if (response.error) {
           setError(response.error)
@@ -144,18 +135,13 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
     [toast],
   )
 
-  const createProfessional = useCallback(
-    async (
-      professionalData: Omit<
-        ProfessionalWithDetails,
-        "id" | "createdAt" | "updatedAt" | "rating" | "completedServices"
-      >,
-    ): Promise<Professional | null> => {
+  const addProfessional = useCallback(
+    async (professional: Partial<Professional>): Promise<Professional | null> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await professionalsApi.createProfessional(professionalData)
+        const response = await createProfessional(professional as any)
 
         if (response.error) {
           setError(response.error)
@@ -167,15 +153,17 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
           return null
         }
 
-        toast({
-          title: "Success",
-          description: "Professional created successfully",
-        })
+        if (response.data) {
+          toast({
+            title: "Success",
+            description: response.message || "Professional created successfully",
+          })
+          // Refresh professionals list
+          fetchProfessionals()
+          return response.data
+        }
 
-        // Refresh the professionals list
-        fetchProfessionals(pagination.currentPage, pagination.itemsPerPage)
-
-        return response.data || null
+        return null
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to create professional"
         setError(errorMessage)
@@ -189,16 +177,16 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     },
-    [fetchProfessionals, pagination, toast],
+    [fetchProfessionals, toast],
   )
 
-  const updateProfessional = useCallback(
-    async (id: string, professionalData: Partial<ProfessionalWithDetails>): Promise<Professional | null> => {
+  const editProfessional = useCallback(
+    async (id: string, professional: Partial<Professional>): Promise<Professional | null> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await professionalsApi.updateProfessional(id, professionalData)
+        const response = await updateProfessional(id, professional as any)
 
         if (response.error) {
           setError(response.error)
@@ -210,15 +198,17 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
           return null
         }
 
-        toast({
-          title: "Success",
-          description: "Professional updated successfully",
-        })
+        if (response.data) {
+          toast({
+            title: "Success",
+            description: response.message || "Professional updated successfully",
+          })
+          // Refresh professionals list
+          fetchProfessionals()
+          return response.data
+        }
 
-        // Refresh the professionals list
-        fetchProfessionals(pagination.currentPage, pagination.itemsPerPage)
-
-        return response.data || null
+        return null
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to update professional"
         setError(errorMessage)
@@ -232,16 +222,16 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     },
-    [fetchProfessionals, pagination, toast],
+    [fetchProfessionals, toast],
   )
 
-  const deleteProfessional = useCallback(
+  const removeProfessional = useCallback(
     async (id: string): Promise<boolean> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await professionalsApi.deleteProfessional(id)
+        const response = await deleteProfessional(id)
 
         if (response.error) {
           setError(response.error)
@@ -255,13 +245,10 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
 
         toast({
           title: "Success",
-          description: "Professional deleted successfully",
-          variant: "destructive",
+          description: response.message || "Professional deleted successfully",
         })
-
-        // Refresh the professionals list
-        fetchProfessionals(pagination.currentPage, pagination.itemsPerPage)
-
+        // Refresh professionals list
+        fetchProfessionals()
         return true
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to delete professional"
@@ -276,95 +263,61 @@ export function ProfessionalsProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     },
-    [fetchProfessionals, pagination, toast],
+    [fetchProfessionals, toast],
   )
 
-  const getProfessionalSchedule = useCallback(
-    async (id: string, startDate: string, endDate: string): Promise<{ date: string; appointments: any[] }[] | null> => {
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        const response = await professionalsApi.getProfessionalSchedule(id, startDate, endDate)
-
-        if (response.error) {
-          setError(response.error)
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return null
-        }
-
-        return response.data || null
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch professional schedule"
-        setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  const fetchTeams = useCallback(async () => {
-    try {
-      const response = await professionalsApi.getTeams()
-
-      if (response.error) {
-        console.error(response.error)
-        return
-      }
-
-      if (response.data) {
-        setTeams(response.data)
-      }
-    } catch (err) {
-      console.error("Failed to fetch teams:", err)
-    }
+  const setFilters = useCallback((newFilters: Partial<ProfessionalsContextType["filters"]>) => {
+    setFiltersState((prev) => ({ ...prev, ...newFilters }))
   }, [])
 
-  const setFilters = useCallback(
-    (newFilters: { status?: string; teamId?: string; search?: string }) => {
-      const updatedFilters = {
-        ...filters,
-        ...newFilters,
-      }
-      setFiltersState(updatedFilters)
-      fetchProfessionals(
-        1,
-        pagination.itemsPerPage,
-        updatedFilters.status,
-        updatedFilters.teamId,
-        updatedFilters.search,
-      )
-    },
-    [filters, fetchProfessionals, pagination.itemsPerPage],
-  )
+  const resetFilters = useCallback(() => {
+    setFiltersState({
+      status: "all",
+      company: "all",
+      search: "",
+    })
+  }, [])
 
-  const value = {
-    professionals,
-    isLoading,
-    error,
-    pagination,
-    filters,
-    teams,
-    fetchProfessionals,
-    getProfessionalById,
-    createProfessional,
-    updateProfessional,
-    deleteProfessional,
-    getProfessionalSchedule,
-    fetchTeams,
-    setFilters,
-  }
+  // Update when filters change
+  useEffect(() => {
+    fetchProfessionals(1)
+  }, [filters])
+
+  // Initial fetch
+  useEffect(() => {
+    fetchProfessionals()
+  }, [])
+
+  const value = useMemo(
+    () => ({
+      professionals,
+      isLoading,
+      error,
+      pagination,
+      filters,
+      fetchProfessionals,
+      getProfessional,
+      addProfessional,
+      editProfessional,
+      removeProfessional,
+      setFilters,
+      resetFilters,
+    }),
+    [
+      professionals,
+      isLoading,
+      error,
+      pagination,
+      filters,
+      fetchProfessionals,
+      getProfessional,
+      addProfessional,
+      editProfessional,
+      removeProfessional,
+      setFilters,
+      resetFilters,
+    ],
+  )
 
   return <ProfessionalsContext.Provider value={value}>{children}</ProfessionalsContext.Provider>
 }

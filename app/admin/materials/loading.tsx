@@ -1,39 +1,9 @@
 import { Package } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PageLoading } from "@/components/ui/page-loading"
 
-export default function MaterialsLoading() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48 bg-[#2a3349]" />
-        <Skeleton className="h-10 w-32 bg-[#2a3349]" />
-      </div>
-
-      <Tabs defaultValue="all" className="w-full">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
-          <TabsList className="mb-0">
-            <TabsTrigger value="all">All Materials</TabsTrigger>
-            <TabsTrigger value="cleaning">Cleaning</TabsTrigger>
-            <TabsTrigger value="tools">Tools</TabsTrigger>
-            <TabsTrigger value="safety">Safety</TabsTrigger>
-          </TabsList>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Skeleton className="h-10 w-full sm:w-[300px] bg-[#2a3349]" />
-            <Skeleton className="h-10 w-[160px] bg-[#2a3349]" />
-          </div>
-        </div>
-
-        <TabsContent value="all" className="m-0">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <MaterialCardSkeleton key={i} />
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
+export default function Loading() {
+  return <PageLoading />
 }
 
 function MaterialCardSkeleton() {

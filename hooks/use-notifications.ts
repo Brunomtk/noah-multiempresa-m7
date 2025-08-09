@@ -1,127 +1,263 @@
-import { useNotificationsContext } from "@/contexts/notifications-context"
-import type { NotificationFormData, NotificationFilters } from "@/types/notification"
-import { formatDistanceToNow } from "date-fns"
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { useToast } from "@/components/ui/use-toast"
+import {
+  getNotifications,
+  getNotificationById,
+  createNotification,
+  updateNotification,
+  deleteNotification,
+  markNotificationAsRead,
+} from "@/lib/api/notifications"
+import type {
+  Notification,
+  NotificationFormData,
+  NotificationUpdateData,
+  NotificationFilters,
+} from "@/types/notification"
 
 export function useNotifications() {
-  const context = useNotificationsContext()
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<NotificationFilters>({})
+  const { toast } = useToast()
 
-  // Format the notification date for display
-  const formatNotificationDate = (date: string) => {
-    return formatDistanceToNow(new Date(date), { addSuffix: true })
-  }
-
-  // Get the appropriate color for a notification type
-  const getNotificationTypeColor = (type: string) => {
-    switch (type) {
-      case "info":
-        return "bg-blue-100 text-blue-800"
-      case "warning":
-        return "bg-yellow-100 text-yellow-800"
-      case "error":
-        return "bg-red-100 text-red-800"
-      case "success":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getNotifications(filters)
+      setNotifications(data)
+    } catch (err) {
+      setError("Failed to fetch notifications")
+      toast({
+        title: "Error",
+        description: "Failed to fetch notifications",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [filters, toast])
 
-  // Get the appropriate icon for a notification type
-  const getNotificationTypeIcon = (type: string) => {
+  const fetchNotificationById = useCallback(
+    async (id: number) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await getNotificationById(id)
+        setSelectedNotification(data)
+        return data
+      } catch (err) {
+        setError(`Failed to fetch notification with ID ${id}`)
+        toast({
+          title: "Error",
+          description: `Failed to fetch notification details`,
+          variant: "destructive",
+        })
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast],
+  )
+
+  const addNotification = useCallback(
+    async (data: NotificationFormData) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const newNotification = await createNotification(data)
+        setNotifications((prev) => [newNotification, ...prev])
+        toast({
+          title: "Success",
+          description: "Notification created successfully",
+        })
+        return newNotification
+      } catch (err) {
+        setError("Failed to create notification")
+        toast({
+          title: "Error",
+          description: "Failed to create notification",
+          variant: "destructive",
+        })
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast],
+  )
+
+  const updateNotificationById = useCallback(
+    async (id: number, data: NotificationUpdateData) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const updatedNotification = await updateNotification(id, data)
+        setNotifications((prev) =>
+          prev.map((notification) => (notification.id === id ? updatedNotification : notification)),
+        )
+        setSelectedNotification(updatedNotification)
+        toast({
+          title: "Success",
+          description: "Notification updated successfully",
+        })
+        return updatedNotification
+      } catch (err) {
+        setError(`Failed to update notification with ID ${id}`)
+        toast({
+          title: "Error",
+          description: "Failed to update notification",
+          variant: "destructive",
+        })
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast],
+  )
+
+  const removeNotification = useCallback(
+    async (id: number) => {
+      setLoading(true)
+      setError(null)
+      try {
+        await deleteNotification(id)
+        setNotifications((prev) => prev.filter((notification) => notification.id !== id))
+        if (selectedNotification?.id === id) {
+          setSelectedNotification(null)
+        }
+        toast({
+          title: "Success",
+          description: "Notification deleted successfully",
+        })
+      } catch (err) {
+        setError(`Failed to delete notification with ID ${id}`)
+        toast({
+          title: "Error",
+          description: "Failed to delete notification",
+          variant: "destructive",
+        })
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [selectedNotification, toast],
+  )
+
+  const markAsRead = useCallback(
+    async (id: number) => {
+      setLoading(true)
+      setError(null)
+      try {
+        await markNotificationAsRead(id)
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification.id === id ? { ...notification, status: 1, readAt: new Date().toISOString() } : notification,
+          ),
+        )
+        if (selectedNotification?.id === id) {
+          setSelectedNotification({
+            ...selectedNotification,
+            status: 1,
+            readAt: new Date().toISOString(),
+          })
+        }
+        toast({
+          title: "Success",
+          description: "Notification marked as read",
+        })
+      } catch (err) {
+        setError(`Failed to mark notification with ID ${id} as read`)
+        toast({
+          title: "Error",
+          description: "Failed to mark notification as read",
+          variant: "destructive",
+        })
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [selectedNotification, toast],
+  )
+
+  const updateFilters = useCallback((newFilters: Partial<NotificationFilters>) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }))
+  }, [])
+
+  const resetFilters = useCallback(() => {
+    setFilters({})
+  }, [])
+
+  // Helper functions for displaying labels
+  const getNotificationTypeLabel = useCallback((type: number): string => {
     switch (type) {
-      case "info":
-        return "info-circle"
-      case "warning":
-        return "alert-triangle"
-      case "error":
-        return "alert-octagon"
-      case "success":
-        return "check-circle"
+      case 1:
+        return "System"
+      case 2:
+        return "Appointment"
+      case 3:
+        return "Message"
+      case 4:
+        return "Alert"
       default:
-        return "bell"
+        return "Unknown"
     }
-  }
+  }, [])
 
-  // Get the appropriate label for a recipient role
-  const getRecipientRoleLabel = (role: string) => {
+  const getRecipientRoleLabel = useCallback((role: number): string => {
     switch (role) {
-      case "admin":
-        return "Administrator"
-      case "company":
+      case 1:
+        return "Admin"
+      case 2:
         return "Company"
-      case "professional":
+      case 3:
         return "Professional"
       default:
-        return role
+        return "Unknown"
     }
-  }
+  }, [])
 
-  // Get the appropriate color for a notification status
-  const getNotificationStatusColor = (status: string) => {
+  const getStatusLabel = useCallback((status: number): string => {
     switch (status) {
-      case "unread":
-        return "bg-blue-100 text-blue-800"
-      case "read":
-        return "bg-gray-100 text-gray-800"
+      case 0:
+        return "Unread"
+      case 1:
+        return "Read"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "Unknown"
     }
-  }
+  }, [])
 
-  // Create a new notification
-  const createNotification = async (data: NotificationFormData) => {
-    await context.addNotification(data)
-  }
-
-  // Update notification filters
-  const updateFilters = (filters: Partial<NotificationFilters>) => {
-    context.setFilters(filters)
-  }
-
-  // Get notification type options for filtering
-  const getNotificationTypeOptions = () => [
-    { value: "all", label: "All Types" },
-    { value: "info", label: "Information" },
-    { value: "warning", label: "Warning" },
-    { value: "error", label: "Error" },
-    { value: "success", label: "Success" },
-  ]
-
-  // Get recipient role options for filtering
-  const getRecipientRoleOptions = () => [
-    { value: "all", label: "All Roles" },
-    { value: "admin", label: "Administrators" },
-    { value: "company", label: "Companies" },
-    { value: "professional", label: "Professionals" },
-  ]
-
-  // Get notification type options for creating
-  const getNotificationTypeCreateOptions = () => [
-    { value: "info", label: "Information" },
-    { value: "warning", label: "Warning" },
-    { value: "error", label: "Error" },
-    { value: "success", label: "Success" },
-  ]
-
-  // Get recipient role options for creating
-  const getRecipientRoleCreateOptions = () => [
-    { value: "admin", label: "Administrators" },
-    { value: "company", label: "Companies" },
-    { value: "professional", label: "Professionals" },
-  ]
+  useEffect(() => {
+    fetchNotifications()
+  }, [fetchNotifications])
 
   return {
-    ...context,
-    formatNotificationDate,
-    getNotificationTypeColor,
-    getNotificationTypeIcon,
-    getRecipientRoleLabel,
-    getNotificationStatusColor,
-    createNotification,
+    notifications,
+    selectedNotification,
+    loading,
+    error,
+    filters,
+    fetchNotifications,
+    fetchNotificationById,
+    addNotification,
+    updateNotificationById,
+    removeNotification,
+    markAsRead,
     updateFilters,
-    getNotificationTypeOptions,
-    getRecipientRoleOptions,
-    getNotificationTypeCreateOptions,
-    getRecipientRoleCreateOptions,
+    resetFilters,
+    setSelectedNotification,
+    getNotificationTypeLabel,
+    getRecipientRoleLabel,
+    getStatusLabel,
   }
 }

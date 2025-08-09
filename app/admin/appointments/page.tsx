@@ -1,13 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Filter, Grid3X3, LayoutGrid, List, Plus } from "lucide-react"
-import { AppointmentCalendar } from "@/components/admin/appointment-calendar"
+import { Input } from "@/components/ui/input"
+import { Calendar, Plus, Search, List, CalendarDays } from "lucide-react"
 import { AppointmentList } from "@/components/admin/appointment-list"
+import { AppointmentCalendar } from "@/components/admin/appointment-calendar"
 import { AppointmentModal } from "@/components/admin/appointment-modal"
 import { AppointmentDetailsModal } from "@/components/admin/appointment-details-modal"
 import { useToast } from "@/hooks/use-toast"
+import { useAppointments } from "@/hooks/use-appointments"
+import { format } from "date-fns"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,481 +22,463 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { Appointment, AppointmentFilters } from "@/types/appointment"
+import { apiRequest } from "@/lib/api/utils"
 
-// Sample data
-const initialAppointments = [
-  {
-    id: 1,
-    title: "Regular Cleaning",
-    customer: "Tech Solutions Ltd",
-    address: "123 Main St, Suite 500",
-    team: "Team Alpha",
-    start: new Date(2025, 4, 26, 9, 0),
-    end: new Date(2025, 4, 26, 11, 0),
-    status: "scheduled",
-    type: "regular",
-    notes: "Focus on kitchen and meeting rooms",
-  },
-  {
-    id: 2,
-    title: "Deep Cleaning",
-    customer: "ABC Consulting",
-    address: "456 Oak Ave, Floor 3",
-    team: "Team Beta",
-    start: new Date(2025, 4, 26, 13, 0),
-    end: new Date(2025, 4, 26, 17, 0),
-    status: "in_progress",
-    type: "deep",
-    notes: "Post-renovation cleaning",
-  },
-  {
-    id: 3,
-    title: "Window Cleaning",
-    customer: "XYZ Commerce",
-    address: "789 Pine St",
-    team: "Team Gamma",
-    start: new Date(2025, 4, 27, 10, 0),
-    end: new Date(2025, 4, 27, 12, 0),
-    status: "scheduled",
-    type: "specialized",
-    notes: "External windows on floors 1-3",
-  },
-  {
-    id: 4,
-    title: "Regular Cleaning",
-    customer: "Delta Industries",
-    address: "101 Maple Dr, Building B",
-    team: "Team Alpha",
-    start: new Date(2025, 4, 27, 14, 0),
-    end: new Date(2025, 4, 27, 16, 0),
-    status: "scheduled",
-    type: "regular",
-    notes: "",
-  },
-  {
-    id: 5,
-    title: "Carpet Cleaning",
-    customer: "Omega Services",
-    address: "202 Elm St, Suite 100",
-    team: "Team Beta",
-    start: new Date(2025, 4, 28, 9, 0),
-    end: new Date(2025, 4, 28, 13, 0),
-    status: "scheduled",
-    type: "specialized",
-    notes: "All office carpets",
-  },
-  {
-    id: 6,
-    title: "Regular Cleaning",
-    customer: "Global Tech",
-    address: "303 Cedar Rd",
-    team: "Team Gamma",
-    start: new Date(2025, 4, 28, 15, 0),
-    end: new Date(2025, 4, 28, 17, 0),
-    status: "scheduled",
-    type: "regular",
-    notes: "",
-  },
-  {
-    id: 7,
-    title: "Deep Cleaning",
-    customer: "Innovate Inc",
-    address: "404 Birch Blvd, Floor 5",
-    team: "Team Alpha",
-    start: new Date(2025, 4, 29, 8, 0),
-    end: new Date(2025, 4, 29, 12, 0),
-    status: "scheduled",
-    type: "deep",
-    notes: "Complete office deep cleaning",
-  },
-  {
-    id: 8,
-    title: "Regular Cleaning",
-    customer: "First Financial",
-    address: "505 Walnut Way",
-    team: "Team Beta",
-    start: new Date(2025, 4, 29, 13, 0),
-    end: new Date(2025, 4, 29, 15, 0),
-    status: "scheduled",
-    type: "regular",
-    notes: "",
-  },
-  {
-    id: 9,
-    title: "Post-Construction Cleaning",
-    customer: "Build Right Construction",
-    address: "606 Spruce St",
-    team: "Team Gamma",
-    start: new Date(2025, 4, 30, 9, 0),
-    end: new Date(2025, 4, 30, 17, 0),
-    status: "scheduled",
-    type: "specialized",
-    notes: "New office space, heavy dust expected",
-  },
-  {
-    id: 10,
-    title: "Regular Cleaning",
-    customer: "Legal Partners",
-    address: "707 Ash Ave, Suite 300",
-    team: "Team Alpha",
-    start: new Date(2025, 4, 31, 7, 0),
-    end: new Date(2025, 4, 31, 9, 0),
-    status: "scheduled",
-    type: "regular",
-    notes: "Early morning cleaning before office hours",
-  },
-  {
-    id: 11,
-    title: "Deep Cleaning",
-    customer: "Health Clinic",
-    address: "808 Redwood Rd",
-    team: "Team Beta",
-    start: new Date(2025, 4, 31, 18, 0),
-    end: new Date(2025, 4, 31, 22, 0),
-    status: "scheduled",
-    type: "deep",
-    notes: "After-hours deep cleaning and sanitization",
-  },
-  {
-    id: 12,
-    title: "Regular Cleaning",
-    customer: "Tech Solutions Ltd",
-    address: "123 Main St, Suite 500",
-    team: "Team Alpha",
-    start: new Date(2025, 5, 2, 9, 0),
-    end: new Date(2025, 5, 2, 11, 0),
-    status: "scheduled",
-    type: "regular",
-    notes: "",
-  },
-  {
-    id: 13,
-    title: "Window Cleaning",
-    customer: "ABC Consulting",
-    address: "456 Oak Ave, Floor 3",
-    team: "Team Gamma",
-    start: new Date(2025, 5, 2, 13, 0),
-    end: new Date(2025, 5, 2, 16, 0),
-    status: "scheduled",
-    type: "specialized",
-    notes: "",
-  },
-  {
-    id: 14,
-    title: "Regular Cleaning",
-    customer: "XYZ Commerce",
-    address: "789 Pine St",
-    team: "Team Beta",
-    start: new Date(2025, 5, 3, 10, 0),
-    end: new Date(2025, 5, 3, 12, 0),
-    status: "scheduled",
-    type: "regular",
-    notes: "",
-  },
-  {
-    id: 15,
-    title: "Deep Cleaning",
-    customer: "Delta Industries",
-    address: "101 Maple Dr, Building B",
-    team: "Team Alpha",
-    start: new Date(2025, 5, 3, 14, 0),
-    end: new Date(2025, 5, 3, 18, 0),
-    status: "scheduled",
-    type: "deep",
-    notes: "Quarterly deep cleaning",
-  },
-]
+interface Company {
+  id: number
+  name: string
+  cnpj: string
+  responsible: string
+  email: string
+  phone: string
+  planId: number
+  status: number
+  createdDate: string
+  updatedDate: string
+}
+
+interface Professional {
+  id: number
+  name: string
+  cpf: string
+  email: string
+  phone: string
+  teamId: number
+  companyId: number
+  status: string
+  rating: number | null
+  completedServices: number | null
+  createdAt: string
+  updatedAt: string
+}
 
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState(initialAppointments)
+  const {
+    appointments,
+    isLoading,
+    pagination,
+    fetchAppointments,
+    addAppointment,
+    updateAppointment,
+    removeAppointment,
+  } = useAppointments()
+
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
-  const [appointmentToDelete, setAppointmentToDelete] = useState<any>(null)
-  const [view, setView] = useState("week")
-  const [displayMode, setDisplayMode] = useState("calendar")
-  const [filters, setFilters] = useState({
-    teams: ["Team Alpha", "Team Beta", "Team Gamma"],
-    statuses: ["scheduled", "in_progress", "completed", "cancelled"],
-    types: ["regular", "deep", "specialized"],
-  })
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<number | undefined>(undefined)
+  const [companyFilter, setCompanyFilter] = useState<number | undefined>(undefined)
+  const [professionalFilter, setProfessionalFilter] = useState<number | undefined>(undefined)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [displayMode, setDisplayMode] = useState<"list" | "calendar">("list")
+  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("week")
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [loadingCompanies, setLoadingCompanies] = useState(false)
+  const [loadingProfessionals, setLoadingProfessionals] = useState(false)
   const { toast } = useToast()
 
-  // Adicionar uma nova função para lidar com a adição de agendamentos a partir do calendário
-  const handleAddAppointmentFromCalendar = (date: Date) => {
-    // Criar um horário de término padrão (1 hora após o início)
-    const endDate = new Date(date)
-    endDate.setHours(date.getHours() + 1)
+  // Load companies and professionals on component mount
+  useEffect(() => {
+    loadCompanies()
+    loadProfessionals()
+  }, [])
 
-    // Criar um objeto de agendamento temporário com a data selecionada
-    const tempAppointment = {
-      start: date,
-      end: endDate,
-      // Outros campos podem ficar vazios, serão preenchidos no modal
-    }
+  // Load appointments on component mount and when filters change
+  useEffect(() => {
+    loadAppointments()
+  }, [currentPage, pageSize, statusFilter, companyFilter, professionalFilter, searchTerm])
 
-    setSelectedAppointment(tempAppointment)
-    setIsModalOpen(true)
-  }
-
-  const handleAddAppointment = (data: any) => {
-    const newAppointment = {
-      id: appointments.length + 1,
-      ...data,
-    }
-    setAppointments([...appointments, newAppointment])
-    setIsModalOpen(false)
-    toast({
-      title: "Appointment added successfully",
-      description: `${data.title} for ${data.customer} has been scheduled.`,
-    })
-  }
-
-  const handleEditAppointment = (data: any) => {
-    setAppointments(
-      appointments.map((appointment) =>
-        appointment.id === selectedAppointment.id ? { ...appointment, ...data } : appointment,
-      ),
-    )
-    setSelectedAppointment(null)
-    setIsModalOpen(false)
-    toast({
-      title: "Appointment updated successfully",
-      description: `${data.title} for ${data.customer} has been updated.`,
-    })
-  }
-
-  const handleDeleteAppointment = () => {
-    if (appointmentToDelete) {
-      setAppointments(appointments.filter((appointment) => appointment.id !== appointmentToDelete.id))
+  const loadCompanies = async () => {
+    try {
+      setLoadingCompanies(true)
+      const response = await apiRequest("/Companies")
+      if (Array.isArray(response)) {
+        setCompanies(response)
+      }
+    } catch (error) {
+      console.error("Error loading companies:", error)
       toast({
-        title: "Appointment deleted successfully",
-        description: `${appointmentToDelete.title} for ${appointmentToDelete.customer} has been removed.`,
+        title: "Error",
+        description: "Failed to load companies",
         variant: "destructive",
       })
-      setAppointmentToDelete(null)
+    } finally {
+      setLoadingCompanies(false)
     }
   }
 
-  const handleViewDetails = (appointment: any) => {
+  const loadProfessionals = async () => {
+    try {
+      setLoadingProfessionals(true)
+      const response = await apiRequest("/Professional")
+      if (Array.isArray(response)) {
+        setProfessionals(response)
+      }
+    } catch (error) {
+      console.error("Error loading professionals:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load professionals",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingProfessionals(false)
+    }
+  }
+
+  const loadAppointments = async () => {
+    const filters: AppointmentFilters = {
+      page: currentPage,
+      pageSize: displayMode === "calendar" ? 100 : pageSize, // Load more for calendar view
+    }
+
+    if (statusFilter !== undefined) {
+      filters.status = statusFilter
+    }
+
+    if (companyFilter !== undefined) {
+      filters.companyId = companyFilter
+    }
+
+    if (professionalFilter !== undefined) {
+      filters.professionalId = professionalFilter
+    }
+
+    if (searchTerm.trim()) {
+      filters.search = searchTerm.trim()
+    }
+
+    await fetchAppointments(filters)
+  }
+
+  const handleAddAppointment = async (data: any) => {
+    const success = await addAppointment(data)
+    if (success) {
+      setIsModalOpen(false)
+      setSelectedAppointment(null)
+    }
+  }
+
+  const handleEditAppointment = async (data: any) => {
+    if (selectedAppointment) {
+      const success = await updateAppointment(selectedAppointment.id, data)
+      if (success) {
+        setIsModalOpen(false)
+        setSelectedAppointment(null)
+      }
+    }
+  }
+
+  const handleDeleteAppointment = async () => {
+    if (appointmentToDelete) {
+      const success = await removeAppointment(appointmentToDelete.id)
+      if (success) {
+        setAppointmentToDelete(null)
+      }
+    }
+  }
+
+  const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setIsDetailsModalOpen(true)
   }
 
-  const handleEdit = (appointment: any) => {
+  const handleEdit = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setIsModalOpen(true)
   }
 
-  const filteredAppointments = appointments.filter((appointment) => {
-    return (
-      filters.teams.includes(appointment.team) &&
-      filters.statuses.includes(appointment.status) &&
-      filters.types.includes(appointment.type)
-    )
-  })
-
-  const handleFilterChange = (filterType: string, value: string, checked: boolean) => {
-    setFilters((prev) => {
-      const newFilters = { ...prev }
-      if (checked) {
-        if (!newFilters[filterType as keyof typeof newFilters].includes(value)) {
-          newFilters[filterType as keyof typeof newFilters] = [
-            ...newFilters[filterType as keyof typeof newFilters],
-            value,
-          ]
-        }
-      } else {
-        newFilters[filterType as keyof typeof newFilters] = newFilters[filterType as keyof typeof newFilters].filter(
-          (item) => item !== value,
-        )
-      }
-      return newFilters
-    })
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
+
+  const handlePageSizeChange = (size: string) => {
+    setPageSize(Number.parseInt(size))
+    setCurrentPage(1)
+  }
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value)
+    setCurrentPage(1)
+  }
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value === "all" ? undefined : Number.parseInt(value))
+    setCurrentPage(1)
+  }
+
+  const handleCompanyFilterChange = (value: string) => {
+    setCompanyFilter(value === "all" ? undefined : Number.parseInt(value))
+    setCurrentPage(1)
+  }
+
+  const handleProfessionalFilterChange = (value: string) => {
+    setProfessionalFilter(value === "all" ? undefined : Number.parseInt(value))
+    setCurrentPage(1)
+  }
+
+  const clearFilters = () => {
+    setSearchTerm("")
+    setStatusFilter(undefined)
+    setCompanyFilter(undefined)
+    setProfessionalFilter(undefined)
+    setCurrentPage(1)
+  }
+
+  const handleAddAppointmentFromCalendar = (date: Date) => {
+    const endDate = new Date(date)
+    endDate.setHours(date.getHours() + 1)
+
+    const tempAppointment = {
+      start: date,
+      end: endDate,
+    }
+
+    setSelectedAppointment(tempAppointment as Appointment)
+    setIsModalOpen(true)
+  }
+
+  const handleDisplayModeChange = (mode: string) => {
+    setDisplayMode(mode as "list" | "calendar")
+    if (mode === "calendar") {
+      // Load more appointments for calendar view
+      setCurrentPage(1)
+      loadAppointments()
+    }
+  }
+
+  // Filter professionals based on selected company
+  const filteredProfessionals = companyFilter
+    ? professionals.filter((prof) => prof.companyId === companyFilter)
+    : professionals
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Appointment Management</h1>
-          <p className="text-gray-400">Schedule and manage all cleaning appointments.</p>
+          <p className="text-gray-400">Schedule and manage all appointments.</p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button
-            className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-            onClick={() => {
-              setSelectedAppointment(null)
-              setIsModalOpen(true)
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Appointment
-          </Button>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="border-[#2a3349] text-white hover:bg-[#2a3349]">
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 bg-[#1a2234] border-[#2a3349] text-white p-4">
-              <div className="space-y-4">
-                <h4 className="font-medium">Filter Appointments</h4>
-
-                <div className="space-y-2">
-                  <h5 className="text-sm font-medium text-gray-400">Teams</h5>
-                  <div className="grid grid-cols-1 gap-2">
-                    {["Team Alpha", "Team Beta", "Team Gamma"].map((team) => (
-                      <div key={team} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`team-${team}`}
-                          checked={filters.teams.includes(team)}
-                          onCheckedChange={(checked) => handleFilterChange("teams", team, checked as boolean)}
-                          className="border-[#2a3349] data-[state=checked]:bg-[#06b6d4] data-[state=checked]:border-[#06b6d4]"
-                        />
-                        <Label htmlFor={`team-${team}`} className="text-sm">
-                          {team}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h5 className="text-sm font-medium text-gray-400">Status</h5>
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { value: "scheduled", label: "Scheduled" },
-                      { value: "in_progress", label: "In Progress" },
-                      { value: "completed", label: "Completed" },
-                      { value: "cancelled", label: "Cancelled" },
-                    ].map((status) => (
-                      <div key={status.value} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`status-${status.value}`}
-                          checked={filters.statuses.includes(status.value)}
-                          onCheckedChange={(checked) =>
-                            handleFilterChange("statuses", status.value, checked as boolean)
-                          }
-                          className="border-[#2a3349] data-[state=checked]:bg-[#06b6d4] data-[state=checked]:border-[#06b6d4]"
-                        />
-                        <Label htmlFor={`status-${status.value}`} className="text-sm">
-                          {status.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h5 className="text-sm font-medium text-gray-400">Service Type</h5>
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { value: "regular", label: "Regular Cleaning" },
-                      { value: "deep", label: "Deep Cleaning" },
-                      { value: "specialized", label: "Specialized Service" },
-                    ].map((type) => (
-                      <div key={type.value} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`type-${type.value}`}
-                          checked={filters.types.includes(type.value)}
-                          onCheckedChange={(checked) => handleFilterChange("types", type.value, checked as boolean)}
-                          className="border-[#2a3349] data-[state=checked]:bg-[#06b6d4] data-[state=checked]:border-[#06b6d4]"
-                        />
-                        <Label htmlFor={`type-${type.value}`} className="text-sm">
-                          {type.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <Button
+          className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
+          onClick={() => {
+            setSelectedAppointment(null)
+            setIsModalOpen(true)
+          }}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Appointment
+        </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#1a2234] p-4 rounded-lg border border-[#2a3349]">
+      {/* Filters and View Toggle */}
+      <div className="flex flex-col gap-4 bg-[#1a2234] p-4 rounded-lg border border-[#2a3349]">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-[#06b6d4]" />
-          <h2 className="text-lg font-medium text-white">Appointment Calendar</h2>
+          <h2 className="text-lg font-medium text-white">Appointments</h2>
         </div>
 
-        <div className="flex items-center gap-4 w-full sm:w-auto">
-          <div className="flex items-center">
-            <Tabs value={view} onValueChange={setView} className="w-full">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Search and Filters */}
+          <div className="flex flex-1 items-center gap-4 flex-wrap">
+            <div className="relative flex-1 max-w-sm min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search appointments..."
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-10 bg-[#0f172a] border-[#2a3349] text-white placeholder-gray-400"
+              />
+            </div>
+
+            <Select value={companyFilter?.toString() || "all"} onValueChange={handleCompanyFilterChange}>
+              <SelectTrigger className="w-[180px] bg-[#0f172a] border-[#2a3349] text-white">
+                <SelectValue placeholder={loadingCompanies ? "Loading..." : "All Companies"} />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                <SelectItem value="all">All Companies</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id.toString()}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={professionalFilter?.toString() || "all"}
+              onValueChange={handleProfessionalFilterChange}
+              disabled={loadingProfessionals}
+            >
+              <SelectTrigger className="w-[180px] bg-[#0f172a] border-[#2a3349] text-white">
+                <SelectValue placeholder={loadingProfessionals ? "Loading..." : "All Professionals"} />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                <SelectItem value="all">All Professionals</SelectItem>
+                {filteredProfessionals.map((professional) => (
+                  <SelectItem key={professional.id} value={professional.id.toString()}>
+                    {professional.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter?.toString() || "all"} onValueChange={handleStatusFilterChange}>
+              <SelectTrigger className="w-[140px] bg-[#0f172a] border-[#2a3349] text-white">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="0">Scheduled</SelectItem>
+                <SelectItem value="1">In Progress</SelectItem>
+                <SelectItem value="2">Completed</SelectItem>
+                <SelectItem value="3">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {displayMode === "list" && (
+              <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="w-[80px] bg-[#0f172a] border-[#2a3349] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
+            {(searchTerm ||
+              statusFilter !== undefined ||
+              companyFilter !== undefined ||
+              professionalFilter !== undefined) && (
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent whitespace-nowrap"
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-4">
+            <Tabs value={displayMode} onValueChange={handleDisplayModeChange}>
               <TabsList className="bg-[#0f172a] border border-[#2a3349]">
-                <TabsTrigger value="day">
-                  <Clock className="h-4 w-4 mr-2" />
-                  Day
+                <TabsTrigger value="list" className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white">
+                  <List className="h-4 w-4 mr-2" />
+                  List
                 </TabsTrigger>
-                <TabsTrigger value="week">
-                  <LayoutGrid className="h-4 w-4 mr-2" />
-                  Week
-                </TabsTrigger>
-                <TabsTrigger value="month">
-                  <Grid3X3 className="h-4 w-4 mr-2" />
-                  Month
+                <TabsTrigger
+                  value="calendar"
+                  className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white"
+                >
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  Calendar
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
 
-          <Select value={displayMode} onValueChange={setDisplayMode}>
-            <SelectTrigger className="w-[130px] bg-[#0f172a] border-[#2a3349] text-white">
-              <SelectValue placeholder="View" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-              <SelectItem value="calendar" className="hover:bg-[#2a3349]">
-                <div className="flex items-center">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <span>Calendar</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="list" className="hover:bg-[#2a3349]">
-                <div className="flex items-center">
-                  <List className="h-4 w-4 mr-2" />
-                  <span>List</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Calendar View Options */}
+            {displayMode === "calendar" && (
+              <Tabs value={calendarView} onValueChange={(value) => setCalendarView(value as "day" | "week" | "month")}>
+                <TabsList className="bg-[#0f172a] border border-[#2a3349]">
+                  <TabsTrigger value="day" className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white">
+                    Day
+                  </TabsTrigger>
+                  <TabsTrigger value="week" className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white">
+                    Week
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="month"
+                    className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white"
+                  >
+                    Month
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
+          </div>
         </div>
       </div>
 
-      {displayMode === "calendar" ? (
-        <div className="bg-[#0f172a] border border-[#2a3349] rounded-lg overflow-hidden">
-          <AppointmentCalendar
-            appointments={filteredAppointments}
-            view={view}
-            onViewDetails={handleViewDetails}
-            onEdit={handleEdit}
-            onDelete={setAppointmentToDelete}
-            onAddAppointment={handleAddAppointmentFromCalendar}
-          />
+      {/* Content */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-white">Loading appointments...</div>
         </div>
       ) : (
-        <AppointmentList
-          appointments={filteredAppointments}
-          onViewDetails={handleViewDetails}
-          onEdit={handleEdit}
-          onDelete={setAppointmentToDelete}
-        />
+        <>
+          {displayMode === "list" ? (
+            <>
+              <AppointmentList
+                appointments={appointments}
+                onViewDetails={handleViewDetails}
+                onEdit={handleEdit}
+                onDelete={setAppointmentToDelete}
+              />
+
+              {/* Pagination */}
+              {pagination.pageCount > 1 && (
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-400">
+                    Showing {pagination.firstRowOnPage || 1} to {pagination.lastRowOnPage || 0} of{" "}
+                    {pagination.totalItems} appointments
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage <= 1}
+                      className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-white">
+                      Page {pagination.currentPage} of {pagination.pageCount}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage >= pagination.pageCount}
+                      className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <AppointmentCalendar
+              appointments={appointments}
+              onAppointmentClick={handleViewDetails}
+              onDateClick={handleAddAppointmentFromCalendar}
+              view={calendarView}
+            />
+          )}
+        </>
       )}
 
+      {/* Modals */}
       <AppointmentModal
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false)
           setSelectedAppointment(null)
         }}
-        onSubmit={selectedAppointment ? handleEditAppointment : handleAddAppointment}
+        onSubmit={selectedAppointment && selectedAppointment.id ? handleEditAppointment : handleAddAppointment}
         appointment={selectedAppointment}
       />
 
@@ -515,9 +500,10 @@ export default function AppointmentsPage() {
             <AlertDialogDescription className="text-gray-400">
               This action cannot be undone. This will permanently delete the appointment
               <span className="font-semibold text-white block mt-1">
-                {appointmentToDelete?.title} for {appointmentToDelete?.customer}
+                {appointmentToDelete?.title} for {appointmentToDelete?.customer?.name}
               </span>
-              scheduled for {appointmentToDelete?.start?.toLocaleString()}.
+              scheduled for{" "}
+              {appointmentToDelete?.start ? format(new Date(appointmentToDelete.start), "PPP 'at' p") : "unknown date"}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

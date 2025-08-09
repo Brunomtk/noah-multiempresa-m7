@@ -3,12 +3,13 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Eye, Edit, Trash2, Star } from "lucide-react"
+import { Star, Search, Plus, Eye, Edit, Trash2, MessageSquare } from "lucide-react"
 import { ReviewModal } from "@/components/admin/review-modal"
 import { ReviewDetailsModal } from "@/components/admin/review-details-modal"
-import { useToast } from "@/hooks/use-toast"
+import { useReviews } from "@/contexts/reviews-context"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,163 +19,95 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
-// Sample data
-const initialReviews = [
-  {
-    id: "REV001",
-    customer: "John Smith",
-    professional: "Dr. Maria Rodriguez",
-    company: "MediCare Plus",
-    rating: 5,
-    comment: "Excellent service! Dr. Rodriguez was very professional and attentive to my needs.",
-    date: "2023-05-15T10:30:00",
-    status: "published",
-    response: "Thank you for your kind words! We're glad you had a positive experience.",
-    responseDate: "2023-05-16T14:20:00",
-    service: "Medical Consultation",
-  },
-  {
-    id: "REV002",
-    customer: "Emily Johnson",
-    professional: "Alex Thompson",
-    company: "HomeClean Services",
-    rating: 4,
-    comment: "Very good cleaning service. The house looks great, but they were 15 minutes late.",
-    date: "2023-05-10T15:45:00",
-    status: "published",
-    response: "Thank you for your feedback. We apologize for the delay and will work to improve our punctuality.",
-    responseDate: "2023-05-11T09:10:00",
-    service: "Home Cleaning",
-  },
-  {
-    id: "REV003",
-    customer: "Michael Brown",
-    professional: "Sarah Wilson",
-    company: "TechSupport Inc",
-    rating: 2,
-    comment: "The technician couldn't solve my computer issue and had to schedule another visit.",
-    date: "2023-05-08T13:20:00",
-    status: "published",
-    response:
-      "We're sorry to hear about your experience. We've assigned a senior technician for your next appointment.",
-    responseDate: "2023-05-08T17:30:00",
-    service: "Computer Repair",
-  },
-  {
-    id: "REV004",
-    customer: "Jessica Davis",
-    professional: "Robert Miller",
-    company: "GreenLawn Gardening",
-    rating: 5,
-    comment: "Robert did an amazing job with our garden. Very professional and knowledgeable.",
-    date: "2023-05-05T11:00:00",
-    status: "published",
-    response: "",
-    responseDate: "",
-    service: "Garden Maintenance",
-  },
-  {
-    id: "REV005",
-    customer: "David Wilson",
-    professional: "Jennifer Lee",
-    company: "BeautySpot Salon",
-    rating: 3,
-    comment: "The haircut was okay, but not exactly what I asked for.",
-    date: "2023-05-03T16:30:00",
-    status: "pending",
-    response: "",
-    responseDate: "",
-    service: "Haircut",
-  },
-]
+import { toast } from "sonner"
 
 export default function ReviewsPage() {
-  const [reviews, setReviews] = useState(initialReviews)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const {
+    reviews,
+    filters,
+    pagination,
+    isLoading,
+    error,
+    selectedReview,
+    setFilters,
+    setCurrentPage,
+    createReview,
+    updateReview,
+    deleteReview,
+    addResponse,
+    setSelectedReview,
+    clearError,
+  } = useReviews()
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedReview, setSelectedReview] = useState<any>(null)
-  const [reviewToDelete, setReviewToDelete] = useState<any>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [ratingFilter, setRatingFilter] = useState("all")
-  const { toast } = useToast()
+  const [reviewToDelete, setReviewToDelete] = useState<number | null>(null)
 
-  const handleAddReview = (data: any) => {
-    const newReview = {
-      id: `REV${String(reviews.length + 1).padStart(3, "0")}`,
-      ...data,
-      date: new Date().toISOString(),
+  const handleCreateReview = async (data: any) => {
+    try {
+      await createReview(data)
+      setIsCreateModalOpen(false)
+      toast.success("Review created successfully")
+    } catch (error) {
+      toast.error("Failed to create review")
     }
-    setReviews([...reviews, newReview])
-    setIsModalOpen(false)
-    toast({
-      title: "Review added successfully",
-      description: `Review from ${data.customer} has been added.`,
-    })
   }
 
-  const handleEditReview = (data: any) => {
-    setReviews(reviews.map((review) => (review.id === selectedReview.id ? { ...review, ...data } : review)))
-    setSelectedReview(null)
-    setIsModalOpen(false)
-    toast({
-      title: "Review updated successfully",
-      description: `Review ${data.id} has been updated.`,
-    })
+  const handleUpdateReview = async (data: any) => {
+    if (selectedReview) {
+      try {
+        await updateReview(selectedReview.id, data)
+        setIsEditModalOpen(false)
+        setSelectedReview(null)
+        toast.success("Review updated successfully")
+      } catch (error) {
+        toast.error("Failed to update review")
+      }
+    }
   }
 
-  const handleDeleteReview = () => {
-    if (reviewToDelete) {
-      setReviews(reviews.filter((review) => review.id !== reviewToDelete.id))
-      toast({
-        title: "Review deleted successfully",
-        description: `Review ${reviewToDelete.id} has been removed.`,
-        variant: "destructive",
-      })
+  const handleDeleteReview = async (id: number) => {
+    try {
+      await deleteReview(id)
       setReviewToDelete(null)
+      toast.success("Review deleted successfully")
+    } catch (error) {
+      toast.error("Failed to delete review")
     }
   }
 
-  const handleViewDetails = (review: any) => {
-    setSelectedReview(review)
-    setIsDetailsModalOpen(true)
+  const handleAddResponse = async (id: number, response: string) => {
+    try {
+      await addResponse(id, response)
+      toast.success("Response added successfully")
+    } catch (error) {
+      toast.error("Failed to add response")
+    }
   }
 
-  const handleEdit = (review: any) => {
-    setSelectedReview(review)
-    setIsModalOpen(true)
-  }
-
-  const filteredReviews = reviews.filter((review) => {
-    const matchesSearch =
-      review.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      review.professional.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      review.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      review.comment.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || review.status === statusFilter
-    const matchesRating = ratingFilter === "all" || review.rating === Number.parseInt(ratingFilter)
-    return matchesSearch && matchesStatus && matchesRating
-  })
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date)
+  const getStatusBadge = (status: number) => {
+    switch (status) {
+      case 0:
+        return <Badge variant="secondary">Pending</Badge>
+      case 1:
+        return <Badge variant="default">Published</Badge>
+      case 2:
+        return <Badge variant="destructive">Rejected</Badge>
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
   }
 
   const renderStars = (rating: number) => {
     return (
-      <div className="flex items-center">
-        {[...Array(5)].map((_, index) => (
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => (
           <Star
-            key={index}
-            className={`h-4 w-4 ${index < rating ? "text-yellow-400 fill-yellow-400" : "text-gray-600"}`}
+            key={star}
+            className={`h-4 w-4 ${star <= rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
           />
         ))}
       </div>
@@ -182,244 +115,267 @@ export default function ReviewsPage() {
   }
 
   return (
-    <TooltipProvider>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">Reviews Management</h1>
-            <p className="text-gray-400">Manage customer reviews and feedback across all services.</p>
-          </div>
-          <Button
-            className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-            onClick={() => {
-              setSelectedReview(null)
-              setIsModalOpen(true)
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Review
-          </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Reviews</h1>
+          <p className="text-muted-foreground">Manage customer reviews and responses</p>
         </div>
+        <Button onClick={() => setIsCreateModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Review
+        </Button>
+      </div>
 
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search reviews..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-full md:w-[300px] bg-[#1a2234] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
-            />
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+          <CardDescription>Filter reviews by status, rating, or search query</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search reviews..."
+                value={filters.searchQuery || ""}
+                onChange={(e) => setFilters({ searchQuery: e.target.value })}
+                className="pl-10"
+              />
+            </div>
+            <Select value={filters.status || "all"} onValueChange={(value) => setFilters({ status: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="0">Pending</SelectItem>
+                <SelectItem value="1">Published</SelectItem>
+                <SelectItem value="2">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filters.rating || "all"} onValueChange={(value) => setFilters({ rating: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Ratings" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Ratings</SelectItem>
+                <SelectItem value="5">5 Stars</SelectItem>
+                <SelectItem value="4">4 Stars</SelectItem>
+                <SelectItem value="3">3 Stars</SelectItem>
+                <SelectItem value="2">2 Stars</SelectItem>
+                <SelectItem value="1">1 Star</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => setFilters({ status: "all", rating: "all", searchQuery: "" })}>
+              Clear Filters
+            </Button>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex gap-2 w-full md:w-auto">
-            <Button
-              variant={statusFilter === "all" ? "default" : "outline"}
-              onClick={() => setStatusFilter("all")}
-              className={
-                statusFilter === "all"
-                  ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-              }
-            >
-              All
-            </Button>
-            <Button
-              variant={statusFilter === "published" ? "default" : "outline"}
-              onClick={() => setStatusFilter("published")}
-              className={
-                statusFilter === "published"
-                  ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-              }
-            >
-              Published
-            </Button>
-            <Button
-              variant={statusFilter === "pending" ? "default" : "outline"}
-              onClick={() => setStatusFilter("pending")}
-              className={
-                statusFilter === "pending"
-                  ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-              }
-            >
-              Pending
-            </Button>
-          </div>
-        </div>
-
-        <div className="rounded-md border border-[#2a3349] overflow-hidden">
-          <Table>
-            <TableHeader className="bg-[#1a2234]">
-              <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
-                <TableHead className="text-white">Customer</TableHead>
-                <TableHead className="text-white">Professional</TableHead>
-                <TableHead className="text-white">Company</TableHead>
-                <TableHead className="text-white">Rating</TableHead>
-                <TableHead className="text-white">Date</TableHead>
-                <TableHead className="text-white">Status</TableHead>
-                <TableHead className="text-white text-center">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredReviews.map((review) => (
-                <TableRow key={review.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
-                  <TableCell className="font-medium text-white">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-[#2a3349] p-1.5 rounded-md">
-                        <Star className="h-4 w-4 text-[#06b6d4]" />
+      {/* Reviews List */}
+      <div className="grid gap-4">
+        {isLoading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading reviews...</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : error ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-destructive mb-4">{error}</p>
+                <Button onClick={clearError} variant="outline">
+                  Try Again
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : reviews.length === 0 ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-muted-foreground mb-4">No reviews found</p>
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create First Review
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          reviews.map((review) => (
+            <Card key={review.id}>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="flex items-center gap-2">
+                        {renderStars(review.rating)}
+                        <span className="text-sm text-muted-foreground">({review.rating}/5)</span>
                       </div>
-                      {review.customer}
+                      {getStatusBadge(review.status)}
                     </div>
-                  </TableCell>
-                  <TableCell className="text-gray-400">{review.professional}</TableCell>
-                  <TableCell className="text-gray-400">{review.company}</TableCell>
-                  <TableCell>{renderStars(review.rating)}</TableCell>
-                  <TableCell className="text-gray-400">{formatDate(review.date)}</TableCell>
-                  <TableCell>
-                    <Badge
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+                      <div>
+                        <span className="font-medium">Customer:</span>
+                        <p className="text-muted-foreground">{review.customerName}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Professional:</span>
+                        <p className="text-muted-foreground">{review.professionalName}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Company:</span>
+                        <p className="text-muted-foreground">{review.companyName}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Service:</span>
+                        <p className="text-muted-foreground">{review.serviceType}</p>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <p className="text-sm font-medium mb-1">Comment:</p>
+                      <p className="text-sm text-muted-foreground">{review.comment}</p>
+                    </div>
+
+                    {review.response && (
+                      <div className="bg-muted p-3 rounded-lg">
+                        <p className="text-sm font-medium mb-1">Company Response:</p>
+                        <p className="text-sm text-muted-foreground">{review.response}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button
                       variant="outline"
-                      className={
-                        review.status === "published"
-                          ? "border-green-500 text-green-500"
-                          : review.status === "pending"
-                            ? "border-yellow-500 text-yellow-500"
-                            : "border-red-500 text-red-500"
-                      }
+                      size="sm"
+                      onClick={() => {
+                        setSelectedReview(review)
+                        setIsDetailsModalOpen(true)
+                      }}
                     >
-                      {review.status.charAt(0).toUpperCase() + review.status.slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewDetails(review)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View Details</p>
-                        </TooltipContent>
-                      </Tooltip>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedReview(review)
+                        setIsEditModalOpen(true)
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    {!review.response && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const response = prompt("Enter response:")
+                          if (response) {
+                            handleAddResponse(review.id, response)
+                          }
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Review</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this review? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteReview(review.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(review)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Edit</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setReviewToDelete(review)}
-                            className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">
-            Showing <span className="font-medium text-white">{filteredReviews.length}</span> of{" "}
-            <span className="font-medium text-white">{reviews.length}</span> reviews
+          <p className="text-sm text-muted-foreground">
+            Showing {(pagination.currentPage - 1) * pagination.itemsPerPage + 1} to{" "}
+            {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of{" "}
+            {pagination.totalItems} reviews
           </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              onClick={() => setCurrentPage(pagination.currentPage - 1)}
+              disabled={pagination.currentPage <= 1}
             >
               Previous
             </Button>
+            <span className="text-sm">
+              Page {pagination.currentPage} of {pagination.totalPages}
+            </span>
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] bg-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              1
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+              onClick={() => setCurrentPage(pagination.currentPage + 1)}
+              disabled={pagination.currentPage >= pagination.totalPages}
             >
               Next
             </Button>
           </div>
         </div>
+      )}
 
-        <ReviewModal
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false)
-            setSelectedReview(null)
-          }}
-          onSubmit={selectedReview ? handleEditReview : handleAddReview}
-          review={selectedReview}
-        />
+      {/* Modals */}
+      <ReviewModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateReview}
+        mode="create"
+      />
 
-        <ReviewDetailsModal
-          isOpen={isDetailsModalOpen}
-          onClose={() => {
-            setIsDetailsModalOpen(false)
-            setSelectedReview(null)
-          }}
-          review={selectedReview}
-        />
+      <ReviewModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedReview(null)
+        }}
+        onSubmit={handleUpdateReview}
+        review={selectedReview}
+        mode="edit"
+      />
 
-        <AlertDialog open={!!reviewToDelete} onOpenChange={() => setReviewToDelete(null)}>
-          <AlertDialogContent className="bg-[#1a2234] border-[#2a3349] text-white">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-400">
-                This action cannot be undone. This will permanently delete the review{" "}
-                <span className="font-semibold text-white">{reviewToDelete?.id}</span> from the system.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-transparent border-[#2a3349] text-white hover:bg-[#2a3349]">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteReview}
-                className="bg-red-600 hover:bg-red-700 text-white border-0"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </TooltipProvider>
+      <ReviewDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false)
+          setSelectedReview(null)
+        }}
+        review={selectedReview}
+      />
+    </div>
   )
 }

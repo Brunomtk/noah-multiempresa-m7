@@ -1,251 +1,232 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LogIn, LogOut, Search, Clock, MapPin, User, Users, CheckCircle, AlertCircle, Timer } from "lucide-react"
+import { LogIn, LogOut, Search, Clock, MapPin, User, Users, CheckCircle, Timer, Plus } from "lucide-react"
 import { CompanyCheckInModal } from "@/components/company/company-check-in-modal"
 import { CompanyCheckInDetailsModal } from "@/components/company/company-check-in-details-modal"
 import { CompanyCheckOutModal } from "@/components/company/company-check-out-modal"
 import { CompanyCheckOutDetailsModal } from "@/components/company/company-check-out-details-modal"
+import { CompanyCheckRecordModal } from "@/components/company/company-check-record-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-
-// Initial data for check-ins
-const initialCheckIns = [
-  {
-    id: 1,
-    professional: "John Doe",
-    team: "Team Alpha",
-    client: "ABC Corporation",
-    location: "Main Office - 123 Main St",
-    scheduledTime: "09:00 AM",
-    checkInTime: "08:55 AM",
-    status: "on-time",
-    date: "2024-01-26",
-    gpsVerified: true,
-    notes: "Arrived early, all equipment ready",
-  },
-  {
-    id: 2,
-    professional: "Jane Smith",
-    team: "Team Beta",
-    client: "XYZ Industries",
-    location: "Warehouse - 456 Industrial Ave",
-    scheduledTime: "10:00 AM",
-    checkInTime: "10:15 AM",
-    status: "late",
-    date: "2024-01-26",
-    gpsVerified: true,
-    notes: "Traffic delay on highway",
-  },
-  {
-    id: 3,
-    professional: "Mike Johnson",
-    team: "Team Alpha",
-    client: "Tech Solutions Inc",
-    location: "Branch Office - 789 Business Blvd",
-    scheduledTime: "11:00 AM",
-    checkInTime: null,
-    status: "pending",
-    date: "2024-01-26",
-    gpsVerified: false,
-    notes: "",
-  },
-]
-
-// Initial data for check-outs
-const initialCheckOuts = [
-  {
-    id: 1,
-    professional: "John Doe",
-    team: "Team Alpha",
-    client: "ABC Corporation",
-    location: "Main Office - 123 Main St",
-    checkInTime: "08:55 AM",
-    scheduledEnd: "05:00 PM",
-    checkOutTime: "05:05 PM",
-    duration: "8h 10m",
-    status: "completed",
-    date: "2024-01-26",
-    gpsVerified: true,
-    tasksCompleted: true,
-    notes: "All tasks completed successfully",
-  },
-  {
-    id: 2,
-    professional: "Jane Smith",
-    team: "Team Beta",
-    client: "XYZ Industries",
-    location: "Warehouse - 456 Industrial Ave",
-    checkInTime: "10:15 AM",
-    scheduledEnd: "06:00 PM",
-    checkOutTime: null,
-    duration: "5h 45m",
-    status: "in-progress",
-    date: "2024-01-26",
-    gpsVerified: false,
-    tasksCompleted: false,
-    notes: "",
-  },
-  {
-    id: 3,
-    professional: "Sarah Wilson",
-    team: "Team Gamma",
-    client: "Global Corp",
-    location: "Downtown Office - 321 Business Ave",
-    checkInTime: "07:00 AM",
-    scheduledEnd: "03:00 PM",
-    checkOutTime: "02:45 PM",
-    duration: "7h 45m",
-    status: "early-departure",
-    date: "2024-01-26",
-    gpsVerified: true,
-    tasksCompleted: true,
-    notes: "Finished all tasks early",
-  },
-]
+import { getCheckRecords, performCheckIn, performCheckOut, type CheckRecordFilters } from "@/lib/api/check-records"
+import type { CheckRecord } from "@/types/check-record"
+import { CHECK_RECORD_STATUS } from "@/types/check-record"
 
 export default function CheckManagementPage() {
-  // State for check-ins
-  const [checkIns, setCheckIns] = useState(initialCheckIns)
-  const [checkInSearchTerm, setCheckInSearchTerm] = useState("")
-  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false)
-  const [selectedCheckIn, setSelectedCheckIn] = useState<any>(null)
-  const [isCheckInDetailsModalOpen, setIsCheckInDetailsModalOpen] = useState(false)
+  // State for check records
+  const [checkRecords, setCheckRecords] = useState<CheckRecord[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
 
-  // State for check-outs
-  const [checkOuts, setCheckOuts] = useState(initialCheckOuts)
-  const [checkOutSearchTerm, setCheckOutSearchTerm] = useState("")
+  // Modal states
+  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false)
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState(false)
-  const [selectedCheckOut, setSelectedCheckOut] = useState<any>(null)
+  const [isCheckRecordModalOpen, setIsCheckRecordModalOpen] = useState(false)
+  const [isCheckInDetailsModalOpen, setIsCheckInDetailsModalOpen] = useState(false)
   const [isCheckOutDetailsModalOpen, setIsCheckOutDetailsModalOpen] = useState(false)
 
-  // Active tab state
+  const [selectedRecord, setSelectedRecord] = useState<CheckRecord | null>(null)
   const [activeTab, setActiveTab] = useState("check-in")
 
   const { toast } = useToast()
 
-  // Filtered check-ins based on search term
-  const filteredCheckIns = checkIns.filter((checkIn) => {
-    const search = checkInSearchTerm.toLowerCase()
-    return (
-      checkIn.professional.toLowerCase().includes(search) ||
-      checkIn.team.toLowerCase().includes(search) ||
-      checkIn.client.toLowerCase().includes(search) ||
-      checkIn.location.toLowerCase().includes(search)
-    )
-  })
+  // Get company ID from localStorage or context
+  const getCompanyId = () => {
+    // This should come from your auth context or localStorage
+    const userData = localStorage.getItem("noah_user")
+    if (userData) {
+      const user = JSON.parse(userData)
+      return user.companyId || 1 // fallback to 1 if not found
+    }
+    return 1
+  }
 
-  // Filtered check-outs based on search term
-  const filteredCheckOuts = checkOuts.filter((checkOut) => {
-    const search = checkOutSearchTerm.toLowerCase()
-    return (
-      checkOut.professional.toLowerCase().includes(search) ||
-      checkOut.team.toLowerCase().includes(search) ||
-      checkOut.client.toLowerCase().includes(search) ||
-      checkOut.location.toLowerCase().includes(search)
+  const companyId = getCompanyId()
+
+  // Fetch check records
+  const fetchCheckRecords = async () => {
+    setIsLoading(true)
+    try {
+      const filters: CheckRecordFilters = {
+        companyId: companyId,
+        pageSize: 100,
+      }
+
+      if (searchTerm) {
+        filters.search = searchTerm
+      }
+
+      const records = await getCheckRecords(filters)
+      setCheckRecords(records)
+    } catch (error) {
+      console.error("Error fetching check records:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch check records",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCheckRecords()
+  }, [searchTerm])
+
+  // Filter records for check-in tab (pending and checked-in)
+  const getCheckInRecords = (): CheckRecord[] => {
+    return checkRecords.filter(
+      (record) => record.status === CHECK_RECORD_STATUS.PENDING || record.status === CHECK_RECORD_STATUS.CHECKED_IN,
     )
-  })
+  }
+
+  // Filter records for check-out tab (checked-in and checked-out)
+  const getCheckOutRecords = (): CheckRecord[] => {
+    return checkRecords.filter(
+      (record) => record.status === CHECK_RECORD_STATUS.CHECKED_IN || record.status === CHECK_RECORD_STATUS.CHECKED_OUT,
+    )
+  }
 
   // Handle manual check-in
-  const handleManualCheckIn = (data: any) => {
-    const updatedCheckIn = {
-      ...selectedCheckIn,
-      checkInTime: data.checkInTime,
-      status: data.status,
-      notes: data.notes,
-      gpsVerified: data.gpsVerified,
+  const handleManualCheckIn = async (recordId: string) => {
+    try {
+      const record = checkRecords.find((r) => r.id.toString() === recordId)
+      if (!record) return
+
+      const updatedRecord = await performCheckIn({
+        professionalId: record.professionalId,
+        professionalName: record.professionalName,
+        companyId: record.companyId,
+        customerId: record.customerId,
+        customerName: record.customerName,
+        appointmentId: record.appointmentId,
+        address: record.address,
+        teamId: record.teamId,
+        teamName: record.teamName,
+        serviceType: record.serviceType,
+        notes: record.notes,
+      })
+
+      // Update the record in state
+      setCheckRecords((prev) => prev.map((r) => (r.id === record.id ? updatedRecord : r)))
+
+      toast({
+        title: "Success",
+        description: "Check-in recorded successfully",
+      })
+    } catch (error) {
+      console.error("Error performing check-in:", error)
+      toast({
+        title: "Error",
+        description: "Failed to perform check-in",
+        variant: "destructive",
+      })
     }
-
-    setCheckIns(checkIns.map((c) => (c.id === selectedCheckIn.id ? updatedCheckIn : c)))
-    setIsCheckInModalOpen(false)
-    setSelectedCheckIn(null)
-
-    toast({
-      title: "Check-in recorded",
-      description: `${selectedCheckIn.professional} has been checked in successfully.`,
-    })
   }
 
   // Handle check-out
-  const handleCheckOut = (data: any) => {
-    const updatedCheckOut = {
-      ...selectedCheckOut,
-      checkOutTime: data.checkOutTime,
-      status: data.status,
-      notes: data.notes,
-      gpsVerified: data.gpsVerified,
-      tasksCompleted: data.tasksCompleted,
+  const handleCheckOut = async (recordId: string) => {
+    try {
+      const updatedRecord = await performCheckOut(recordId)
+
+      // Update the record in state
+      setCheckRecords((prev) => prev.map((r) => (r.id.toString() === recordId ? updatedRecord : r)))
+
+      toast({
+        title: "Success",
+        description: "Check-out recorded successfully",
+      })
+    } catch (error) {
+      console.error("Error performing check-out:", error)
+      toast({
+        title: "Error",
+        description: "Failed to perform check-out",
+        variant: "destructive",
+      })
     }
-
-    setCheckOuts(checkOuts.map((c) => (c.id === selectedCheckOut.id ? updatedCheckOut : c)))
-    setIsCheckOutModalOpen(false)
-    setSelectedCheckOut(null)
-
-    toast({
-      title: "Check-out recorded",
-      description: `${selectedCheckOut.professional} has been checked out successfully.`,
-    })
   }
 
   // View check-in details
-  const handleViewCheckInDetails = (checkIn: any) => {
-    setSelectedCheckIn(checkIn)
+  const handleViewCheckInDetails = (record: CheckRecord) => {
+    setSelectedRecord(record)
     setIsCheckInDetailsModalOpen(true)
   }
 
   // View check-out details
-  const handleViewCheckOutDetails = (checkOut: any) => {
-    setSelectedCheckOut(checkOut)
+  const handleViewCheckOutDetails = (record: CheckRecord) => {
+    setSelectedRecord(record)
     setIsCheckOutDetailsModalOpen(true)
   }
 
-  // Get status badge for check-ins
-  const getCheckInStatusBadge = (status: string) => {
-    switch (status) {
-      case "on-time":
-        return <Badge className="bg-green-500/20 text-green-500 border-green-500">On Time</Badge>
-      case "late":
-        return <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500">Late</Badge>
-      case "pending":
+  // Get status badge
+  const getStatusBadge = (status: number | string) => {
+    const numStatus = typeof status === "string" ? Number.parseInt(status) : status
+
+    switch (numStatus) {
+      case CHECK_RECORD_STATUS.PENDING:
         return <Badge className="bg-gray-500/20 text-gray-500 border-gray-500">Pending</Badge>
+      case CHECK_RECORD_STATUS.CHECKED_IN:
+        return <Badge className="bg-blue-500/20 text-blue-500 border-blue-500">Checked In</Badge>
+      case CHECK_RECORD_STATUS.CHECKED_OUT:
+        return <Badge className="bg-green-500/20 text-green-500 border-green-500">Checked Out</Badge>
       default:
-        return null
+        return <Badge className="bg-gray-500/20 text-gray-500 border-gray-500">Unknown</Badge>
     }
   }
 
-  // Get status badge for check-outs
-  const getCheckOutStatusBadge = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <Badge className="bg-green-500/20 text-green-500 border-green-500">Completed</Badge>
-      case "in-progress":
-        return <Badge className="bg-blue-500/20 text-blue-500 border-blue-500">In Progress</Badge>
-      case "early-departure":
-        return <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500">Early Departure</Badge>
-      default:
-        return null
-    }
+  // Format time
+  const formatTime = (dateString: string | null): string => {
+    if (!dateString) return "-"
+    const date = new Date(dateString)
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  // Calculate duration
+  const calculateDuration = (checkInTime: string | null, checkOutTime: string | null): string => {
+    if (!checkInTime || !checkOutTime) return "-"
+
+    const start = new Date(checkInTime)
+    const end = new Date(checkOutTime)
+    const durationMs = end.getTime() - start.getTime()
+
+    const hours = Math.floor(durationMs / (1000 * 60 * 60))
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60))
+
+    return `${hours}h ${minutes}m`
   }
 
   // Stats for check-ins
+  const checkInRecords = getCheckInRecords()
   const checkInStats = {
-    total: checkIns.length,
-    onTime: checkIns.filter((c) => c.status === "on-time").length,
-    late: checkIns.filter((c) => c.status === "late").length,
-    pending: checkIns.filter((c) => c.status === "pending").length,
+    total: checkInRecords.length,
+    pending: checkInRecords.filter((r) => r.status === CHECK_RECORD_STATUS.PENDING).length,
+    checkedIn: checkInRecords.filter((r) => r.status === CHECK_RECORD_STATUS.CHECKED_IN).length,
   }
 
   // Stats for check-outs
+  const checkOutRecords = getCheckOutRecords()
   const checkOutStats = {
-    total: checkOuts.length,
-    completed: checkOuts.filter((c) => c.status === "completed").length,
-    inProgress: checkOuts.filter((c) => c.status === "in-progress").length,
-    earlyDeparture: checkOuts.filter((c) => c.status === "early-departure").length,
+    total: checkOutRecords.length,
+    inProgress: checkOutRecords.filter((r) => r.status === CHECK_RECORD_STATUS.CHECKED_IN).length,
+    completed: checkOutRecords.filter((r) => r.status === CHECK_RECORD_STATUS.CHECKED_OUT).length,
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-white">Loading check records...</div>
+      </div>
+    )
   }
 
   return (
@@ -255,6 +236,10 @@ export default function CheckManagementPage() {
           <h1 className="text-2xl font-bold text-white mb-1">Check Management</h1>
           <p className="text-gray-400">Monitor and manage professional check-ins and check-outs</p>
         </div>
+        <Button onClick={() => setIsCheckRecordModalOpen(true)} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
+          <Plus className="h-4 w-4 mr-2" />
+          New Check Record
+        </Button>
       </div>
 
       <Tabs defaultValue="check-in" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -276,14 +261,14 @@ export default function CheckManagementPage() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Search check-ins..."
-                value={checkInSearchTerm}
-                onChange={(e) => setCheckInSearchTerm(e.target.value)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-[300px] bg-[#1a2234] border-[#2a3349] text-white"
               />
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card className="bg-[#1a2234] border-[#2a3349]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-400">Total Check-ins</CardTitle>
@@ -296,26 +281,12 @@ export default function CheckManagementPage() {
             </Card>
             <Card className="bg-[#1a2234] border-[#2a3349]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">On Time</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CardTitle className="text-sm font-medium text-gray-400">Checked In</CardTitle>
+                <CheckCircle className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white">{checkInStats.onTime}</div>
-                <p className="text-xs text-gray-400">
-                  {Math.round((checkInStats.onTime / checkInStats.total) * 100)}% compliance
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#1a2234] border-[#2a3349]">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Late</CardTitle>
-                <AlertCircle className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">{checkInStats.late}</div>
-                <p className="text-xs text-gray-400">
-                  {Math.round((checkInStats.late / checkInStats.total) * 100)}% of total
-                </p>
+                <div className="text-2xl font-bold text-white">{checkInStats.checkedIn}</div>
+                <p className="text-xs text-gray-400">Currently working</p>
               </CardContent>
             </Card>
             <Card className="bg-[#1a2234] border-[#2a3349]">
@@ -332,60 +303,49 @@ export default function CheckManagementPage() {
 
           <Card className="bg-[#1a2234] border-[#2a3349]">
             <CardHeader>
-              <CardTitle className="text-white">Today's Check-ins</CardTitle>
+              <CardTitle className="text-white">Check-ins</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow className="border-[#2a3349]">
                     <TableHead className="text-gray-400">Professional</TableHead>
+                    <TableHead className="text-gray-400">Customer</TableHead>
                     <TableHead className="text-gray-400">Team</TableHead>
-                    <TableHead className="text-gray-400">Client</TableHead>
-                    <TableHead className="text-gray-400">Location</TableHead>
-                    <TableHead className="text-gray-400">Scheduled</TableHead>
-                    <TableHead className="text-gray-400">Check-in</TableHead>
+                    <TableHead className="text-gray-400">Address</TableHead>
+                    <TableHead className="text-gray-400">Service Type</TableHead>
+                    <TableHead className="text-gray-400">Check-in Time</TableHead>
                     <TableHead className="text-gray-400">Status</TableHead>
-                    <TableHead className="text-gray-400">GPS</TableHead>
                     <TableHead className="text-gray-400">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCheckIns.map((checkIn) => (
-                    <TableRow key={checkIn.id} className="border-[#2a3349]">
+                  {checkInRecords.map((record) => (
+                    <TableRow key={record.id} className="border-[#2a3349]">
                       <TableCell className="text-white">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-gray-400" />
-                          {checkIn.professional}
+                          {record.professionalName || "N/A"}
                         </div>
                       </TableCell>
-                      <TableCell className="text-white">{checkIn.team}</TableCell>
-                      <TableCell className="text-white">{checkIn.client}</TableCell>
+                      <TableCell className="text-white">{record.customerName || "N/A"}</TableCell>
+                      <TableCell className="text-white">{record.teamName || "N/A"}</TableCell>
                       <TableCell className="text-gray-400 text-sm">
                         <div className="flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {checkIn.location}
+                          {record.address}
                         </div>
                       </TableCell>
-                      <TableCell className="text-white">{checkIn.scheduledTime}</TableCell>
-                      <TableCell className="text-white">{checkIn.checkInTime || "-"}</TableCell>
-                      <TableCell>{getCheckInStatusBadge(checkIn.status)}</TableCell>
-                      <TableCell>
-                        {checkIn.gpsVerified ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-gray-400" />
-                        )}
-                      </TableCell>
+                      <TableCell className="text-white">{record.serviceType}</TableCell>
+                      <TableCell className="text-white">{formatTime(record.checkInTime)}</TableCell>
+                      <TableCell>{getStatusBadge(record.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {checkIn.status === "pending" && (
+                          {record.status === CHECK_RECORD_STATUS.PENDING && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {
-                                setSelectedCheckIn(checkIn)
-                                setIsCheckInModalOpen(true)
-                              }}
+                              onClick={() => handleManualCheckIn(record.id.toString())}
                               className="border-[#2a3349] text-white hover:bg-[#2a3349]"
                             >
                               <LogIn className="h-4 w-4" />
@@ -394,7 +354,7 @@ export default function CheckManagementPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleViewCheckInDetails(checkIn)}
+                            onClick={() => handleViewCheckInDetails(record)}
                             className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
                           >
                             View
@@ -416,14 +376,14 @@ export default function CheckManagementPage() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Search check-outs..."
-                value={checkOutSearchTerm}
-                onChange={(e) => setCheckOutSearchTerm(e.target.value)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-[300px] bg-[#1a2234] border-[#2a3349] text-white"
               />
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card className="bg-[#1a2234] border-[#2a3349]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-400">Total Sessions</CardTitle>
@@ -432,18 +392,6 @@ export default function CheckManagementPage() {
               <CardContent>
                 <div className="text-2xl font-bold text-white">{checkOutStats.total}</div>
                 <p className="text-xs text-gray-400">Active today</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#1a2234] border-[#2a3349]">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Completed</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">{checkOutStats.completed}</div>
-                <p className="text-xs text-gray-400">
-                  {Math.round((checkOutStats.completed / checkOutStats.total) * 100)}% finished
-                </p>
               </CardContent>
             </Card>
             <Card className="bg-[#1a2234] border-[#2a3349]">
@@ -458,28 +406,28 @@ export default function CheckManagementPage() {
             </Card>
             <Card className="bg-[#1a2234] border-[#2a3349]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Early Departure</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-500" />
+                <CardTitle className="text-sm font-medium text-gray-400">Completed</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white">{checkOutStats.earlyDeparture}</div>
-                <p className="text-xs text-gray-400">Left early</p>
+                <div className="text-2xl font-bold text-white">{checkOutStats.completed}</div>
+                <p className="text-xs text-gray-400">Finished sessions</p>
               </CardContent>
             </Card>
           </div>
 
           <Card className="bg-[#1a2234] border-[#2a3349]">
             <CardHeader>
-              <CardTitle className="text-white">Today's Check-outs</CardTitle>
+              <CardTitle className="text-white">Check-outs</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow className="border-[#2a3349]">
                     <TableHead className="text-gray-400">Professional</TableHead>
+                    <TableHead className="text-gray-400">Customer</TableHead>
                     <TableHead className="text-gray-400">Team</TableHead>
-                    <TableHead className="text-gray-400">Client</TableHead>
-                    <TableHead className="text-gray-400">Location</TableHead>
+                    <TableHead className="text-gray-400">Address</TableHead>
                     <TableHead className="text-gray-400">Check-in</TableHead>
                     <TableHead className="text-gray-400">Check-out</TableHead>
                     <TableHead className="text-gray-400">Duration</TableHead>
@@ -488,36 +436,35 @@ export default function CheckManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCheckOuts.map((checkOut) => (
-                    <TableRow key={checkOut.id} className="border-[#2a3349]">
+                  {checkOutRecords.map((record) => (
+                    <TableRow key={record.id} className="border-[#2a3349]">
                       <TableCell className="text-white">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-gray-400" />
-                          {checkOut.professional}
+                          {record.professionalName || "N/A"}
                         </div>
                       </TableCell>
-                      <TableCell className="text-white">{checkOut.team}</TableCell>
-                      <TableCell className="text-white">{checkOut.client}</TableCell>
+                      <TableCell className="text-white">{record.customerName || "N/A"}</TableCell>
+                      <TableCell className="text-white">{record.teamName || "N/A"}</TableCell>
                       <TableCell className="text-gray-400 text-sm">
                         <div className="flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {checkOut.location}
+                          {record.address}
                         </div>
                       </TableCell>
-                      <TableCell className="text-white">{checkOut.checkInTime}</TableCell>
-                      <TableCell className="text-white">{checkOut.checkOutTime || "-"}</TableCell>
-                      <TableCell className="text-white">{checkOut.duration}</TableCell>
-                      <TableCell>{getCheckOutStatusBadge(checkOut.status)}</TableCell>
+                      <TableCell className="text-white">{formatTime(record.checkInTime)}</TableCell>
+                      <TableCell className="text-white">{formatTime(record.checkOutTime)}</TableCell>
+                      <TableCell className="text-white">
+                        {calculateDuration(record.checkInTime, record.checkOutTime)}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(record.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {checkOut.status === "in-progress" && (
+                          {record.status === CHECK_RECORD_STATUS.CHECKED_IN && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {
-                                setSelectedCheckOut(checkOut)
-                                setIsCheckOutModalOpen(true)
-                              }}
+                              onClick={() => handleCheckOut(record.id.toString())}
                               className="border-[#2a3349] text-white hover:bg-[#2a3349]"
                             >
                               <LogOut className="h-4 w-4" />
@@ -526,7 +473,7 @@ export default function CheckManagementPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleViewCheckOutDetails(checkOut)}
+                            onClick={() => handleViewCheckOutDetails(record)}
                             className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
                           >
                             View
@@ -542,44 +489,57 @@ export default function CheckManagementPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Check-in Modals */}
+      {/* Modals */}
+      <CompanyCheckRecordModal
+        isOpen={isCheckRecordModalOpen}
+        onClose={() => setIsCheckRecordModalOpen(false)}
+        onSuccess={fetchCheckRecords}
+      />
+
       <CompanyCheckInModal
         isOpen={isCheckInModalOpen}
         onClose={() => {
           setIsCheckInModalOpen(false)
-          setSelectedCheckIn(null)
+          setSelectedRecord(null)
         }}
-        onSubmit={handleManualCheckIn}
-        checkIn={selectedCheckIn}
+        onSubmit={() => {
+          setIsCheckInModalOpen(false)
+          setSelectedRecord(null)
+          fetchCheckRecords()
+        }}
+        checkIn={selectedRecord}
       />
 
       <CompanyCheckInDetailsModal
         isOpen={isCheckInDetailsModalOpen}
         onClose={() => {
           setIsCheckInDetailsModalOpen(false)
-          setSelectedCheckIn(null)
+          setSelectedRecord(null)
         }}
-        checkIn={selectedCheckIn}
+        checkIn={selectedRecord}
       />
 
-      {/* Check-out Modals */}
       <CompanyCheckOutModal
         isOpen={isCheckOutModalOpen}
         onClose={() => {
           setIsCheckOutModalOpen(false)
-          setSelectedCheckOut(null)
+          setSelectedRecord(null)
         }}
-        onSubmit={handleCheckOut}
-        checkOut={selectedCheckOut}
+        onSubmit={() => {
+          setIsCheckOutModalOpen(false)
+          setSelectedRecord(null)
+          fetchCheckRecords()
+        }}
+        checkOut={selectedRecord}
       />
 
       <CompanyCheckOutDetailsModal
         isOpen={isCheckOutDetailsModalOpen}
         onClose={() => {
           setIsCheckOutDetailsModalOpen(false)
-          setSelectedCheckOut(null)
+          setSelectedRecord(null)
         }}
-        checkOut={selectedCheckOut}
+        checkOut={selectedRecord}
       />
     </div>
   )

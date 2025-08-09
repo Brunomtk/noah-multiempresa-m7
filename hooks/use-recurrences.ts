@@ -1,175 +1,249 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { useRecurrencesContext } from "@/contexts/recurrences-context"
+import { useState, useEffect, useCallback } from "react"
+import { recurrencesApi } from "@/lib/api/recurrences"
+import type { Recurrence, RecurrenceFilters } from "@/types/recurrence"
 
-interface UseRecurrencesOptions {
-  initialFilters?: {
-    status?: string
-    type?: string
-    searchQuery?: string
+interface UseRecurrencesReturn {
+  recurrences: Recurrence[]
+  loading: boolean
+  selectedRecurrence: Recurrence | null
+  filters: {
+    searchQuery: string
+    status: string
+    type: string
+    companyId: string
   }
+  pagination: {
+    currentPage: number
+    totalPages: number
+    pageSize: number
+    totalItems: number
+  }
+  companies: any[]
+  customers: any[]
+  teams: any[]
+  loadingDropdowns: boolean
+  handleSearch: (query: string) => void
+  handleStatusFilter: (status: string) => void
+  handleTypeFilter: (type: string) => void
+  handleCompanyFilter: (companyId: string) => void
+  addRecurrence: (data: any) => Promise<void>
+  editRecurrence: (id: number, data: any) => Promise<void>
+  removeRecurrence: (id: number) => Promise<void>
+  selectRecurrence: (recurrence: Recurrence | null) => void
+  setPage: (page: number) => void
+  refreshData: () => Promise<void>
 }
 
-export function useRecurrences(options: UseRecurrencesOptions = {}) {
-  const {
-    recurrences,
-    loading,
-    error,
-    selectedRecurrence,
-    fetchRecurrences,
-    fetchRecurrenceById,
-    addRecurrence,
-    editRecurrence,
-    removeRecurrence,
-    selectRecurrence,
-    fetchRecurrencesByCompany,
-    fetchRecurrencesByCustomer,
-    fetchRecurrencesByTeam,
-    fetchRecurrencesByStatus,
-    fetchRecurrencesByType,
-    searchRecurrencesByQuery,
-    filterRecurrences,
-  } = useRecurrencesContext()
+export function useRecurrences(): UseRecurrencesReturn {
+  const [recurrences, setRecurrences] = useState<Recurrence[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedRecurrence, setSelectedRecurrence] = useState<Recurrence | null>(null)
+  const [companies, setCompanies] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
+  const [loadingDropdowns, setLoadingDropdowns] = useState(false)
 
   const [filters, setFilters] = useState({
-    status: options.initialFilters?.status || "all",
-    type: options.initialFilters?.type || "all",
-    searchQuery: options.initialFilters?.searchQuery || "",
+    searchQuery: "",
+    status: "all",
+    type: "all",
+    companyId: "all",
   })
 
-  const filteredRecurrences = filterRecurrences(filters)
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    pageSize: 10,
+    totalItems: 0,
+  })
 
-  const updateFilters = useCallback((newFilters: Partial<typeof filters>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }))
+  // Load recurrences data
+  const loadRecurrences = useCallback(async () => {
+    setLoading(true)
+    try {
+      const apiFilters: RecurrenceFilters = {
+        pageNumber: pagination.currentPage,
+        pageSize: pagination.pageSize,
+      }
+
+      if (filters.searchQuery.trim()) {
+        apiFilters.search = filters.searchQuery.trim()
+      }
+
+      if (filters.status !== "all") {
+        apiFilters.status = filters.status === "active" ? "1" : "0"
+      }
+
+      if (filters.type !== "all") {
+        switch (filters.type) {
+          case "regular":
+            apiFilters.type = "1"
+            break
+          case "deep":
+            apiFilters.type = "2"
+            break
+          case "specialized":
+            apiFilters.type = "3"
+            break
+        }
+      }
+
+      if (filters.companyId !== "all") {
+        apiFilters.companyId = Number.parseInt(filters.companyId)
+      }
+
+      console.log("Loading recurrences with filters:", apiFilters)
+      const response = await recurrencesApi.getAll(apiFilters)
+
+      setRecurrences(response.results)
+      setPagination({
+        currentPage: response.currentPage,
+        totalPages: response.pageCount,
+        pageSize: response.pageSize,
+        totalItems: response.totalItems,
+      })
+    } catch (error) {
+      console.error("Failed to load recurrences:", error)
+      setRecurrences([])
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, pagination.currentPage, pagination.pageSize])
+
+  // Load dropdown data
+  const loadDropdownData = useCallback(async () => {
+    setLoadingDropdowns(true)
+    try {
+      const [companiesResult, customersResult, teamsResult] = await Promise.allSettled([
+        recurrencesApi.getCompanies(),
+        recurrencesApi.getCustomers(),
+        recurrencesApi.getTeams(),
+      ])
+
+      if (companiesResult.status === "fulfilled") {
+        setCompanies(companiesResult.value)
+      }
+
+      if (customersResult.status === "fulfilled") {
+        setCustomers(customersResult.value)
+      }
+
+      if (teamsResult.status === "fulfilled") {
+        setTeams(teamsResult.value)
+      }
+    } catch (error) {
+      console.error("Failed to load dropdown data:", error)
+    } finally {
+      setLoadingDropdowns(false)
+    }
   }, [])
 
-  const handleSearch = useCallback(
-    (query: string) => {
-      updateFilters({ searchQuery: query })
+  // Initial load
+  useEffect(() => {
+    loadRecurrences()
+  }, [loadRecurrences])
+
+  useEffect(() => {
+    loadDropdownData()
+  }, [loadDropdownData])
+
+  // Filter handlers
+  const handleSearch = useCallback((query: string) => {
+    setFilters((prev) => ({ ...prev, searchQuery: query }))
+    setPagination((prev) => ({ ...prev, currentPage: 1 }))
+  }, [])
+
+  const handleStatusFilter = useCallback((status: string) => {
+    setFilters((prev) => ({ ...prev, status }))
+    setPagination((prev) => ({ ...prev, currentPage: 1 }))
+  }, [])
+
+  const handleTypeFilter = useCallback((type: string) => {
+    setFilters((prev) => ({ ...prev, type }))
+    setPagination((prev) => ({ ...prev, currentPage: 1 }))
+  }, [])
+
+  const handleCompanyFilter = useCallback((companyId: string) => {
+    setFilters((prev) => ({ ...prev, companyId }))
+    setPagination((prev) => ({ ...prev, currentPage: 1 }))
+  }, [])
+
+  // CRUD operations
+  const addRecurrence = useCallback(
+    async (data: any) => {
+      try {
+        console.log("Adding recurrence:", data)
+        await recurrencesApi.create(data)
+        await loadRecurrences()
+      } catch (error) {
+        console.error("Failed to add recurrence:", error)
+        throw error
+      }
     },
-    [updateFilters],
+    [loadRecurrences],
   )
 
-  const handleStatusFilter = useCallback(
-    (status: string) => {
-      updateFilters({ status })
+  const editRecurrence = useCallback(
+    async (id: number, data: any) => {
+      try {
+        console.log("Editing recurrence:", id, data)
+        await recurrencesApi.update(id, data)
+        await loadRecurrences()
+      } catch (error) {
+        console.error("Failed to edit recurrence:", error)
+        throw error
+      }
     },
-    [updateFilters],
+    [loadRecurrences],
   )
 
-  const handleTypeFilter = useCallback(
-    (type: string) => {
-      updateFilters({ type })
+  const removeRecurrence = useCallback(
+    async (id: number) => {
+      try {
+        console.log("Removing recurrence:", id)
+        await recurrencesApi.delete(id)
+        await loadRecurrences()
+      } catch (error) {
+        console.error("Failed to remove recurrence:", error)
+        throw error
+      }
     },
-    [updateFilters],
+    [loadRecurrences],
   )
 
-  const resetFilters = useCallback(() => {
-    setFilters({
-      status: "all",
-      type: "all",
-      searchQuery: "",
-    })
+  const selectRecurrence = useCallback((recurrence: Recurrence | null) => {
+    setSelectedRecurrence(recurrence)
   }, [])
 
-  // Helper function to get the day name from a number
-  const getDayName = useCallback((day: number | undefined, frequency: string): string => {
-    if (day === undefined) return ""
-
-    if (frequency === "daily") {
-      if (day === 0) return "Every day"
-      if (day === 1) return "Every weekday"
-      if (day === 2) return "Every weekend"
-      return "Custom"
-    }
-
-    if (frequency === "weekly" || frequency === "biweekly") {
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-      return days[day % 7] || "Unknown"
-    }
-
-    if (frequency === "monthly") {
-      if (day === 1) return "First Monday"
-      if (day === 2) return "First Tuesday"
-      if (day === 3) return "First Wednesday"
-      if (day === 4) return "First Thursday"
-      if (day === 5) return "First Friday"
-      if (day === 25) return "Last Monday"
-      if (day === 29) return "Last Friday"
-      if (day === 31) return "Last day"
-      return `${day}${getDaySuffix(day)}`
-    }
-
-    return `Day ${day}`
+  const setPage = useCallback((page: number) => {
+    setPagination((prev) => ({ ...prev, currentPage: page }))
   }, [])
 
-  // Helper function to get the day suffix (st, nd, rd, th)
-  const getDaySuffix = (day: number): string => {
-    if (day >= 11 && day <= 13) return "th"
-
-    switch (day % 10) {
-      case 1:
-        return "st"
-      case 2:
-        return "nd"
-      case 3:
-        return "rd"
-      default:
-        return "th"
-    }
-  }
-
-  // Helper function to get frequency label
-  const getFrequencyLabel = useCallback((frequency: string): string => {
-    switch (frequency) {
-      case "daily":
-        return "Daily"
-      case "weekly":
-        return "Weekly"
-      case "biweekly":
-        return "Bi-weekly"
-      case "monthly":
-        return "Monthly"
-      default:
-        return frequency
-    }
-  }, [])
-
-  // Helper function to format duration
-  const formatDuration = useCallback((minutes: number): string => {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-
-    if (hours === 0) return `${mins} minute${mins !== 1 ? "s" : ""}`
-    if (mins === 0) return `${hours} hour${hours !== 1 ? "s" : ""}`
-
-    return `${hours} hour${hours !== 1 ? "s" : ""} and ${mins} minute${mins !== 1 ? "s" : ""}`
-  }, [])
+  const refreshData = useCallback(async () => {
+    await Promise.all([loadRecurrences(), loadDropdownData()])
+  }, [loadRecurrences, loadDropdownData])
 
   return {
-    recurrences: filteredRecurrences,
-    allRecurrences: recurrences,
+    recurrences,
     loading,
-    error,
     selectedRecurrence,
     filters,
-    fetchRecurrences,
-    fetchRecurrenceById,
-    addRecurrence,
-    editRecurrence,
-    removeRecurrence,
-    selectRecurrence,
-    fetchRecurrencesByCompany,
-    fetchRecurrencesByCustomer,
-    fetchRecurrencesByTeam,
-    updateFilters,
+    pagination,
+    companies,
+    customers,
+    teams,
+    loadingDropdowns,
     handleSearch,
     handleStatusFilter,
     handleTypeFilter,
-    resetFilters,
-    getDayName,
-    getFrequencyLabel,
-    formatDuration,
+    handleCompanyFilter,
+    addRecurrence,
+    editRecurrence,
+    removeRecurrence,
+    selectRecurrence,
+    setPage,
+    refreshData,
   }
 }

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useCompanies } from "@/contexts/companies-context"
+import { useCompanies } from "@/hooks/use-companies"
 import type { Company } from "@/types"
 
 export default function CompaniesPage() {
@@ -31,12 +31,12 @@ export default function CompaniesPage() {
     isLoading,
     error,
     pagination,
-    filters,
     fetchCompanies,
     createCompany,
     updateCompany,
     deleteCompany,
     setFilters,
+    getCompanyById,
   } = useCompanies()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -47,9 +47,22 @@ export default function CompaniesPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const { toast } = useToast()
 
-  // Fetch companies on initial load
+  const initializedRef = useRef(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout>()
+
   useEffect(() => {
-    fetchCompanies()
+    if (!initializedRef.current) {
+      initializedRef.current = true
+      fetchCompanies(1, 10)
+    }
+  }, [fetchCompanies])
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
   }, [])
 
   const handleStatusFilterChange = (status: string) => {
@@ -61,12 +74,13 @@ export default function CompaniesPage() {
     const value = e.target.value
     setSearchQuery(value)
 
-    // Debounce search
-    const timeoutId = setTimeout(() => {
-      setFilters({ status: statusFilter, search: value })
-    }, 300)
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
 
-    return () => clearTimeout(timeoutId)
+    searchTimeoutRef.current = setTimeout(() => {
+      setFilters({ status: statusFilter, search: value })
+    }, 500)
   }
 
   const handleAddCompany = async (data: any) => {
@@ -92,7 +106,7 @@ export default function CompaniesPage() {
   const handleEditCompany = async (data: any) => {
     if (!selectedCompany) return
 
-    const result = await updateCompany(selectedCompany.id.toString(), {
+    const result = await updateCompany(selectedCompany.id, {
       name: data.name,
       cnpj: data.cnpj,
       responsible: data.responsible,
@@ -113,7 +127,7 @@ export default function CompaniesPage() {
 
   const handleDeleteCompany = async () => {
     if (companyToDelete) {
-      const success = await deleteCompany(companyToDelete.id.toString())
+      const success = await deleteCompany(companyToDelete.id)
       if (success) {
         toast({
           title: "Company deleted successfully",
@@ -125,9 +139,12 @@ export default function CompaniesPage() {
     }
   }
 
-  const handleViewDetails = (company: Company) => {
-    setSelectedCompany(company)
-    setIsDetailsModalOpen(true)
+  const handleViewDetails = async (company: Company) => {
+    const fullCompany = await getCompanyById(company.id)
+    if (fullCompany) {
+      setSelectedCompany(fullCompany)
+      setIsDetailsModalOpen(true)
+    }
   }
 
   const handleEdit = (company: Company) => {
@@ -136,7 +153,7 @@ export default function CompaniesPage() {
   }
 
   const handlePageChange = (page: number) => {
-    fetchCompanies(page, pagination.itemsPerPage)
+    fetchCompanies(page, pagination.itemsPerPage, statusFilter, searchQuery)
   }
 
   return (
@@ -220,7 +237,7 @@ export default function CompaniesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isLoading && companies.length === 0 ? (
                 <TableRow className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
                   <TableCell colSpan={6} className="text-center py-8 text-gray-400">
                     Loading companies...
@@ -250,7 +267,7 @@ export default function CompaniesPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-400">{company.cnpj}</TableCell>
-                    <TableCell className="text-gray-400">{company.plan?.name || "N/A"}</TableCell>
+                    <TableCell className="text-gray-400">{company.planName || company.plan?.name || "N/A"}</TableCell>
                     <TableCell className="text-gray-400">{company.responsible}</TableCell>
                     <TableCell>
                       <Badge
@@ -323,8 +340,8 @@ export default function CompaniesPage() {
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-400">
-              Showing <span className="font-medium text-white">{companies.length}</span> of{" "}
-              <span className="font-medium text-white">{pagination.totalItems}</span> companies
+              Page <span className="font-medium text-white">{pagination.currentPage}</span> of{" "}
+              <span className="font-medium text-white">{pagination.totalPages}</span>
             </p>
             <div className="flex gap-2">
               <Button

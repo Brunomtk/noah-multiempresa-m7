@@ -1,125 +1,102 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Calendar, CheckCircle, Clock, Star, Users, XCircle } from "lucide-react"
-import { DashboardChart } from "@/components/admin/dashboard-chart"
-import { DashboardStats } from "@/components/admin/dashboard-stats"
-import { RecentActivities } from "@/components/admin/recent-activities"
+"use client"
 
-export default function AdminDashboard() {
+import { DashboardProvider, useDashboardContext } from "@/contexts/dashboard-context"
+import { DashboardOverview } from "@/components/admin/dashboard-overview"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Calendar, Users, BarChart, RefreshCw, Building2, UserCheck, ClipboardCheck } from "lucide-react"
+import { useRouter } from "next/navigation"
+
+function DashboardContent() {
+  const { refresh, isLoading } = useDashboardContext()
+  const router = useRouter()
+
+  const quickActions = [
+    {
+      icon: Calendar,
+      label: "New Appointment",
+      path: "/admin/appointments",
+    },
+    {
+      icon: Building2,
+      label: "New Company",
+      path: "/admin/companies",
+    },
+    {
+      icon: UserCheck,
+      label: "New Customer",
+      path: "/admin/customers",
+    },
+    {
+      icon: BarChart,
+      label: "Reports",
+      path: "/admin/reports",
+    },
+    {
+      icon: Users,
+      label: "New Team",
+      path: "/admin/teams",
+    },
+    {
+      icon: ClipboardCheck,
+      label: "Check-in",
+      path: "/admin/check-in",
+    },
+  ]
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>
-        <p className="text-gray-400">Bem-vindo ao painel administrativo da Noah.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>
+          <p className="text-gray-400">Welcome to Noah's administrative panel.</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+          onClick={refresh}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+          {isLoading ? "Loading..." : "Refresh"}
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <DashboardStats title="Agendamentos da Semana" value="128" change="+12%" icon={Calendar} trend="up" />
-        <DashboardStats title="Empresas Ativas" value="24" change="+2" icon={Users} trend="up" />
-        <DashboardStats title="Profissionais em Serviço" value="45" change="-3" icon={Clock} trend="down" />
-        <DashboardStats title="Avaliações Positivas" value="92%" change="+5%" icon={Star} trend="up" />
-      </div>
+      {/* Main Dashboard Overview */}
+      <DashboardOverview />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-[#1a2234] border-[#2a3349] text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Agendamentos por Dia</CardTitle>
-            <CardDescription className="text-gray-400">Últimos 7 dias</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DashboardChart />
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349] text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Status de Pagamentos</CardTitle>
-            <CardDescription className="text-gray-400">Mês atual</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                  <span className="text-sm">Pagos</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="font-medium mr-2">R$ 24.500,00</span>
-                  <span className="text-xs text-green-500">68%</span>
-                </div>
-              </div>
-
-              <div className="w-full bg-[#0f172a] rounded-full h-2.5">
-                <div className="bg-green-500 h-2.5 rounded-full" style={{ width: "68%" }}></div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <XCircle className="h-4 w-4 text-red-500 mr-2" />
-                  <span className="text-sm">Pendentes</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="font-medium mr-2">R$ 11.500,00</span>
-                  <span className="text-xs text-red-500">32%</span>
-                </div>
-              </div>
-
-              <div className="w-full bg-[#0f172a] rounded-full h-2.5">
-                <div className="bg-red-500 h-2.5 rounded-full" style={{ width: "32%" }}></div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="bg-[#1a2234] border-[#2a3349] text-white lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Atividades Recentes</CardTitle>
-            <CardDescription className="text-gray-400">Últimas 24 horas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecentActivities />
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349] text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Atalhos Rápidos</CardTitle>
-            <CardDescription className="text-gray-400">Acesso rápido</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="bg-[#0f172a] border-[#2a3349] hover:border-[#06b6d4] transition-colors cursor-pointer">
+      {/* Quick Actions */}
+      <Card className="bg-[#1a2234] border-[#2a3349] text-white">
+        <CardContent className="p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-medium">Quick Actions</h3>
+            <p className="text-gray-400 text-sm">Quick access to main features</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {quickActions.map((action, index) => (
+              <Card
+                key={index}
+                className="bg-[#0f172a] border-[#2a3349] hover:border-[#06b6d4] transition-colors cursor-pointer"
+                onClick={() => router.push(action.path)}
+              >
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                  <Calendar className="h-6 w-6 text-[#06b6d4] mb-2" />
-                  <span className="text-xs">Novo Agendamento</span>
+                  <action.icon className="h-6 w-6 text-[#06b6d4] mb-2" />
+                  <span className="text-xs">{action.label}</span>
                 </CardContent>
               </Card>
-
-              <Card className="bg-[#0f172a] border-[#2a3349] hover:border-[#06b6d4] transition-colors cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                  <Users className="h-6 w-6 text-[#06b6d4] mb-2" />
-                  <span className="text-xs">Nova Empresa</span>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-[#0f172a] border-[#2a3349] hover:border-[#06b6d4] transition-colors cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                  <Users className="h-6 w-6 text-[#06b6d4] mb-2" />
-                  <span className="text-xs">Novo Profissional</span>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-[#0f172a] border-[#2a3349] hover:border-[#06b6d4] transition-colors cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                  <BarChart className="h-6 w-6 text-[#06b6d4] mb-2" />
-                  <span className="text-xs">Exportar Relatório</span>
-                </CardContent>
-              </Card>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  )
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <DashboardProvider>
+      <DashboardContent />
+    </DashboardProvider>
   )
 }

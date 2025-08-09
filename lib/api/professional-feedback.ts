@@ -1,5 +1,10 @@
 import type { ApiResponse } from "@/types/api"
-import type { InternalFeedback } from "@/types/internal-feedback"
+import type {
+  InternalFeedback,
+  InternalFeedbackFilters,
+  InternalFeedbackPagedResponse,
+} from "@/types/internal-feedback"
+import { fetchApi } from "./utils"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
@@ -17,8 +22,132 @@ export interface FeedbackResponse {
   respondedAt: string
 }
 
+interface CreateFeedbackData {
+  title: string
+  category: string
+  description: string
+  priority: number
+  status: number
+}
+
+interface AddCommentData {
+  authorId: number
+  author: string
+  text: string
+}
+
+export const professionalFeedbackApi = {
+  // Get professional's own feedbacks
+  async getMyFeedbacks(
+    filters: InternalFeedbackFilters = {},
+  ): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
+    try {
+      const params = new URLSearchParams()
+
+      // Add filters to params
+      if (filters.status && filters.status !== "all") {
+        params.append("Status", filters.status.toString())
+      }
+      if (filters.priority && filters.priority !== "all") {
+        params.append("Priority", filters.priority.toString())
+      }
+      if (filters.category && filters.category !== "all") {
+        params.append("Category", filters.category)
+      }
+      if (filters.search) {
+        params.append("Search", filters.search)
+      }
+      if (filters.pageNumber) {
+        params.append("PageNumber", filters.pageNumber.toString())
+      }
+      if (filters.pageSize) {
+        params.append("PageSize", filters.pageSize.toString())
+      }
+
+      const query = params.toString()
+      const url = query ? `/InternalFeedback/paged?${query}` : "/InternalFeedback/paged"
+
+      const response = await fetchApi<InternalFeedbackPagedResponse>(url)
+      return { data: response }
+    } catch (error) {
+      console.error("Error fetching professional feedbacks:", error)
+      return { error: error instanceof Error ? error.message : "Failed to fetch feedbacks" }
+    }
+  },
+
+  // Get feedback by ID
+  async getById(id: number): Promise<{ data?: InternalFeedback; error?: string }> {
+    try {
+      const response = await fetchApi<InternalFeedback>(`/InternalFeedback/${id}`)
+      return { data: response }
+    } catch (error) {
+      console.error("Error fetching feedback:", error)
+      return { error: error instanceof Error ? error.message : "Failed to fetch feedback" }
+    }
+  },
+
+  // Create new feedback
+  async create(data: CreateFeedbackData): Promise<{ data?: InternalFeedback; error?: string }> {
+    try {
+      // Get current user info from token or context
+      const currentUser = await fetchApi<any>("/Users/current") // Assuming this endpoint exists
+
+      const feedbackData = {
+        title: data.title,
+        professionalId: currentUser?.id || 1, // Use current user ID
+        teamId: currentUser?.teamId || 1, // Use current user's team ID
+        category: data.category,
+        status: data.status,
+        date: new Date().toISOString(),
+        description: data.description,
+        priority: data.priority,
+        assignedToId: 1, // Default admin assignment
+      }
+
+      const response = await fetchApi<InternalFeedback>("/InternalFeedback", {
+        method: "POST",
+        body: JSON.stringify(feedbackData),
+      })
+
+      return { data: response }
+    } catch (error) {
+      console.error("Error creating feedback:", error)
+      return { error: error instanceof Error ? error.message : "Failed to create feedback" }
+    }
+  },
+
+  // Add comment to feedback
+  async addComment(feedbackId: number, commentText: string): Promise<{ data?: InternalFeedback; error?: string }> {
+    try {
+      // Get current user info
+      const currentUser = await fetchApi<any>("/Users/current")
+
+      const commentData: AddCommentData = {
+        authorId: currentUser?.id || 1,
+        author: currentUser?.name || currentUser?.firstName + " " + currentUser?.lastName || "Professional",
+        text: commentText,
+      }
+
+      const response = await fetchApi<InternalFeedback>(`/InternalFeedback/${feedbackId}/comments`, {
+        method: "POST",
+        body: JSON.stringify(commentData),
+      })
+
+      return { data: response }
+    } catch (error) {
+      console.error("Error adding comment:", error)
+      return { error: error instanceof Error ? error.message : "Failed to add comment" }
+    }
+  },
+}
+
+// Legacy exports for backward compatibility
+export const getProfessionalFeedbacks = professionalFeedbackApi.getMyFeedbacks
+export const createProfessionalFeedback = professionalFeedbackApi.create
+export const addProfessionalFeedbackComment = professionalFeedbackApi.addComment
+
 // Buscar feedbacks do profissional
-export async function getProfessionalFeedbacks(
+export async function getProfessionalFeedbacksLegacy(
   professionalId: string,
   filters?: ProfessionalFeedbackFilters,
 ): Promise<ApiResponse<InternalFeedback[]>> {
@@ -62,7 +191,7 @@ export async function getProfessionalFeedbacks(
 }
 
 // Buscar feedback específico
-export async function getProfessionalFeedback(
+export async function getProfessionalFeedbackLegacy(
   professionalId: string,
   feedbackId: string,
 ): Promise<ApiResponse<InternalFeedback>> {
@@ -98,7 +227,7 @@ export async function getProfessionalFeedback(
 }
 
 // Responder a um feedback
-export async function respondToProfessionalFeedback(
+export async function respondToProfessionalFeedbackLegacy(
   professionalId: string,
   feedbackId: string,
   response: string,
@@ -141,7 +270,7 @@ export async function respondToProfessionalFeedback(
 }
 
 // Marcar feedback como lido
-export async function markProfessionalFeedbackAsRead(
+export async function markProfessionalFeedbackAsReadLegacy(
   professionalId: string,
   feedbackId: string,
 ): Promise<ApiResponse<InternalFeedback>> {
@@ -182,7 +311,7 @@ export async function markProfessionalFeedbackAsRead(
 }
 
 // Buscar estatísticas de feedback do profissional
-export async function getProfessionalFeedbackStats(
+export async function getProfessionalFeedbackStatsLegacy(
   professionalId: string,
   period?: "week" | "month" | "quarter" | "year",
 ): Promise<
@@ -231,7 +360,7 @@ export async function getProfessionalFeedbackStats(
 }
 
 // Marcar todos os feedbacks como lidos
-export async function markAllProfessionalFeedbacksAsRead(
+export async function markAllProfessionalFeedbacksAsReadLegacy(
   professionalId: string,
 ): Promise<ApiResponse<{ updatedCount: number }>> {
   try {

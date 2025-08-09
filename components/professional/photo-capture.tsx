@@ -101,9 +101,9 @@ export function PhotoCapture({
           {label} {required && <span className="text-destructive">*</span>}
         </label>
         {capturedPhoto && (
-          <Button type="button" variant="outline" size="sm" onClick={retakePhoto} className="text-xs">
+          <Button type="button" variant="outline" size="sm" onClick={retakePhoto} className="text-xs bg-transparent">
             <RotateCcw className="h-3 w-3 mr-1" />
-            Refazer
+            Retake
           </Button>
         )}
       </div>
@@ -134,7 +134,12 @@ export function PhotoCapture({
                 <Button type="button" onClick={capturePhoto} className="rounded-full h-12 w-12">
                   <Camera className="h-6 w-6" />
                 </Button>
-                <Button type="button" variant="outline" onClick={stopCamera} className="rounded-full h-12 w-12">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={stopCamera}
+                  className="rounded-full h-12 w-12 bg-transparent"
+                >
                   <X className="h-6 w-6" />
                 </Button>
               </div>
@@ -145,7 +150,7 @@ export function PhotoCapture({
                 <div className="flex justify-center gap-2">
                   <Button type="button" onClick={startCamera} className="flex-1 max-w-32">
                     <Camera className="h-4 w-4 mr-2" />
-                    Câmera
+                    Camera
                   </Button>
                   <Button
                     type="button"
@@ -154,10 +159,10 @@ export function PhotoCapture({
                     className="flex-1 max-w-32"
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    Galeria
+                    Gallery
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Tire uma foto ou selecione da galeria</p>
+                <p className="text-xs text-muted-foreground">Take a photo or select from gallery</p>
               </div>
             </div>
           )}

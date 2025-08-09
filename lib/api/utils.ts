@@ -2,7 +2,7 @@
 export const apiDelay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // URL base da API
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://localhost:44394/api"
+const API_BASE_URL = "https://localhost:44394/api"
 
 // Função para obter o token de autenticação
 function getAuthToken(): string | null {
@@ -10,23 +10,65 @@ function getAuthToken(): string | null {
   return localStorage.getItem("noah_token")
 }
 
+// Função para criar headers de autenticação
+export function createAuthHeaders(): HeadersInit {
+  const token = getAuthToken()
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
+  return headers
+}
+
 // Função principal para fazer requisições à API
 export async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken()
 
   const config: RequestInit = {
-    ...options,
     headers: {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
+    ...options,
   }
 
-  const url = `${API_BASE_URL}${endpoint}`
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// Nova função apiRequest que usa a estrutura correta
+export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken()
+
+  const config: RequestInit = {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+    ...options,
+  }
+
+  // Construir URL corretamente - verificar se endpoint é string válida
+  if (!endpoint || typeof endpoint !== "string") {
+    throw new Error("Invalid endpoint provided to apiRequest")
+  }
+
+  const fullUrl = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`
 
   try {
-    const response = await fetch(url, config)
+    const response = await fetch(fullUrl, config)
 
     // Se não autorizado, limpar token e redirecionar
     if (response.status === 401) {
@@ -56,6 +98,42 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
   }
 }
 
-// Alias para compatibilidade
-export const fetchWithAuth = fetchApi
-export const apiRequest = fetchApi
+// Utility function for making authenticated API requests
+export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  // Get token from localStorage
+  const token = localStorage.getItem("token")
+
+  // Prepare headers
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  }
+
+  // Add authorization header if token exists
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
+  // Make the request
+  return fetch(url, {
+    ...options,
+    headers,
+  })
+}
+
+// Utility function to get API base URL
+export function getApiUrl(): string {
+  return "https://localhost:44394/api"
+}
+
+// Utility function to get user data from localStorage
+export function getUserData() {
+  const userData = localStorage.getItem("user")
+  return userData ? JSON.parse(userData) : null
+}
+
+// Utility function to get company ID from user data
+export function getCompanyId(): number | null {
+  const user = getUserData()
+  return user?.companyId || null
+}

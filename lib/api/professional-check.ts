@@ -1,5 +1,5 @@
+import { apiRequest } from "./utils"
 import type { CheckRecord } from "@/types/check-record"
-import { performCheckIn, performCheckOut, updateCheckRecord } from "@/lib/api/check-records"
 
 // Interface para foto de check
 export interface CheckPhoto {
@@ -27,10 +27,12 @@ export interface CurrentCheckStatus {
   status: "pending" | "checked_in" | "checked_out" | "no_appointment"
   appointmentDetails?: {
     id: string
-    clientName: string
+    title: string
     address: string
+    start: string
+    end: string
+    customerName: string
     serviceType: string
-    scheduledTime: string
     notes?: string
   } | null
   checkInTime?: string
@@ -42,102 +44,238 @@ export interface CurrentCheckStatus {
   location?: CheckLocation
 }
 
-// Mock data para desenvolvimento
-const mockCurrentAppointment = {
-  id: "app123",
-  clientName: "Maria Silva",
-  address: "Rua das Flores, 123 - Apartamento 45 - Centro",
-  serviceType: "Limpeza Residencial",
-  scheduledTime: "14:30 - 16:30",
-  notes: "Apartamento no 3º andar. Tem um cachorro pequeno e amigável. Chaves com a portaria.",
+// Interface para filtros de check records
+export interface CheckRecordFilters {
+  professionalId?: number
+  companyId?: number
+  customerId?: number
+  teamId?: number
+  appointmentId?: number
+  status?: string
+  serviceType?: string
+  startDate?: string
+  endDate?: string
+  search?: string
+  pageNumber?: number
+  pageSize?: number
+}
+
+// Interface para resposta paginada
+export interface CheckRecordResponse {
+  results: CheckRecord[]
+  currentPage: number
+  pageCount: number
+  pageSize: number
+  totalItems: number
+  firstRowOnPage: number
+  lastRowOnPage: number
+}
+
+// Obter check records do profissional
+export const getProfessionalCheckRecords = async (
+  professionalId: number,
+  filters?: CheckRecordFilters,
+): Promise<CheckRecordResponse> => {
+  try {
+    const params = new URLSearchParams()
+
+    // Sempre filtrar pelo profissional
+    params.append("professionalId", professionalId.toString())
+
+    if (filters?.companyId) params.append("companyId", filters.companyId.toString())
+    if (filters?.customerId) params.append("customerId", filters.customerId.toString())
+    if (filters?.teamId) params.append("teamId", filters.teamId.toString())
+    if (filters?.appointmentId) params.append("appointmentId", filters.appointmentId.toString())
+    if (filters?.status) params.append("status", filters.status)
+    if (filters?.serviceType) params.append("serviceType", filters.serviceType)
+    if (filters?.startDate) params.append("startDate", filters.startDate)
+    if (filters?.endDate) params.append("endDate", filters.endDate)
+    if (filters?.search) params.append("search", filters.search)
+    if (filters?.pageNumber) params.append("pageNumber", filters.pageNumber.toString())
+    if (filters?.pageSize) params.append("pageSize", filters.pageSize.toString())
+
+    const queryString = params.toString()
+    const url = queryString ? `/CheckRecord?${queryString}` : "/CheckRecord"
+
+    const response = await apiRequest(url)
+    return response
+  } catch (error) {
+    console.error("Error fetching professional check records:", error)
+    throw error
+  }
+}
+
+// Obter agendamentos do profissional
+export const getProfessionalAppointments = async (professionalId: number): Promise<any[]> => {
+  try {
+    const params = new URLSearchParams()
+    params.append("professionalId", professionalId.toString())
+
+    const response = await apiRequest(`/Appointment?${params.toString()}`)
+    return response.results || []
+  } catch (error) {
+    console.error("Error fetching professional appointments:", error)
+    throw error
+  }
 }
 
 // Obter o status atual do check para o profissional
-export const getCurrentCheckStatus = async (professionalId: string): Promise<CurrentCheckStatus> => {
-  // Simular delay de API
-  await new Promise((resolve) => setTimeout(resolve, 800))
+export const getCurrentCheckStatus = async (professionalId: number): Promise<CurrentCheckStatus> => {
+  try {
+    // Primeiro, buscar check records do profissional para hoje
+    const today = new Date().toISOString().split("T")[0]
+    const checkRecords = await getProfessionalCheckRecords(professionalId, {
+      startDate: today,
+      endDate: today,
+      pageSize: 10,
+    })
 
-  // Em um app real, você buscaria o próximo agendamento e verificaria se há um check-record associado
-  // Aqui estamos simulando um agendamento pendente
-  return {
-    appointmentId: mockCurrentAppointment.id,
-    checkRecordId: null,
-    status: "pending",
-    appointmentDetails: mockCurrentAppointment,
+    if (checkRecords.results.length === 0) {
+      return {
+        appointmentId: null,
+        checkRecordId: null,
+        status: "no_appointment",
+        appointmentDetails: null,
+      }
+    }
+
+    // Pegar o primeiro check record (mais recente)
+    const checkRecord = checkRecords.results[0]
+
+    // Buscar detalhes do agendamento
+    const appointments = await getProfessionalAppointments(professionalId)
+    const appointment = appointments.find((apt) => apt.id === checkRecord.appointmentId)
+
+    // Determinar o status baseado nos tempos de check
+    let status: "pending" | "checked_in" | "checked_out" = "pending"
+    if (checkRecord.checkInTime && !checkRecord.checkOutTime) {
+      status = "checked_in"
+    } else if (checkRecord.checkInTime && checkRecord.checkOutTime) {
+      status = "checked_out"
+    }
+
+    return {
+      appointmentId: checkRecord.appointmentId.toString(),
+      checkRecordId: checkRecord.id.toString(),
+      status,
+      appointmentDetails: appointment
+        ? {
+            id: appointment.id.toString(),
+            title: appointment.title || checkRecord.serviceType,
+            address: checkRecord.address,
+            start: appointment.start || new Date().toISOString(),
+            end: appointment.end || new Date().toISOString(),
+            customerName: checkRecord.customerName || "Customer",
+            serviceType: checkRecord.serviceType,
+            notes: appointment.notes || checkRecord.notes,
+          }
+        : {
+            id: checkRecord.appointmentId.toString(),
+            title: checkRecord.serviceType,
+            address: checkRecord.address,
+            start: new Date().toISOString(),
+            end: new Date().toISOString(),
+            customerName: checkRecord.customerName || "Customer",
+            serviceType: checkRecord.serviceType,
+            notes: checkRecord.notes,
+          },
+      checkInTime: checkRecord.checkInTime,
+      checkOutTime: checkRecord.checkOutTime,
+      checkInNotes: checkRecord.notes,
+    }
+  } catch (error) {
+    console.error("Error getting current check status:", error)
+    throw error
   }
 }
 
-// Realizar check-in com foto
+// Realizar check-in
 export const performCheckInWithPhoto = async (
-  professionalId: string,
-  appointmentId: string,
+  professionalId: number,
+  appointmentId: number,
   data: {
-    photoBase64: string
+    photoBase64?: string
     notes?: string
-    location: CheckLocation
+    location?: CheckLocation
   },
 ): Promise<CheckRecord> => {
-  // Simular delay de API
-  await new Promise((resolve) => setTimeout(resolve, 1500))
+  try {
+    // Buscar dados do agendamento
+    const appointments = await getProfessionalAppointments(professionalId)
+    const appointment = appointments.find((apt) => apt.id === appointmentId)
 
-  // Em um app real, você faria upload da foto para um serviço de armazenamento
-  // e então criaria o registro de check-in com a URL da foto
+    if (!appointment) {
+      throw new Error("Agendamento não encontrado")
+    }
 
-  // Criar o check record
-  const checkInData: Omit<CheckRecord, "id" | "createdAt" | "updatedAt" | "checkOutTime" | "status"> = {
-    professionalId,
-    professionalName: "Nome do Profissional", // Em um app real, você obteria isso do perfil
-    companyId: "comp1", // Em um app real, você obteria isso do contexto
-    customerId: "cust1", // Em um app real, você obteria isso do agendamento
-    customerName: mockCurrentAppointment.clientName,
-    appointmentId,
-    address: mockCurrentAppointment.address,
-    serviceType: mockCurrentAppointment.serviceType,
-    notes: data.notes,
+    const checkInData = {
+      professionalId,
+      professionalName: appointment.professional?.name || "Profissional",
+      companyId: appointment.companyId,
+      customerId: appointment.customerId,
+      customerName: appointment.customer?.name || "Cliente",
+      appointmentId,
+      address: appointment.address,
+      teamId: appointment.teamId,
+      teamName: appointment.team?.name || "Equipe",
+      serviceType: appointment.title,
+      notes: data.notes || "",
+    }
+
+    const response = await apiRequest("/CheckRecord/check-in", {
+      method: "POST",
+      body: JSON.stringify(checkInData),
+    })
+
+    return response
+  } catch (error) {
+    console.error("Error performing check-in:", error)
+    throw error
   }
-
-  const checkRecord = await performCheckIn(checkInData)
-
-  // Simular armazenamento da foto
-  console.log("Photo stored:", data.photoBase64.substring(0, 50) + "...")
-  console.log("Location stored:", data.location)
-
-  return checkRecord
 }
 
-// Realizar check-out com foto
+// Realizar check-out
 export const performCheckOutWithPhoto = async (
-  checkRecordId: string,
+  checkRecordId: number,
   data: {
-    photoBase64: string
+    photoBase64?: string
     notes?: string
-    location: CheckLocation
+    location?: CheckLocation
   },
 ): Promise<CheckRecord> => {
-  // Simular delay de API
-  await new Promise((resolve) => setTimeout(resolve, 1500))
+  try {
+    const response = await apiRequest(`/CheckRecord/check-out/${checkRecordId}`, {
+      method: "POST",
+      body: "",
+    })
 
-  // Em um app real, você faria upload da foto para um serviço de armazenamento
-  // e então atualizaria o registro de check-out com a URL da foto
+    // Se há notas adicionais, atualizar o registro
+    if (data.notes) {
+      // Buscar o registro atual
+      const currentRecord = await apiRequest(`/CheckRecord/${checkRecordId}`)
 
-  // Realizar o check-out
-  const checkRecord = await performCheckOut(checkRecordId)
+      // Atualizar com as novas notas
+      const updateData = {
+        ...currentRecord,
+        notes: data.notes,
+      }
 
-  // Atualizar as notas se fornecidas
-  if (data.notes) {
-    await updateCheckRecord(checkRecordId, { notes: data.notes })
+      await apiRequest(`/CheckRecord/${checkRecordId}`, {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      })
+    }
+
+    return response
+  } catch (error) {
+    console.error("Error performing check-out:", error)
+    throw error
   }
-
-  // Simular armazenamento da foto
-  console.log("Photo stored:", data.photoBase64.substring(0, 50) + "...")
-  console.log("Location stored:", data.location)
-
-  return checkRecord
 }
 
 // Obter histórico de checks do profissional
 export const getProfessionalCheckHistory = async (
-  professionalId: string,
+  professionalId: number,
   filters?: {
     startDate?: string
     endDate?: string
@@ -146,87 +284,53 @@ export const getProfessionalCheckHistory = async (
     offset?: number
   },
 ): Promise<CheckRecord[]> => {
-  // Simular delay de API
-  await new Promise((resolve) => setTimeout(resolve, 800))
+  try {
+    const checkFilters: CheckRecordFilters = {
+      professionalId,
+      pageSize: filters?.limit || 50,
+      pageNumber: filters?.offset ? Math.floor(filters.offset / (filters.limit || 50)) + 1 : 1,
+    }
 
-  // Mock data - em um app real, você buscaria do backend
-  return [
-    {
-      id: "check1",
-      professionalId,
-      professionalName: "Nome do Profissional",
-      companyId: "comp1",
-      customerId: "cust1",
-      customerName: "Maria Silva",
-      appointmentId: "app1",
-      address: "Rua das Flores, 123 - Centro",
-      teamId: "team1",
-      teamName: "Equipe A",
-      checkInTime: "2023-05-15T14:32:00Z",
-      checkOutTime: "2023-05-15T16:45:00Z",
-      status: "checked_out",
-      serviceType: "Limpeza Residencial",
-      notes: "Serviço concluído com sucesso",
-      createdAt: "2023-05-15T14:30:00Z",
-      updatedAt: "2023-05-15T16:45:00Z",
-    },
-    {
-      id: "check2",
-      professionalId,
-      professionalName: "Nome do Profissional",
-      companyId: "comp1",
-      customerId: "cust2",
-      customerName: "João Pereira",
-      appointmentId: "app2",
-      address: "Av. Principal, 456 - Sala 302",
-      teamId: "team1",
-      teamName: "Equipe A",
-      checkInTime: "2023-05-14T09:05:00Z",
-      checkOutTime: "2023-05-14T11:30:00Z",
-      status: "checked_out",
-      serviceType: "Limpeza Comercial",
-      notes: "Cliente muito satisfeito",
-      createdAt: "2023-05-14T09:00:00Z",
-      updatedAt: "2023-05-14T11:30:00Z",
-    },
-  ]
+    if (filters?.startDate) checkFilters.startDate = filters.startDate
+    if (filters?.endDate) checkFilters.endDate = filters.endDate
+    if (filters?.status) {
+      checkFilters.status = filters.status === "checked_in" ? "1" : "2"
+    }
+
+    const response = await getProfessionalCheckRecords(professionalId, checkFilters)
+    return response.results
+  } catch (error) {
+    console.error("Error fetching professional check history:", error)
+    throw error
+  }
 }
 
-// Obter fotos de um check específico
+// Obter fotos de um check específico (mock - não implementado na API)
 export const getCheckPhotos = async (checkRecordId: string): Promise<CheckPhoto[]> => {
-  // Simular delay de API
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
   // Mock data - em um app real, você buscaria do backend
   return [
     {
       id: "photo1",
       checkRecordId,
-      photoUrl: "/placeholder.svg?height=300&width=400&query=before cleaning",
+      photoUrl: "/placeholder.svg?height=300&width=400",
       photoType: "check_in",
-      createdAt: "2023-05-15T14:32:00Z",
+      createdAt: new Date().toISOString(),
     },
     {
       id: "photo2",
       checkRecordId,
-      photoUrl: "/placeholder.svg?height=300&width=400&query=after cleaning",
+      photoUrl: "/placeholder.svg?height=300&width=400",
       photoType: "check_out",
-      createdAt: "2023-05-15T16:45:00Z",
+      createdAt: new Date().toISOString(),
     },
   ]
 }
 
-// Verificar a localização em relação ao endereço do agendamento
+// Verificar a localização em relação ao endereço do agendamento (mock)
 export const verifyLocation = async (
-  appointmentId: string,
+  appointmentId: number,
   currentLocation: { latitude: number; longitude: number },
 ): Promise<{ isNearby: boolean; distance: number; accuracy: number }> => {
-  // Simular delay de API
-  await new Promise((resolve) => setTimeout(resolve, 600))
-
-  // Em um app real, você usaria um serviço de geocodificação para verificar a distância
-  // entre a localização atual e o endereço do agendamento
-
   // Simulando uma verificação de proximidade
   const randomDistance = Math.random() * 200 // 0-200 metros
   const isNearby = randomDistance < 100 // Consideramos "próximo" se estiver a menos de 100m

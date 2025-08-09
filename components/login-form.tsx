@@ -61,9 +61,6 @@ export function LoginForm() {
     <div className=" flex items-center justify-center from-slate-900 via-blue-900 to-slate-900 p-4">
       <Card className="w-full max-w-md bg-white/10 backdrop-blur-md border-white/20">
         <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center">
-            <NoahLogo className="h-12 w-auto" />
-          </div>
           <div>
             <CardTitle className="text-2xl font-bold text-white">Welcome back</CardTitle>
             <CardDescription className="text-gray-300">Sign in to your account to continue</CardDescription>

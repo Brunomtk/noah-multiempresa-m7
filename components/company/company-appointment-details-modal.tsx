@@ -1,161 +1,280 @@
 "use client"
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Edit, MapPin, Trash2, User, Users } from "lucide-react"
-import { format } from "date-fns"
 import { Separator } from "@/components/ui/separator"
+import { Calendar, Clock, MapPin, User, Phone, Mail, FileText, Edit, Trash2 } from "lucide-react"
+import { format, isValid } from "date-fns"
+import type { Appointment } from "@/types/appointment"
 
 interface CompanyAppointmentDetailsModalProps {
+  appointment: Appointment | null
   isOpen: boolean
   onClose: () => void
-  appointment: any
-  onEdit: (appointment: any) => void
-  onDelete: (appointment: any) => void
+  onEdit: (appointment: Appointment) => void
+  onDelete: (appointment: Appointment) => void
+}
+
+const getStatusColor = (status: number) => {
+  switch (status) {
+    case 0:
+      return "bg-blue-100 text-blue-800"
+    case 1:
+      return "bg-yellow-100 text-yellow-800"
+    case 2:
+      return "bg-green-100 text-green-800"
+    case 3:
+      return "bg-red-100 text-red-800"
+    default:
+      return "bg-gray-100 text-gray-800"
+  }
+}
+
+const getStatusText = (status: number) => {
+  switch (status) {
+    case 0:
+      return "Scheduled"
+    case 1:
+      return "In Progress"
+    case 2:
+      return "Completed"
+    case 3:
+      return "Cancelled"
+    default:
+      return "Unknown"
+  }
+}
+
+const getTypeText = (type: number) => {
+  switch (type) {
+    case 0:
+      return "Regular Cleaning"
+    case 1:
+      return "Deep Cleaning"
+    case 2:
+      return "Move-in/Move-out"
+    default:
+      return "Other"
+  }
+}
+
+const getPriorityText = (priority: number) => {
+  switch (priority) {
+    case 0:
+      return "Low"
+    case 1:
+      return "Medium"
+    case 2:
+      return "High"
+    case 3:
+      return "Urgent"
+    default:
+      return "Normal"
+  }
+}
+
+const getPriorityColor = (priority: number) => {
+  switch (priority) {
+    case 0:
+      return "bg-gray-100 text-gray-800"
+    case 1:
+      return "bg-blue-100 text-blue-800"
+    case 2:
+      return "bg-orange-100 text-orange-800"
+    case 3:
+      return "bg-red-100 text-red-800"
+    default:
+      return "bg-gray-100 text-gray-800"
+  }
 }
 
 export function CompanyAppointmentDetailsModal({
+  appointment,
   isOpen,
   onClose,
-  appointment,
   onEdit,
   onDelete,
 }: CompanyAppointmentDetailsModalProps) {
   if (!appointment) return null
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "scheduled":
-        return { label: "Scheduled", className: "border-blue-500 text-blue-500" }
-      case "in_progress":
-        return { label: "In Progress", className: "border-yellow-500 text-yellow-500" }
-      case "completed":
-        return { label: "Completed", className: "border-green-500 text-green-500" }
-      case "cancelled":
-        return { label: "Cancelled", className: "border-red-500 text-red-500" }
-      default:
-        return { label: status, className: "border-gray-500 text-gray-500" }
-    }
-  }
-
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case "regular":
-        return { label: "Regular Cleaning", className: "border-blue-400 text-blue-400" }
-      case "deep":
-        return { label: "Deep Cleaning", className: "border-purple-400 text-purple-400" }
-      case "specialized":
-        return { label: "Specialized Service", className: "border-orange-400 text-orange-400" }
-      default:
-        return { label: type, className: "border-gray-400 text-gray-400" }
-    }
-  }
-
-  // Calculate duration in hours and minutes
-  const durationMs = appointment.end - appointment.start
-  const durationHours = Math.floor(durationMs / (1000 * 60 * 60))
-  const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60))
-  const durationText =
-    durationHours > 0
-      ? `${durationHours} hour${durationHours !== 1 ? "s" : ""}${durationMinutes > 0 ? ` ${durationMinutes} min` : ""}`
-      : `${durationMinutes} minutes`
+  const startDate = new Date(appointment.start)
+  const endDate = new Date(appointment.end)
+  const isValidStartDate = isValid(startDate)
+  const isValidEndDate = isValid(endDate)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-[#1a2234] border-[#2a3349] text-white">
+      <DialogContent className="max-w-2xl bg-[#1a2234] border-[#2a3349] text-white">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-[#06b6d4]" />
-            Appointment Details
-          </DialogTitle>
-          <DialogDescription className="text-gray-400">Complete information about the appointment</DialogDescription>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-semibold text-white">
+              {appointment.title || "Appointment Details"}
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Badge className={getStatusColor(appointment.status)}>{getStatusText(appointment.status)}</Badge>
+              <Badge variant="outline" className={getPriorityColor(appointment.priority || 0)}>
+                {getPriorityText(appointment.priority || 0)}
+              </Badge>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">{appointment.title}</h3>
-            <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
-              {getStatusBadge(appointment.status).label}
-            </Badge>
-          </div>
-
-          <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-            <div className="flex items-center gap-2 text-gray-400 mb-2">
-              <Clock className="h-4 w-4" />
-              <span className="text-sm">Date & Time</span>
-            </div>
-            <p className="font-medium">{format(new Date(appointment.start), "EEEE, MMMM d, yyyy")}</p>
-            <p className="text-gray-400">
-              {format(new Date(appointment.start), "h:mm a")} - {format(new Date(appointment.end), "h:mm a")}
-            </p>
-          </div>
-
+        <div className="space-y-6">
+          {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <User className="h-4 w-4" />
-                <span className="text-sm">Customer</span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-gray-300">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm font-medium">Date & Time</span>
               </div>
-              <p className="font-medium">{appointment.customer}</p>
+              <div className="pl-6 space-y-1">
+                <p className="text-white">
+                  {isValidStartDate ? format(startDate, "EEEE, MMMM d, yyyy") : "Invalid date"}
+                </p>
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Clock className="h-3 w-3" />
+                  <span className="text-sm">
+                    {isValidStartDate && isValidEndDate
+                      ? `${format(startDate, "h:mm a")} - ${format(endDate, "h:mm a")}`
+                      : "Invalid time"}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <Users className="h-4 w-4" />
-                <span className="text-sm">Assigned Team</span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-gray-300">
+                <FileText className="h-4 w-4" />
+                <span className="text-sm font-medium">Service Type</span>
               </div>
-              <p className="font-medium">{appointment.team}</p>
+              <div className="pl-6">
+                <p className="text-white">{getTypeText(appointment.type)}</p>
+              </div>
             </div>
           </div>
-
-          <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-            <div className="flex items-center gap-2 text-gray-400 mb-2">
-              <MapPin className="h-4 w-4" />
-              <span className="text-sm">Service Address</span>
-            </div>
-            <p className="font-medium">{appointment.address}</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className={getTypeBadge(appointment.type).className}>
-              {getTypeBadge(appointment.type).label}
-            </Badge>
-            <span className="text-sm text-gray-400">Duration: {durationText}</span>
-          </div>
-
-          {appointment.notes && (
-            <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <span className="text-sm">Notes</span>
-              </div>
-              <p className="text-gray-400">{appointment.notes}</p>
-            </div>
-          )}
 
           <Separator className="bg-[#2a3349]" />
 
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => onEdit(appointment)}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                onDelete(appointment)
-                onClose()
-              }}
-              className="border-[#2a3349] text-red-500 hover:bg-[#2a3349] hover:text-red-400"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
+          {/* Customer Information */}
+          {appointment.customer && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-gray-300">
+                <User className="h-4 w-4" />
+                <span className="text-sm font-medium">Customer Information</span>
+              </div>
+              <div className="pl-6 space-y-2">
+                <p className="text-white font-medium">{appointment.customer.name}</p>
+                {appointment.customer.email && (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Mail className="h-3 w-3" />
+                    <span className="text-sm">{appointment.customer.email}</span>
+                  </div>
+                )}
+                {appointment.customer.phone && (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Phone className="h-3 w-3" />
+                    <span className="text-sm">{appointment.customer.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Location */}
+          {appointment.address && (
+            <>
+              <Separator className="bg-[#2a3349]" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-gray-300">
+                  <MapPin className="h-4 w-4" />
+                  <span className="text-sm font-medium">Location</span>
+                </div>
+                <div className="pl-6">
+                  <p className="text-white">{appointment.address}</p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Description */}
+          {appointment.notes && (
+            <>
+              <Separator className="bg-[#2a3349]" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-gray-300">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-sm font-medium">Notes</span>
+                </div>
+                <div className="pl-6">
+                  <p className="text-gray-300 text-sm leading-relaxed">{appointment.notes}</p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Professional Assignment */}
+          {appointment.professional && (
+            <>
+              <Separator className="bg-[#2a3349]" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-gray-300">
+                  <User className="h-4 w-4" />
+                  <span className="text-sm font-medium">Assigned Professional</span>
+                </div>
+                <div className="pl-6">
+                  <p className="text-white font-medium">{appointment.professional.name}</p>
+                  {appointment.professional.email && (
+                    <div className="flex items-center gap-2 text-gray-400 mt-1">
+                      <Mail className="h-3 w-3" />
+                      <span className="text-sm">{appointment.professional.email}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Additional Details */}
+          <Separator className="bg-[#2a3349]" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-400">Created:</span>
+              <p className="text-white">
+                {appointment.createdAt && isValid(new Date(appointment.createdAt))
+                  ? format(new Date(appointment.createdAt), "MMM d, yyyy 'at' h:mm a")
+                  : "N/A"}
+              </p>
+            </div>
+            <div>
+              <span className="text-gray-400">Last Updated:</span>
+              <p className="text-white">
+                {appointment.updatedAt && isValid(new Date(appointment.updatedAt))
+                  ? format(new Date(appointment.updatedAt), "MMM d, yyyy 'at' h:mm a")
+                  : "N/A"}
+              </p>
+            </div>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-[#2a3349]">
+          <Button
+            variant="outline"
+            onClick={() => onEdit(appointment)}
+            className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onDelete(appointment)}
+            className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

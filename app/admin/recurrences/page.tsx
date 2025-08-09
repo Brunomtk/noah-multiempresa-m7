@@ -22,136 +22,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRecurrences } from "@/hooks/use-recurrences"
-
-// Sample data
-const initialRecurrences = [
-  {
-    id: 1,
-    title: "Weekly Office Cleaning",
-    customer: "Tech Solutions Ltd",
-    address: "123 Main St, Suite 500",
-    team: "Team Alpha",
-    frequency: "weekly",
-    day: "Monday",
-    time: "09:00",
-    duration: 120,
-    status: "active",
-    type: "regular",
-    startDate: "2025-01-15",
-    endDate: "2025-12-31",
-    notes: "Focus on kitchen and meeting rooms",
-    lastExecution: "2025-05-20",
-    nextExecution: "2025-05-27",
-  },
-  {
-    id: 2,
-    title: "Bi-weekly Deep Cleaning",
-    customer: "ABC Consulting",
-    address: "456 Oak Ave, Floor 3",
-    team: "Team Beta",
-    frequency: "biweekly",
-    day: "Wednesday",
-    time: "14:00",
-    duration: 240,
-    status: "active",
-    type: "deep",
-    startDate: "2025-02-05",
-    endDate: "2025-12-31",
-    notes: "Include carpet cleaning",
-    lastExecution: "2025-05-15",
-    nextExecution: "2025-05-29",
-  },
-  {
-    id: 3,
-    title: "Monthly Window Cleaning",
-    customer: "XYZ Commerce",
-    address: "789 Pine St",
-    team: "Team Gamma",
-    frequency: "monthly",
-    day: "First Friday",
-    time: "10:00",
-    duration: 180,
-    status: "active",
-    type: "specialized",
-    startDate: "2025-01-03",
-    endDate: "2025-12-31",
-    notes: "External windows on floors 1-3",
-    lastExecution: "2025-05-03",
-    nextExecution: "2025-06-07",
-  },
-  {
-    id: 4,
-    title: "Daily Morning Cleaning",
-    customer: "Delta Industries",
-    address: "101 Maple Dr, Building B",
-    team: "Team Alpha",
-    frequency: "daily",
-    day: "Every weekday",
-    time: "06:00",
-    duration: 90,
-    status: "active",
-    type: "regular",
-    startDate: "2025-03-01",
-    endDate: "2025-12-31",
-    notes: "Before office hours",
-    lastExecution: "2025-05-24",
-    nextExecution: "2025-05-27",
-  },
-  {
-    id: 5,
-    title: "Quarterly Deep Cleaning",
-    customer: "Omega Services",
-    address: "202 Elm St, Suite 100",
-    team: "Team Beta",
-    frequency: "quarterly",
-    day: "First Monday of quarter",
-    time: "08:00",
-    duration: 480,
-    status: "paused",
-    type: "deep",
-    startDate: "2025-01-06",
-    endDate: "2025-12-31",
-    notes: "Full day deep cleaning",
-    lastExecution: "2025-04-07",
-    nextExecution: "2025-07-07",
-  },
-  {
-    id: 6,
-    title: "Weekly Carpet Cleaning",
-    customer: "Global Tech",
-    address: "303 Cedar Rd",
-    team: "Team Gamma",
-    frequency: "weekly",
-    day: "Friday",
-    time: "16:00",
-    duration: 120,
-    status: "active",
-    type: "specialized",
-    startDate: "2025-02-07",
-    endDate: "2025-12-31",
-    notes: "Focus on high-traffic areas",
-    lastExecution: "2025-05-23",
-    nextExecution: "2025-05-30",
-  },
-  {
-    id: 7,
-    title: "Monthly HVAC Cleaning",
-    customer: "Innovate Inc",
-    address: "404 Birch Blvd, Floor 5",
-    team: "Team Alpha",
-    frequency: "monthly",
-    day: "Last Saturday",
-    time: "09:00",
-    duration: 360,
-    status: "completed",
-    type: "specialized",
-    startDate: "2025-01-25",
-    endDate: "2025-05-31",
-    notes: "HVAC system maintenance and cleaning",
-    lastExecution: "2025-05-25",
-    nextExecution: null,
-  },
-]
+import type { Recurrence } from "@/types/recurrence"
 
 export default function RecurrencesPage() {
   const {
@@ -159,105 +30,125 @@ export default function RecurrencesPage() {
     loading,
     selectedRecurrence,
     filters,
+    pagination,
+    companies,
+    customers,
+    teams,
+    loadingDropdowns,
     handleSearch,
     handleStatusFilter,
     handleTypeFilter,
+    handleCompanyFilter,
     addRecurrence,
     editRecurrence,
     removeRecurrence,
     selectRecurrence,
+    setPage,
   } = useRecurrences()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [recurrenceToDelete, setRecurrenceToDelete] = useState<any>(null)
+  const [recurrenceToDelete, setRecurrenceToDelete] = useState<Recurrence | null>(null)
   const { toast } = useToast()
 
-  const handleAddRecurrence = (data: any) => {
-    addRecurrence({
-      ...data,
-      customerId: data.customer, // Map the form field to the API field
-      companyId: "comp_1", // Use the current company ID from context in a real app
-    })
-    setIsModalOpen(false)
-    toast({
-      title: "Recurrence added successfully",
-      description: `${data.title} for ${data.customer} has been scheduled.`,
-    })
-  }
-
-  const handleEditRecurrence = (data: any) => {
-    if (selectedRecurrence) {
-      editRecurrence(selectedRecurrence.id, {
-        ...data,
-        customerId: data.customer, // Map the form field to the API field
-      })
+  const handleAddRecurrence = async (data: any) => {
+    try {
+      await addRecurrence(data)
       setIsModalOpen(false)
       toast({
-        title: "Recurrence updated successfully",
-        description: `${data.title} for ${data.customer} has been updated.`,
+        title: "Recurrence added successfully",
+        description: `${data.title} has been scheduled.`,
       })
+    } catch (error) {
+      console.error("Failed to add recurrence:", error)
     }
   }
 
-  const handleDeleteRecurrence = () => {
+  const handleEditRecurrence = async (data: any) => {
+    if (selectedRecurrence) {
+      try {
+        await editRecurrence(selectedRecurrence.id, data)
+        setIsModalOpen(false)
+        toast({
+          title: "Recurrence updated successfully",
+          description: `${data.title} has been updated.`,
+        })
+      } catch (error) {
+        console.error("Failed to edit recurrence:", error)
+      }
+    }
+  }
+
+  const handleDeleteRecurrence = async () => {
     if (recurrenceToDelete) {
-      removeRecurrence(recurrenceToDelete.id)
-      setRecurrenceToDelete(null)
+      try {
+        await removeRecurrence(recurrenceToDelete.id)
+        setRecurrenceToDelete(null)
+        toast({
+          title: "Recurrence deleted successfully",
+          description: `${recurrenceToDelete.title} has been deleted.`,
+        })
+      } catch (error) {
+        console.error("Failed to delete recurrence:", error)
+      }
     }
   }
 
-  const handleViewDetails = (recurrence: any) => {
+  const handleViewDetails = (recurrence: Recurrence) => {
     selectRecurrence(recurrence)
     setIsDetailsModalOpen(true)
   }
 
-  const handleEdit = (recurrence: any) => {
+  const handleEdit = (recurrence: Recurrence) => {
     selectRecurrence(recurrence)
     setIsModalOpen(true)
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: number) => {
     switch (status) {
-      case "active":
+      case 1:
         return { label: "Active", className: "border-green-500 text-green-500" }
-      case "paused":
-        return { label: "Paused", className: "border-yellow-500 text-yellow-500" }
-      case "completed":
-        return { label: "Completed", className: "border-blue-500 text-blue-500" }
+      case 0:
+        return { label: "Inactive", className: "border-red-500 text-red-500" }
       default:
-        return { label: status, className: "border-gray-500 text-gray-500" }
+        return { label: "Unknown", className: "border-gray-500 text-gray-500" }
     }
   }
 
-  const getTypeBadge = (type: string) => {
+  const getTypeBadge = (type: number) => {
     switch (type) {
-      case "regular":
+      case 1:
         return { label: "Regular", className: "border-blue-400 text-blue-400" }
-      case "deep":
+      case 2:
         return { label: "Deep", className: "border-purple-400 text-purple-400" }
-      case "specialized":
+      case 3:
         return { label: "Specialized", className: "border-orange-400 text-orange-400" }
       default:
-        return { label: type, className: "border-gray-400 text-gray-400" }
+        return { label: "Unknown", className: "border-gray-400 text-gray-400" }
     }
   }
 
-  const getFrequencyLabel = (frequency: string) => {
+  const getFrequencyLabel = (frequency: number) => {
     switch (frequency) {
-      case "daily":
-        return "Daily"
-      case "weekly":
+      case 1:
         return "Weekly"
-      case "biweekly":
+      case 2:
         return "Bi-weekly"
-      case "monthly":
+      case 3:
         return "Monthly"
-      case "quarterly":
-        return "Quarterly"
       default:
-        return frequency
+        return "Unknown"
     }
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const formatTime = (timeString: string) => {
+    if (!timeString) return "N/A"
+    return timeString.substring(0, 5) // HH:MM format
   }
 
   return (
@@ -266,7 +157,7 @@ export default function RecurrencesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white mb-1">Recurrence Management</h1>
-            <p className="text-gray-400">Manage all recurring cleaning services.</p>
+            <p className="text-gray-400">Manage all recurring services.</p>
           </div>
           <Button
             className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
@@ -303,11 +194,8 @@ export default function RecurrencesPage() {
                 <SelectItem value="active" className="hover:bg-[#2a3349]">
                   Active
                 </SelectItem>
-                <SelectItem value="paused" className="hover:bg-[#2a3349]">
-                  Paused
-                </SelectItem>
-                <SelectItem value="completed" className="hover:bg-[#2a3349]">
-                  Completed
+                <SelectItem value="inactive" className="hover:bg-[#2a3349]">
+                  Inactive
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -345,6 +233,7 @@ export default function RecurrencesPage() {
                 <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
                   <TableHead className="text-white">Service</TableHead>
                   <TableHead className="text-white">Customer</TableHead>
+                  <TableHead className="text-white">Company</TableHead>
                   <TableHead className="text-white">Frequency</TableHead>
                   <TableHead className="text-white">Next Execution</TableHead>
                   <TableHead className="text-white">Team</TableHead>
@@ -364,24 +253,28 @@ export default function RecurrencesPage() {
                         {recurrence.title}
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-400">{recurrence.customer}</TableCell>
+                    <TableCell className="text-gray-400">{recurrence.customer?.name || "N/A"}</TableCell>
+                    <TableCell className="text-gray-400">{recurrence.company?.name || "N/A"}</TableCell>
                     <TableCell className="text-gray-400">
                       <div className="flex flex-col">
                         <span>{getFrequencyLabel(recurrence.frequency)}</span>
-                        <span className="text-xs">{recurrence.day}</span>
+                        <span className="text-xs">Day {recurrence.day}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-400">
                       {recurrence.nextExecution ? (
                         <div className="flex flex-col">
-                          <span>{recurrence.nextExecution}</span>
-                          <span className="text-xs">{recurrence.time}</span>
+                          <span>{formatDate(recurrence.nextExecution)}</span>
+                          <span className="text-xs">{formatTime(recurrence.time)}</span>
                         </div>
                       ) : (
-                        <span className="text-gray-500">Completed</span>
+                        <div className="flex flex-col">
+                          <span>{formatDate(recurrence.startDate)}</span>
+                          <span className="text-xs">{formatTime(recurrence.time)}</span>
+                        </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-gray-400">{recurrence.team}</TableCell>
+                    <TableCell className="text-gray-400">{recurrence.team?.name || "N/A"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={getTypeBadge(recurrence.type).className}>
                         {getTypeBadge(recurrence.type).label}
@@ -452,34 +345,49 @@ export default function RecurrencesPage() {
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-400">
-            Showing <span className="font-medium text-white">{recurrences.length}</span> of{" "}
-            <span className="font-medium text-white">{recurrences.length}</span> recurrences
+            Showing{" "}
+            <span className="font-medium text-white">
+              {pagination.totalItems > 0 ? (pagination.currentPage - 1) * pagination.pageSize + 1 : 0}
+            </span>{" "}
+            to{" "}
+            <span className="font-medium text-white">
+              {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)}
+            </span>{" "}
+            of <span className="font-medium text-white">{pagination.totalItems}</span> recurrences
           </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setPage(pagination.currentPage - 1)}
+              disabled={pagination.currentPage <= 1}
               className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
             >
               Previous
             </Button>
+
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              const pageNum = i + 1
+              return (
+                <Button
+                  key={pageNum}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(pageNum)}
+                  className={`border-[#2a3349] hover:bg-[#2a3349] hover:text-white ${
+                    pagination.currentPage === pageNum ? "bg-[#2a3349] text-white" : "text-white"
+                  }`}
+                >
+                  {pageNum}
+                </Button>
+              )
+            })}
+
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] bg-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              1
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              2
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+              onClick={() => setPage(pagination.currentPage + 1)}
+              disabled={pagination.currentPage >= pagination.totalPages}
               className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
             >
               Next
@@ -514,9 +422,7 @@ export default function RecurrencesPage() {
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription className="text-gray-400">
                 This action cannot be undone. This will permanently delete the recurring service
-                <span className="font-semibold text-white block mt-1">
-                  {recurrenceToDelete?.title} for {recurrenceToDelete?.customer}
-                </span>
+                <span className="font-semibold text-white block mt-1">{recurrenceToDelete?.title}</span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

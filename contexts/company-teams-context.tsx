@@ -2,20 +2,10 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react"
-import type { Team, Professional } from "@/types"
-import {
-  getCompanyTeams,
-  getCompanyTeamById,
-  createCompanyTeam,
-  updateCompanyTeam,
-  deleteCompanyTeam,
-  getCompanyTeamMembers,
-  getCompanyTeamPerformance,
-  getCompanyTeamUpcomingServices,
-  getCompanyAvailableProfessionals,
-  getCompanyTeamStats,
-} from "@/lib/api/company-teams"
+import type { Team, CreateTeamRequest, UpdateTeamRequest } from "@/types"
+import { getTeams, getTeamById, createTeam, updateTeam, deleteTeam } from "@/lib/api/teams"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CompanyTeamsContextType {
   teams: Team[]
@@ -29,40 +19,13 @@ interface CompanyTeamsContextType {
   }
   statusFilter: string
   searchQuery: string
-  companyId: string | null
-  stats: {
-    totalTeams: number
-    activeTeams: number
-    inactiveTeams: number
-    totalMembers: number
-    averageRating: number
-    totalCompletedServices: number
-  } | null
   fetchTeams: (page?: number, status?: string, search?: string) => Promise<void>
   getTeam: (id: string) => Promise<Team | null>
-  addTeam: (team: Partial<Team>) => Promise<Team | null>
-  editTeam: (id: string, team: Partial<Team>) => Promise<Team | null>
+  addTeam: (team: CreateTeamRequest) => Promise<Team | null>
+  editTeam: (id: string, team: UpdateTeamRequest) => Promise<Team | null>
   removeTeam: (id: string) => Promise<boolean>
-  getMembers: (teamId: string) => Promise<Professional[]>
-  getPerformance: (teamId: string) => Promise<{
-    onTimeCompletion: number
-    customerSatisfaction: number
-    qualityScore: number
-    efficiency: number
-  } | null>
-  getUpcomingServices: (teamId: string) => Promise<Array<{
-    id: string
-    date: string
-    time: string
-    customer: string
-    address: string
-    type: string
-  }> | null>
-  getAvailableProfessionals: () => Promise<Professional[]>
-  fetchStats: () => Promise<void>
   setStatusFilter: (status: string) => void
   setSearchQuery: (query: string) => void
-  setCompanyId: (id: string) => void
 }
 
 const CompanyTeamsContext = createContext<CompanyTeamsContextType | undefined>(undefined)
@@ -73,15 +36,6 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
-  const [companyId, setCompanyId] = useState<string | null>(null)
-  const [stats, setStats] = useState<{
-    totalTeams: number
-    activeTeams: number
-    inactiveTeams: number
-    totalMembers: number
-    averageRating: number
-    totalCompletedServices: number
-  } | null>(null)
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -89,21 +43,22 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
     itemsPerPage: 10,
   })
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const fetchTeams = useCallback(
     async (page = 1, status = statusFilter, search = searchQuery) => {
-      if (!companyId) return
+      if (!user?.companyId) return
 
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await getCompanyTeams(companyId, page, pagination.itemsPerPage, status, search)
+        const response = await getTeams(page, pagination.itemsPerPage, status, search)
 
         if (response.error) {
           setError(response.error)
           toast({
-            title: "Error",
+            title: "Erro",
             description: response.error,
             variant: "destructive",
           })
@@ -111,14 +66,19 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
         }
 
         if (response.data) {
-          setTeams(response.data.data)
-          setPagination(response.data.meta)
+          // Filter teams by company
+          const companyTeams = response.data.data.filter((team) => team.companyId === user.companyId)
+          setTeams(companyTeams)
+          setPagination({
+            ...response.data.meta,
+            totalItems: companyTeams.length,
+          })
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch teams"
+        const errorMessage = err instanceof Error ? err.message : "Falha ao buscar equipes"
         setError(errorMessage)
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
@@ -126,36 +86,21 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
         setIsLoading(false)
       }
     },
-    [companyId, statusFilter, searchQuery, pagination.itemsPerPage, toast],
+    [statusFilter, searchQuery, pagination.itemsPerPage, toast, user?.companyId],
   )
-
-  const fetchStats = useCallback(async () => {
-    if (!companyId) return
-
-    try {
-      const response = await getCompanyTeamStats(companyId)
-      if (response.data) {
-        setStats(response.data)
-      }
-    } catch (err) {
-      console.error("Failed to fetch team stats:", err)
-    }
-  }, [companyId])
 
   const getTeam = useCallback(
     async (id: string): Promise<Team | null> => {
-      if (!companyId) return null
-
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await getCompanyTeamById(companyId, id)
+        const response = await getTeamById(id)
 
         if (response.error) {
           setError(response.error)
           toast({
-            title: "Error",
+            title: "Erro",
             description: response.error,
             variant: "destructive",
           })
@@ -164,10 +109,10 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
 
         return response.data || null
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch team"
+        const errorMessage = err instanceof Error ? err.message : "Falha ao buscar equipe"
         setError(errorMessage)
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
@@ -176,23 +121,28 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
         setIsLoading(false)
       }
     },
-    [companyId, toast],
+    [toast],
   )
 
   const addTeam = useCallback(
-    async (team: Partial<Team>): Promise<Team | null> => {
-      if (!companyId) return null
+    async (teamData: CreateTeamRequest): Promise<Team | null> => {
+      if (!user?.companyId) return null
 
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await createCompanyTeam(companyId, team)
+        const teamWithCompany = {
+          ...teamData,
+          companyId: user.companyId,
+        }
+
+        const response = await createTeam(teamWithCompany)
 
         if (response.error) {
           setError(response.error)
           toast({
-            title: "Error",
+            title: "Erro",
             description: response.error,
             variant: "destructive",
           })
@@ -201,21 +151,20 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
 
         if (response.data) {
           toast({
-            title: "Success",
-            description: response.message || "Team created successfully",
+            title: "Sucesso",
+            description: response.message || "Equipe criada com sucesso",
           })
-          // Refresh teams list and stats
+          // Refresh teams list
           fetchTeams()
-          fetchStats()
           return response.data
         }
 
         return null
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to create team"
+        const errorMessage = err instanceof Error ? err.message : "Falha ao criar equipe"
         setError(errorMessage)
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
@@ -224,23 +173,28 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
         setIsLoading(false)
       }
     },
-    [companyId, fetchTeams, fetchStats, toast],
+    [fetchTeams, toast, user?.companyId],
   )
 
   const editTeam = useCallback(
-    async (id: string, team: Partial<Team>): Promise<Team | null> => {
-      if (!companyId) return null
+    async (id: string, teamData: UpdateTeamRequest): Promise<Team | null> => {
+      if (!user?.companyId) return null
 
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await updateCompanyTeam(companyId, id, team)
+        const teamWithCompany = {
+          ...teamData,
+          companyId: user.companyId,
+        }
+
+        const response = await updateTeam(id, teamWithCompany)
 
         if (response.error) {
           setError(response.error)
           toast({
-            title: "Error",
+            title: "Erro",
             description: response.error,
             variant: "destructive",
           })
@@ -249,21 +203,20 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
 
         if (response.data) {
           toast({
-            title: "Success",
-            description: response.message || "Team updated successfully",
+            title: "Sucesso",
+            description: response.message || "Equipe atualizada com sucesso",
           })
-          // Refresh teams list and stats
+          // Refresh teams list
           fetchTeams()
-          fetchStats()
           return response.data
         }
 
         return null
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to update team"
+        const errorMessage = err instanceof Error ? err.message : "Falha ao atualizar equipe"
         setError(errorMessage)
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
@@ -272,23 +225,21 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
         setIsLoading(false)
       }
     },
-    [companyId, fetchTeams, fetchStats, toast],
+    [fetchTeams, toast, user?.companyId],
   )
 
   const removeTeam = useCallback(
     async (id: string): Promise<boolean> => {
-      if (!companyId) return false
-
       setIsLoading(true)
       setError(null)
 
       try {
-        const response = await deleteCompanyTeam(companyId, id)
+        const response = await deleteTeam(id)
 
         if (response.error) {
           setError(response.error)
           toast({
-            title: "Error",
+            title: "Erro",
             description: response.error,
             variant: "destructive",
           })
@@ -296,18 +247,17 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
         }
 
         toast({
-          title: "Success",
-          description: response.message || "Team deleted successfully",
+          title: "Sucesso",
+          description: response.message || "Equipe excluída com sucesso",
         })
-        // Refresh teams list and stats
+        // Refresh teams list
         fetchTeams()
-        fetchStats()
         return true
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to delete team"
+        const errorMessage = err instanceof Error ? err.message : "Falha ao excluir equipe"
         setError(errorMessage)
         toast({
-          title: "Error",
+          title: "Erro",
           description: errorMessage,
           variant: "destructive",
         })
@@ -316,156 +266,22 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
         setIsLoading(false)
       }
     },
-    [companyId, fetchTeams, fetchStats, toast],
+    [fetchTeams, toast],
   )
 
-  const getMembers = useCallback(
-    async (teamId: string): Promise<Professional[]> => {
-      if (!companyId) return []
-
-      try {
-        const response = await getCompanyTeamMembers(companyId, teamId)
-
-        if (response.error) {
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return []
-        }
-
-        return response.data || []
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch team members"
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-        return []
-      }
-    },
-    [companyId, toast],
-  )
-
-  const getPerformance = useCallback(
-    async (
-      teamId: string,
-    ): Promise<{
-      onTimeCompletion: number
-      customerSatisfaction: number
-      qualityScore: number
-      efficiency: number
-    } | null> => {
-      if (!companyId) return null
-
-      try {
-        const response = await getCompanyTeamPerformance(companyId, teamId)
-
-        if (response.error) {
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return null
-        }
-
-        return response.data || null
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch team performance"
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-        return null
-      }
-    },
-    [companyId, toast],
-  )
-
-  const getUpcomingServices = useCallback(
-    async (
-      teamId: string,
-    ): Promise<Array<{
-      id: string
-      date: string
-      time: string
-      customer: string
-      address: string
-      type: string
-    }> | null> => {
-      if (!companyId) return null
-
-      try {
-        const response = await getCompanyTeamUpcomingServices(companyId, teamId)
-
-        if (response.error) {
-          toast({
-            title: "Error",
-            description: response.error,
-            variant: "destructive",
-          })
-          return null
-        }
-
-        return response.data || null
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch upcoming services"
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-        return null
-      }
-    },
-    [companyId, toast],
-  )
-
-  const getAvailableProfessionals = useCallback(async (): Promise<Professional[]> => {
-    if (!companyId) return []
-
-    try {
-      const response = await getCompanyAvailableProfessionals(companyId)
-
-      if (response.error) {
-        toast({
-          title: "Error",
-          description: response.error,
-          variant: "destructive",
-        })
-        return []
-      }
-
-      return response.data || []
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch available professionals"
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return []
-    }
-  }, [companyId, toast])
-
-  // Fetch teams and stats when companyId changes
+  // Initial fetch
   useEffect(() => {
-    if (companyId) {
+    if (user?.companyId) {
       fetchTeams()
-      fetchStats()
     }
-  }, [companyId, fetchTeams, fetchStats])
+  }, [fetchTeams, user?.companyId])
 
   // Update when filters change
   useEffect(() => {
-    if (companyId) {
+    if (user?.companyId) {
       fetchTeams(1, statusFilter, searchQuery)
     }
-  }, [statusFilter, searchQuery, companyId, fetchTeams])
+  }, [statusFilter, searchQuery, fetchTeams, user?.companyId])
 
   const value = useMemo(
     () => ({
@@ -475,21 +291,13 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
       pagination,
       statusFilter,
       searchQuery,
-      companyId,
-      stats,
       fetchTeams,
       getTeam,
       addTeam,
       editTeam,
       removeTeam,
-      getMembers,
-      getPerformance,
-      getUpcomingServices,
-      getAvailableProfessionals,
-      fetchStats,
       setStatusFilter,
       setSearchQuery,
-      setCompanyId,
     }),
     [
       teams,
@@ -498,18 +306,11 @@ export function CompanyTeamsProvider({ children }: { children: React.ReactNode }
       pagination,
       statusFilter,
       searchQuery,
-      companyId,
-      stats,
       fetchTeams,
       getTeam,
       addTeam,
       editTeam,
       removeTeam,
-      getMembers,
-      getPerformance,
-      getUpcomingServices,
-      getAvailableProfessionals,
-      fetchStats,
     ],
   )
 

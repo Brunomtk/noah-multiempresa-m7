@@ -1,628 +1,488 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import {
   Calendar,
-  Clock,
   User,
   Building2,
-  AlertCircle,
   DollarSign,
+  AlertCircle,
   CheckCircle,
   XCircle,
-  AlertTriangle,
   Mail,
-  Phone,
-  FileText,
   MessageSquare,
+  FileText,
+  History,
+  Send,
 } from "lucide-react"
-import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useCancellations } from "@/hooks/use-cancellations"
+import type { Cancellation } from "@/types/cancellation"
+import type { RefundStatus, CancelledByRole } from "@/types/cancellation"
 
 interface CancellationDetailsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  cancellation: any
+  cancellation: Cancellation | null
 }
 
 export function CancellationDetailsModal({ open, onOpenChange, cancellation }: CancellationDetailsModalProps) {
   const [activeTab, setActiveTab] = useState("overview")
-  const { toast } = useToast()
+  const [message, setMessage] = useState("")
+  const [sendingMessage, setSendingMessage] = useState(false)
+
+  const {
+    formatDate,
+    getRefundStatusColor,
+    getRefundStatusLabel,
+    getCancelledByRoleLabel,
+    getCancelledByRoleColor,
+    canProcessRefund,
+    processRefund,
+    RefundStatus: RefundStatusEnum,
+    CancelledByRole: CancelledByRoleEnum,
+  } = useCancellations()
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab("overview")
+      setMessage("")
+    }
+  }, [open])
 
   if (!cancellation) return null
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "approved":
-        return (
-          <Badge variant="outline" className="border-green-500 text-green-500 flex items-center gap-1">
-            <CheckCircle className="h-3 w-3" />
-            Aprovado
-          </Badge>
-        )
-      case "pending":
-        return (
-          <Badge variant="outline" className="border-yellow-500 text-yellow-500 flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            Pendente
-          </Badge>
-        )
-      case "rejected":
-        return (
-          <Badge variant="outline" className="border-red-500 text-red-500 flex items-center gap-1">
-            <XCircle className="h-3 w-3" />
-            Rejeitado
-          </Badge>
-        )
-      default:
-        return null
+  const handleProcessRefund = async (status: RefundStatus) => {
+    try {
+      await processRefund(cancellation.id, {
+        status: status,
+        notes: status === RefundStatusEnum.Processed ? "Refund approved" : "Refund rejected",
+      })
+    } catch (error) {
+      console.error("Error processing refund:", error)
     }
   }
 
-  const getRefundBadge = (status: string) => {
-    switch (status) {
-      case "processed":
-        return (
-          <Badge variant="outline" className="border-green-500 text-green-500">
-            Processado
-          </Badge>
-        )
-      case "pending":
-        return (
-          <Badge variant="outline" className="border-yellow-500 text-yellow-500">
-            Pendente
-          </Badge>
-        )
-      case "not_applicable":
-        return (
-          <Badge variant="outline" className="border-gray-500 text-gray-500">
-            N/A
-          </Badge>
-        )
-      default:
-        return null
+  const handleSendMessage = async () => {
+    if (!message.trim()) return
+
+    setSendingMessage(true)
+    try {
+      // TODO: Implement message sending API
+      console.log("Sending message:", message)
+      setMessage("")
+    } catch (error) {
+      console.error("Error sending message:", error)
+    } finally {
+      setSendingMessage(false)
     }
   }
 
-  const getCancelledByIcon = (cancelledBy: string) => {
-    switch (cancelledBy) {
-      case "customer":
-        return <User className="h-5 w-5" />
-      case "professional":
-        return <User className="h-5 w-5" />
-      case "company":
-        return <Building2 className="h-5 w-5" />
-      case "system":
-        return <Clock className="h-5 w-5" />
-      default:
-        return null
-    }
+  const getRefundBadge = (status: RefundStatus) => {
+    const colorClass = getRefundStatusColor(status)
+    const label = getRefundStatusLabel(status)
+
+    return (
+      <Badge variant="outline" className={colorClass}>
+        {label}
+      </Badge>
+    )
   }
 
-  const getCancelledByLabel = (cancelledBy: string) => {
-    switch (cancelledBy) {
-      case "customer":
-        return "Cliente"
-      case "professional":
-        return "Profissional"
-      case "company":
-        return "Empresa"
-      case "system":
-        return "Sistema"
-      default:
-        return cancelledBy
-    }
-  }
+  const getCancelledByBadge = (role: CancelledByRole) => {
+    const colorClass = getCancelledByRoleColor(role)
+    const label = getCancelledByRoleLabel(role)
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "approved":
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case "pending":
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />
-      case "rejected":
-        return <XCircle className="h-5 w-5 text-red-500" />
-      default:
-        return null
-    }
-  }
-
-  const handleSendNotification = () => {
-    toast({
-      title: "Notificação enviada",
-      description: `Uma notificação foi enviada para ${cancellation.customer.name}.`,
-    })
-  }
-
-  const handleProcessRefund = () => {
-    toast({
-      title: "Reembolso processado",
-      description: `O reembolso de R$ ${cancellation.refundAmount?.toFixed(2)} foi processado com sucesso.`,
-    })
+    return (
+      <div className={`flex items-center gap-2 px-3 py-1 rounded-md text-sm ${colorClass}`}>
+        {role === CancelledByRoleEnum.Customer && <User className="h-4 w-4" />}
+        {role === CancelledByRoleEnum.Professional && <User className="h-4 w-4" />}
+        {role === CancelledByRoleEnum.Company && <Building2 className="h-4 w-4" />}
+        {role === CancelledByRoleEnum.Admin && <AlertCircle className="h-4 w-4" />}
+        {label}
+      </div>
+    )
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Cancelamento #{cancellation.id} - {cancellation.appointmentId}
-            <div className="ml-2">{getStatusBadge(cancellation.status)}</div>
+          <DialogTitle className="flex items-center gap-3">
+            <span>Cancellation Details #{cancellation.id}</span>
+            {getRefundBadge(cancellation.refundStatus)}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
           <TabsList className="bg-[#0f172a] border border-[#2a3349]">
             <TabsTrigger value="overview" className="data-[state=active]:bg-[#2a3349]">
-              Visão Geral
+              Overview
             </TabsTrigger>
             <TabsTrigger value="details" className="data-[state=active]:bg-[#2a3349]">
-              Detalhes
+              Complete Details
             </TabsTrigger>
             <TabsTrigger value="refund" className="data-[state=active]:bg-[#2a3349]">
-              Reembolso
+              Refund
             </TabsTrigger>
             <TabsTrigger value="actions" className="data-[state=active]:bg-[#2a3349]">
-              Ações
+              Actions
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-4 space-y-6">
-            {/* Status Section */}
-            <div className="flex items-center justify-between p-4 bg-[#0f172a] rounded-lg">
-              <div className="flex items-center gap-3">
-                {getStatusIcon(cancellation.status)}
-                <div>
-                  <p className="text-sm text-gray-400">Status do Cancelamento</p>
-                  <div className="mt-1">{getStatusBadge(cancellation.status)}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-400">Status do Reembolso</p>
-                  <div className="mt-1">{getRefundBadge(cancellation.refundStatus)}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Info Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TabsContent value="overview" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Customer */}
               <Card className="bg-[#0f172a] border-[#2a3349]">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#2a3349] rounded-full">
-                      <User className="h-5 w-5 text-[#06b6d4]" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">Cliente</p>
-                      <p className="font-medium">{cancellation.customer.name}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-[#0f172a] border-[#2a3349]">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#2a3349] rounded-full">
-                      <Calendar className="h-5 w-5 text-[#06b6d4]" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">Data Original</p>
-                      <p className="font-medium">
-                        {new Date(cancellation.originalDate).toLocaleDateString("pt-BR")} às {cancellation.originalTime}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-[#0f172a] border-[#2a3349]">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#2a3349] rounded-full">
-                      <DollarSign className="h-5 w-5 text-[#06b6d4]" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">Valor do Reembolso</p>
-                      <p className="font-medium">
-                        {cancellation.refundAmount ? `R$ ${cancellation.refundAmount.toFixed(2)}` : "Sem reembolso"}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Separator className="bg-[#2a3349]" />
-
-            {/* Cancellation Reason */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Motivo do Cancelamento</h3>
-              <Card className="bg-[#0f172a] border-[#2a3349]">
-                <CardContent className="pt-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="p-1 bg-[#2a3349] rounded">{getCancelledByIcon(cancellation.cancelledBy)}</div>
-                        <p className="text-sm text-gray-400">
-                          Cancelado por: {getCancelledByLabel(cancellation.cancelledBy)}
-                        </p>
-                      </div>
-                      <p className="text-sm">{cancellation.reason}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Timeline */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Histórico</h3>
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <div className="w-3 h-3 bg-[#06b6d4] rounded-full"></div>
-                    <div className="w-0.5 h-16 bg-[#2a3349]"></div>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Agendamento criado</p>
-                    <p className="text-sm text-gray-400">
-                      {new Date(cancellation.originalDate).toLocaleDateString("pt-BR")} - Agendamento confirmado
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5 text-[#06b6d4]" />
+                    Customer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-white font-medium">
+                      {cancellation.customerName || `Customer #${cancellation.customerId}`}
                     </p>
+                    <p className="text-sm text-gray-400">ID: {cancellation.customerId}</p>
                   </div>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <div className="w-0.5 h-16 bg-[#2a3349]"></div>
+                </CardContent>
+              </Card>
+
+              {/* Appointment */}
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-[#06b6d4]" />
+                    Appointment
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-gray-400">Appointment ID</p>
+                    <p className="text-white font-medium">#{cancellation.appointmentId}</p>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Cancelamento solicitado</p>
-                    <p className="text-sm text-gray-400">
-                      {new Date(cancellation.cancelledAt).toLocaleString("pt-BR")} - Por{" "}
-                      {getCancelledByLabel(cancellation.cancelledBy)}
-                    </p>
+                  <div>
+                    <p className="text-sm text-gray-400">Company ID</p>
+                    <p className="text-white">#{cancellation.companyId}</p>
                   </div>
-                </div>
-                {cancellation.status !== "pending" && (
-                  <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`w-3 h-3 rounded-full ${
-                          cancellation.status === "approved" ? "bg-green-500" : "bg-red-500"
-                        }`}
-                      ></div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">
-                        Cancelamento {cancellation.status === "approved" ? "aprovado" : "rejeitado"}
-                      </p>
-                      <p className="text-sm text-gray-400">{new Date().toLocaleString("pt-BR")}</p>
-                    </div>
+                </CardContent>
+              </Card>
+
+              {/* Status */}
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-[#06b6d4]" />
+                    Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-gray-400">Refund Status</p>
+                    {getRefundBadge(cancellation.refundStatus)}
                   </div>
-                )}
-              </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Cancelled At</p>
+                    <p className="text-white">{formatDate(cancellation.cancelledAt)}</p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Action Buttons */}
-            {cancellation.status === "pending" && (
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" className="border-red-500 text-red-500 hover:bg-red-500/10">
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Rejeitar
-                </Button>
-                <Button className="bg-green-500 hover:bg-green-600">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Aprovar
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="details" className="mt-4 space-y-6">
-            {/* Appointment Information */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Informações do Agendamento</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="bg-[#0f172a] border-[#2a3349]">
-                  <CardContent className="pt-4">
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-sm text-gray-400">ID do Agendamento</p>
-                        <p className="font-medium">{cancellation.appointmentId}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-400">Serviço</p>
-                        <p className="font-medium">{cancellation.service}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-400">Valor</p>
-                        <p className="font-medium">R$ {cancellation.price.toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-400">Data e Hora</p>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <p className="font-medium">
-                            {new Date(cancellation.originalDate).toLocaleDateString("pt-BR")} às{" "}
-                            {cancellation.originalTime}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
+            <Card className="bg-[#0f172a] border-[#2a3349]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-[#06b6d4]" />
+                  Cancellation Reason
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-4">
-                  <Card className="bg-[#0f172a] border-[#2a3349]">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <User className="h-5 w-5 text-[#06b6d4]" />
-                        <p className="font-medium">Informações do Cliente</p>
-                      </div>
-                      <div className="space-y-2 pl-8">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <p>{cancellation.customer.name}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <p>{cancellation.customer.email}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-400" />
-                          <p>{cancellation.customer.phone}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-[#0f172a] border-[#2a3349]">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <User className="h-5 w-5 text-[#06b6d4]" />
-                        <p className="font-medium">Informações do Profissional</p>
-                      </div>
-                      <div className="space-y-2 pl-8">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <p>{cancellation.professional.name}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-gray-400" />
-                          <p>{cancellation.professional.specialty}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </div>
-
-            <Separator className="bg-[#2a3349]" />
-
-            {/* Cancellation Details */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Detalhes do Cancelamento</h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-400">Cancelado em</p>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <p className="font-medium">{new Date(cancellation.cancelledAt).toLocaleString("pt-BR")}</p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-400">Cancelled by:</span>
+                    {getCancelledByBadge(cancellation.cancelledByRole)}
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-400">Cancelado por</p>
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 bg-[#2a3349] rounded">{getCancelledByIcon(cancellation.cancelledBy)}</div>
-                      <p className="font-medium">{getCancelledByLabel(cancellation.cancelledBy)}</p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-400">Cancelled by ID:</span>
+                    <span className="text-white">#{cancellation.cancelledById}</span>
                   </div>
-                </div>
-
-                <Card className="bg-[#0f172a] border-[#2a3349]">
-                  <CardContent className="pt-4">
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-400">Motivo do Cancelamento</p>
-                      <div className="p-3 bg-[#1a2234] rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="h-4 w-4 text-gray-400 mt-0.5" />
-                          <p className="text-sm">{cancellation.reason}</p>
-                        </div>
-                      </div>
+                  <Separator className="bg-[#2a3349]" />
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Reason:</p>
+                    <p className="text-white bg-[#1a2234] p-3 rounded-md border border-[#2a3349]">
+                      {cancellation.reason}
+                    </p>
+                  </div>
+                  {cancellation.notes && (
+                    <div>
+                      <p className="text-sm text-gray-400 mb-2">Notes:</p>
+                      <p className="text-white bg-[#1a2234] p-3 rounded-md border border-[#2a3349]">
+                        {cancellation.notes}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-
-                {cancellation.notes && (
-                  <Card className="bg-[#0f172a] border-[#2a3349]">
-                    <CardContent className="pt-4">
-                      <div className="space-y-2">
-                        <p className="text-sm text-gray-400">Observações</p>
-                        <div className="p-3 bg-[#1a2234] rounded-lg">
-                          <div className="flex items-start gap-2">
-                            <MessageSquare className="h-4 w-4 text-gray-400 mt-0.5" />
-                            <p className="text-sm">{cancellation.notes}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="refund" className="mt-4 space-y-6">
-            {/* Refund Information */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Informações de Reembolso</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="bg-[#0f172a] border-[#2a3349]">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <DollarSign className="h-5 w-5 text-gray-400" />
-                        <div>
-                          <p className="text-sm text-gray-400">Valor do Serviço</p>
-                          <p className="text-xl font-semibold">R$ {cancellation.price.toFixed(2)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#0f172a] border-[#2a3349]">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <DollarSign className="h-5 w-5 text-gray-400" />
-                        <div>
-                          <p className="text-sm text-gray-400">Valor do Reembolso</p>
-                          <p className="text-xl font-semibold">
-                            {cancellation.refundAmount ? `R$ ${cancellation.refundAmount.toFixed(2)}` : "Sem reembolso"}
-                          </p>
-                        </div>
-                      </div>
-                      {getRefundBadge(cancellation.refundStatus)}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {cancellation.policyApplied && (
-                <Card className="bg-[#0f172a] border-[#2a3349] mt-4">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start gap-3">
-                      <FileText className="h-5 w-5 text-[#06b6d4] mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium">Política Aplicada</p>
-                        <p className="text-sm text-gray-400 mt-1">{cancellation.policyApplied}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {cancellation.refundStatus === "pending" && cancellation.refundAmount > 0 && (
-                <div className="mt-4">
-                  <Button className="bg-[#06b6d4] hover:bg-[#0891b2]" onClick={handleProcessRefund}>
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Processar Reembolso
-                  </Button>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="actions" className="mt-4 space-y-6">
+          <TabsContent value="details" className="space-y-6 mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Ações de Cancelamento</h3>
-
-                {cancellation.status === "pending" ? (
-                  <div className="space-y-4">
-                    <Card className="bg-[#0f172a] border-[#2a3349]">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start gap-3">
-                          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium">Aprovar Cancelamento</p>
-                            <p className="text-sm text-gray-400 mt-1">
-                              Aprovar este cancelamento e processar o reembolso conforme a política aplicada.
-                            </p>
-                            <Button className="mt-3 bg-green-500 hover:bg-green-600">Aprovar Cancelamento</Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-[#0f172a] border-[#2a3349]">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start gap-3">
-                          <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium">Rejeitar Cancelamento</p>
-                            <p className="text-sm text-gray-400 mt-1">
-                              Rejeitar este cancelamento. O agendamento permanecerá ativo.
-                            </p>
-                            <Button className="mt-3 bg-red-500 hover:bg-red-600">Rejeitar Cancelamento</Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#06b6d4]" />
+                    Technical Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-400">Cancellation ID</p>
+                      <p className="text-white font-mono">#{cancellation.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-400">Appointment ID</p>
+                      <p className="text-white font-mono">#{cancellation.appointmentId}</p>
+                    </div>
                   </div>
-                ) : (
-                  <Card className="bg-[#0f172a] border-[#2a3349]">
-                    <CardContent className="pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-400">Customer ID</p>
+                      <p className="text-white font-mono">#{cancellation.customerId}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-400">Company ID</p>
+                      <p className="text-white font-mono">#{cancellation.companyId}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Cancelled By ID</p>
+                    <p className="text-white font-mono">#{cancellation.cancelledById}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-[#06b6d4]" />
+                    Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-[#06b6d4] rounded-full mt-2"></div>
+                      <div>
+                        <p className="text-sm text-white">Cancellation created</p>
+                        <p className="text-xs text-gray-400">{formatDate(cancellation.createdDate)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                      <div>
+                        <p className="text-sm text-white">Appointment cancelled</p>
+                        <p className="text-xs text-gray-400">{formatDate(cancellation.cancelledAt)}</p>
+                      </div>
+                    </div>
+                    {cancellation.updatedDate !== cancellation.createdDate && (
                       <div className="flex items-start gap-3">
-                        {cancellation.status === "approved" ? (
-                          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                        )}
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
                         <div>
-                          <p className="text-sm font-medium">
-                            Cancelamento {cancellation.status === "approved" ? "Aprovado" : "Rejeitado"}
-                          </p>
-                          <p className="text-sm text-gray-400 mt-1">
-                            Este cancelamento já foi {cancellation.status === "approved" ? "aprovado" : "rejeitado"}.
-                          </p>
+                          <p className="text-sm text-white">Last updated</p>
+                          <p className="text-xs text-gray-400">{formatDate(cancellation.updatedDate)}</p>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Comunicação</h3>
-
-                <Card className="bg-[#0f172a] border-[#2a3349]">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start gap-3">
-                      <Mail className="h-5 w-5 text-[#06b6d4] mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium">Enviar Notificação</p>
-                        <p className="text-sm text-gray-400 mt-1">
-                          Enviar uma notificação por email para o cliente sobre o status do cancelamento.
-                        </p>
-                        <Button className="mt-3 bg-[#06b6d4] hover:bg-[#0891b2]" onClick={handleSendNotification}>
-                          Enviar Notificação
-                        </Button>
+                    )}
+                    {cancellation.refundStatus === RefundStatusEnum.Processed && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                        <div>
+                          <p className="text-sm text-white">Refund processed</p>
+                          <p className="text-xs text-gray-400">Status updated</p>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="refund" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-[#06b6d4]" />
+                    Refund Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Status:</span>
+                    {getRefundBadge(cancellation.refundStatus)}
+                  </div>
+                  <Separator className="bg-[#2a3349]" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Cancelled by:</span>
+                    {getCancelledByBadge(cancellation.cancelledByRole)}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-500" />
+                    Processing Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {cancellation.refundStatus === RefundStatusEnum.Pending && (
+                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md">
+                      <p className="text-yellow-400 text-sm">
+                        This refund is awaiting processing. Use the actions below to approve or reject.
+                      </p>
+                    </div>
+                  )}
+                  {cancellation.refundStatus === RefundStatusEnum.Processed && (
+                    <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-md">
+                      <p className="text-green-400 text-sm">This refund has been processed successfully.</p>
+                    </div>
+                  )}
+                  {cancellation.refundStatus === RefundStatusEnum.Rejected && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+                      <p className="text-red-400 text-sm">This refund has been rejected.</p>
+                    </div>
+                  )}
+                  {cancellation.refundStatus === RefundStatusEnum.NotApplicable && (
+                    <div className="p-3 bg-gray-500/10 border border-gray-500/20 rounded-md">
+                      <p className="text-gray-400 text-sm">No refund is applicable for this cancellation.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="actions" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Refund Actions */}
+              {canProcessRefund(cancellation.refundStatus) && (
+                <Card className="bg-[#0f172a] border-[#2a3349]">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-[#06b6d4]" />
+                      Process Refund
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-gray-400">
+                      Choose an action to process the refund for this cancellation:
+                    </p>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => handleProcessRefund(RefundStatusEnum.Processed)}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve Refund
+                      </Button>
+                      <Button
+                        onClick={() => handleProcessRefund(RefundStatusEnum.Rejected)}
+                        variant="outline"
+                        className="flex-1 border-red-500 text-red-500 hover:bg-red-500/10 bg-transparent"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
+              )}
 
-                <Card className="bg-[#0f172a] border-[#2a3349]">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start gap-3">
-                      <Calendar className="h-5 w-5 text-[#06b6d4] mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium">Reagendar</p>
-                        <p className="text-sm text-gray-400 mt-1">
-                          Criar um novo agendamento para este cliente com os mesmos detalhes.
-                        </p>
-                        <Button className="mt-3 bg-[#06b6d4] hover:bg-[#0891b2]">Reagendar Serviço</Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {/* Communication */}
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-[#06b6d4]" />
+                    Communication
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="message">Send message to customer</Label>
+                    <Textarea
+                      id="message"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Type your message..."
+                      className="bg-[#1a2234] border-[#2a3349] text-white min-h-[100px]"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!message.trim() || sendingMessage}
+                    className="w-full bg-[#06b6d4] hover:bg-[#0891b2]"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {sendingMessage ? "Sending..." : "Send Message"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Notifications */}
+              <Card className="bg-[#0f172a] border-[#2a3349]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-[#06b6d4]" />
+                    Notifications
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-gray-400">Send automatic notifications about the cancellation status.</p>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      className="w-full border-[#2a3349] text-gray-400 hover:text-white hover:bg-[#2a3349] bg-transparent"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Notify by Email
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-[#2a3349] text-gray-400 hover:text-white hover:bg-[#2a3349] bg-transparent"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Notify by SMS
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="border-[#2a3349] text-gray-400 hover:text-white hover:bg-[#2a3349] bg-transparent"
+          >
+            Close
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )

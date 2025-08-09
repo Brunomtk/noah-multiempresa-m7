@@ -1,14 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, User, Eye, Edit, Trash2, History } from "lucide-react"
-import { CustomerModal } from "@/components/admin/customer-modal"
-import { CustomerDetailsModal } from "@/components/admin/customer-details-modal"
-import { useToast } from "@/hooks/use-toast"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,414 +15,247 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
-// Sample data
-const initialCustomers = [
-  {
-    id: 1,
-    name: "John Smith",
-    document: "123.456.789-00",
-    company: "Tech Solutions Ltd",
-    phone: "(11) 98765-4321",
-    email: "john.smith@email.com",
-    status: "active",
-    address: "123 Main St, Downtown",
-    city: "New York",
-    state: "NY",
-    observations: "VIP customer, prefers morning appointments",
-  },
-  {
-    id: 2,
-    name: "Mary Johnson",
-    document: "987.654.321-00",
-    company: "ABC Consulting",
-    phone: "(11) 91234-5678",
-    email: "mary.johnson@email.com",
-    status: "active",
-    address: "456 Oak Ave, Westside",
-    city: "Los Angeles",
-    state: "CA",
-    observations: "",
-  },
-  {
-    id: 3,
-    name: "Charles Brown",
-    document: "456.789.012-34",
-    company: "XYZ Commerce",
-    phone: "(11) 94567-8901",
-    email: "charles.brown@email.com",
-    status: "inactive",
-    address: "789 Pine St, Eastside",
-    city: "Chicago",
-    state: "IL",
-    observations: "Requires special cleaning products",
-  },
-  {
-    id: 4,
-    name: "Anna Davis",
-    document: "345.678.901-23",
-    company: "Delta Industries",
-    phone: "(11) 93456-7890",
-    email: "anna.davis@email.com",
-    status: "active",
-    address: "101 Maple Dr, Northside",
-    city: "Houston",
-    state: "TX",
-    observations: "",
-  },
-  {
-    id: 5,
-    name: "Robert Wilson",
-    document: "567.890.123-45",
-    company: "Omega Services",
-    phone: "(11) 95678-9012",
-    email: "robert.wilson@email.com",
-    status: "active",
-    address: "202 Elm St, Southside",
-    city: "Miami",
-    state: "FL",
-    observations: "Has pets, needs extra care",
-  },
-]
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Plus, Search, Eye, Edit, Trash2 } from "lucide-react"
+import { CustomerModal } from "@/components/admin/customer-modal"
+import { CustomerDetailsModal } from "@/components/admin/customer-details-modal"
+import { useCustomers } from "@/hooks/use-customers"
+import { useCompanies } from "@/hooks/use-companies"
+import type { Customer } from "@/types/customer"
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState(initialCustomers)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
-  const [customerToDelete, setCustomerToDelete] = useState<any>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const { toast } = useToast()
+  const { state, setFilters, deleteCustomer } = useCustomers()
+  const { companies, fetchCompanies } = useCompanies()
 
-  const handleAddCustomer = (data: any) => {
-    const newCustomer = {
-      id: customers.length + 1,
-      ...data,
-      status: "active",
-    }
-    setCustomers([...customers, newCustomer])
-    setIsModalOpen(false)
-    toast({
-      title: "Customer added successfully",
-      description: `${data.name} has been added to the system.`,
-    })
-  }
+  const [modalOpen, setModalOpen] = useState(false)
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null)
 
-  const handleEditCustomer = (data: any) => {
-    setCustomers(
-      customers.map((customer) => (customer.id === selectedCustomer.id ? { ...customer, ...data } : customer)),
-    )
-    setSelectedCustomer(null)
-    setIsModalOpen(false)
-    toast({
-      title: "Customer updated successfully",
-      description: `${data.name} has been updated.`,
-    })
-  }
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [companyFilter, setCompanyFilter] = useState<string>("all")
 
-  const handleDeleteCustomer = () => {
-    if (customerToDelete) {
-      setCustomers(customers.filter((customer) => customer.id !== customerToDelete.id))
-      toast({
-        title: "Customer deleted successfully",
-        description: `${customerToDelete.name} has been removed from the system.`,
-        variant: "destructive",
+  // Load companies only once
+  useEffect(() => {
+    fetchCompanies()
+  }, [fetchCompanies])
+
+  // Handle filter changes with debounce
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setFilters({
+        search: searchTerm,
+        status: statusFilter,
+        companyId: companyFilter === "all" ? "" : companyFilter,
       })
+    }, 500)
+
+    return () => clearTimeout(delayedSearch)
+  }, [searchTerm, statusFilter, companyFilter, setFilters])
+
+  const handleEdit = (customer: Customer) => {
+    setSelectedCustomer(customer)
+    setModalOpen(true)
+  }
+
+  const handleView = (customer: Customer) => {
+    setSelectedCustomer(customer)
+    setDetailsModalOpen(true)
+  }
+
+  const handleDelete = (customer: Customer) => {
+    setCustomerToDelete(customer)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (customerToDelete) {
+      await deleteCustomer(customerToDelete.id)
+      setDeleteDialogOpen(false)
       setCustomerToDelete(null)
     }
   }
 
-  const handleViewDetails = (customer: any) => {
-    setSelectedCustomer(customer)
-    setIsDetailsModalOpen(true)
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("pt-BR")
   }
 
-  const handleEdit = (customer: any) => {
-    setSelectedCustomer(customer)
-    setIsModalOpen(true)
+  const handleModalClose = () => {
+    setModalOpen(false)
+    setSelectedCustomer(null)
   }
 
-  const handleViewHistory = (customer: any) => {
-    toast({
-      title: "Appointment History",
-      description: `Viewing appointment history for ${customer.name}`,
-    })
+  const handleDetailsModalClose = () => {
+    setDetailsModalOpen(false)
+    setSelectedCustomer(null)
   }
-
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
-      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.document.includes(searchQuery) ||
-      customer.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || customer.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
 
   return (
-    <TooltipProvider>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">Customer Management</h1>
-            <p className="text-gray-400">Manage all customers in the system.</p>
-          </div>
-          <Button
-            className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-            onClick={() => {
-              setSelectedCustomer(null)
-              setIsModalOpen(true)
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Customer
-          </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Customers</h1>
+          <p className="text-gray-400">Manage system customers</p>
         </div>
+        <Button
+          onClick={() => {
+            setSelectedCustomer(null)
+            setModalOpen(true)
+          }}
+          className="bg-[#06b6d4] hover:bg-[#0891b2]"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          New Customer
+        </Button>
+      </div>
 
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by name, document or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-full md:w-[300px] bg-[#1a2234] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
-            />
+      <Card className="bg-[#1a2234] border-[#2a3349]">
+        <CardHeader>
+          <CardTitle className="text-white">Filters</CardTitle>
+          <CardDescription className="text-gray-400">Use the filters below to find specific customers</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search by name, document or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-[#0f172a] border-[#2a3349] text-white"
+                />
+              </div>
+            </div>
+            <select
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
+              className="w-[200px] flex h-10 rounded-md border border-[#2a3349] bg-[#0f172a] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="all">All companies</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-[150px] flex h-10 rounded-md border border-[#2a3349] bg-[#0f172a] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="all">All</option>
+              <option value="1">Active</option>
+              <option value="0">Inactive</option>
+            </select>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex gap-2 w-full md:w-auto">
-            <Button
-              variant={statusFilter === "all" ? "default" : "outline"}
-              onClick={() => setStatusFilter("all")}
-              className={
-                statusFilter === "all"
-                  ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-              }
-            >
-              All
-            </Button>
-            <Button
-              variant={statusFilter === "active" ? "default" : "outline"}
-              onClick={() => setStatusFilter("active")}
-              className={
-                statusFilter === "active"
-                  ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-              }
-            >
-              Active
-            </Button>
-            <Button
-              variant={statusFilter === "inactive" ? "default" : "outline"}
-              onClick={() => setStatusFilter("inactive")}
-              className={
-                statusFilter === "inactive"
-                  ? "bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-                  : "border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-              }
-            >
-              Inactive
-            </Button>
-          </div>
-        </div>
-
-        <div className="rounded-md border border-[#2a3349] overflow-hidden">
+      <Card className="bg-[#1a2234] border-[#2a3349]">
+        <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-[#1a2234]">
-              <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
-                <TableHead className="text-white">Name</TableHead>
-                <TableHead className="text-white">Document</TableHead>
-                <TableHead className="text-white">Company</TableHead>
-                <TableHead className="text-white">Phone</TableHead>
-                <TableHead className="text-white">Status</TableHead>
-                <TableHead className="text-white text-center">Actions</TableHead>
+            <TableHeader>
+              <TableRow className="border-[#2a3349] hover:bg-[#1a2234]">
+                <TableHead className="text-gray-300">Name</TableHead>
+                <TableHead className="text-gray-300">Document</TableHead>
+                <TableHead className="text-gray-300">Email</TableHead>
+                <TableHead className="text-gray-300">Company</TableHead>
+                <TableHead className="text-gray-300">Status</TableHead>
+                <TableHead className="text-gray-300">Created at</TableHead>
+                <TableHead className="text-gray-300 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCustomers.map((customer) => (
-                <TableRow key={customer.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
-                  <TableCell className="font-medium text-white">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-[#2a3349] p-1.5 rounded-md">
-                        <User className="h-4 w-4 text-[#06b6d4]" />
-                      </div>
-                      {customer.name}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-400">{customer.document}</TableCell>
-                  <TableCell className="text-gray-400">{customer.company}</TableCell>
-                  <TableCell className="text-gray-400">{customer.phone}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        customer.status === "active" ? "border-green-500 text-green-500" : "border-red-500 text-red-500"
-                      }
-                    >
-                      {customer.status === "active" ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewDetails(customer)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View Details</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(customer)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Edit</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewHistory(customer)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <History className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View History</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setCustomerToDelete(customer)}
-                            className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+              {state.loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-400">
+                    Loading customers...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : state.customers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-400">
+                    No customers found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                state.customers.map((customer) => (
+                  <TableRow key={customer.id} className="border-[#2a3349] hover:bg-[#0f172a]">
+                    <TableCell className="text-white font-medium">{customer.name}</TableCell>
+                    <TableCell className="text-gray-300">{customer.document}</TableCell>
+                    <TableCell className="text-gray-300">{customer.email}</TableCell>
+                    <TableCell className="text-gray-300">{customer.company?.name || "N/A"}</TableCell>
+                    <TableCell>
+                      <Badge variant={customer.status === 1 ? "default" : "secondary"}>
+                        {customer.status === 1 ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-gray-300">{formatDate(customer.createdDate)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleView(customer)}
+                          className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(customer)}
+                          className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(customer)}
+                          className="text-gray-400 hover:text-red-400 hover:bg-[#2a3349]"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">
-            Showing <span className="font-medium text-white">{filteredCustomers.length}</span> of{" "}
-            <span className="font-medium text-white">{customers.length}</span> customers
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] bg-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              1
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              2
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              3
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+      <CustomerModal open={modalOpen} onOpenChange={handleModalClose} customer={selectedCustomer} />
 
-        <CustomerModal
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false)
-            setSelectedCustomer(null)
-          }}
-          onSubmit={selectedCustomer ? handleEditCustomer : handleAddCustomer}
-          customer={selectedCustomer}
-        />
+      <CustomerDetailsModal
+        open={detailsModalOpen}
+        onOpenChange={handleDetailsModalClose}
+        customer={selectedCustomer}
+      />
 
-        <CustomerDetailsModal
-          isOpen={isDetailsModalOpen}
-          onClose={() => {
-            setIsDetailsModalOpen(false)
-            setSelectedCustomer(null)
-          }}
-          customer={selectedCustomer}
-        />
-
-        <AlertDialog open={!!customerToDelete} onOpenChange={() => setCustomerToDelete(null)}>
-          <AlertDialogContent className="bg-[#1a2234] border-[#2a3349] text-white">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-400">
-                This action cannot be undone. This will permanently delete the customer{" "}
-                <span className="font-semibold text-white">{customerToDelete?.name}</span> from the system.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-transparent border-[#2a3349] text-white hover:bg-[#2a3349]">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteCustomer}
-                className="bg-red-600 hover:bg-red-700 text-white border-0"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </TooltipProvider>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-[#1a2234] border-[#2a3349]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Confirm deletion</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              Are you sure you want to delete the customer "{customerToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }

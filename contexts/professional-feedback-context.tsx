@@ -1,211 +1,191 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useState, useCallback } from "react"
-import type { InternalFeedback } from "@/types/internal-feedback"
-import {
-  getProfessionalFeedbacks,
-  getProfessionalFeedback,
-  respondToProfessionalFeedback,
-  markProfessionalFeedbackAsRead,
-  getProfessionalFeedbackStats,
-  markAllProfessionalFeedbacksAsRead,
-  type ProfessionalFeedbackFilters,
-} from "@/lib/api/professional-feedback"
+import type { ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect } from "react"
+import type { InternalFeedback, InternalFeedbackFilters } from "@/types/internal-feedback"
+import { professionalFeedbackApi } from "@/lib/api/professional-feedback"
+import { useToast } from "@/hooks/use-toast"
 
-interface ProfessionalFeedbackStats {
-  total: number
-  positive: number
-  negative: number
-  neutral: number
-  averageRating: number
-  responseRate: number
-  unreadCount: number
+interface CreateFeedbackData {
+  title: string
+  category: string
+  description: string
+  priority: number
+  status: number
 }
 
 interface ProfessionalFeedbackContextType {
   feedbacks: InternalFeedback[]
-  selectedFeedback: InternalFeedback | null
-  stats: ProfessionalFeedbackStats | null
-  loading: boolean
-  error: string | null
-
-  // Actions
-  loadFeedbacks: (professionalId: string, filters?: ProfessionalFeedbackFilters) => Promise<void>
-  loadFeedback: (professionalId: string, feedbackId: string) => Promise<void>
-  respondToFeedback: (professionalId: string, feedbackId: string, response: string) => Promise<boolean>
-  markAsRead: (professionalId: string, feedbackId: string) => Promise<boolean>
-  markAllAsRead: (professionalId: string) => Promise<boolean>
-  loadStats: (professionalId: string, period?: "week" | "month" | "quarter" | "year") => Promise<void>
-  setSelectedFeedback: (feedback: InternalFeedback | null) => void
-  clearError: () => void
+  isLoading: boolean
+  error: Error | null
+  filters: InternalFeedbackFilters
+  setFilters: (filters: InternalFeedbackFilters) => void
+  resetFilters: () => void
+  fetchFeedbacks: () => Promise<void>
+  createFeedback: (data: CreateFeedbackData) => Promise<InternalFeedback | null>
+  addComment: (feedbackId: number, comment: string) => Promise<InternalFeedback | null>
+  getFeedbackById: (id: number) => Promise<InternalFeedback | null>
 }
 
 const ProfessionalFeedbackContext = createContext<ProfessionalFeedbackContextType | undefined>(undefined)
 
-export function ProfessionalFeedbackProvider({ children }: { children: React.ReactNode }) {
+export function ProfessionalFeedbackProvider({ children }: { children: ReactNode }) {
   const [feedbacks, setFeedbacks] = useState<InternalFeedback[]>([])
-  const [selectedFeedback, setSelectedFeedback] = useState<InternalFeedback | null>(null)
-  const [stats, setStats] = useState<ProfessionalFeedbackStats | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<Error | null>(null)
+  const [filters, setFilters] = useState<InternalFeedbackFilters>({
+    status: "all",
+  })
+  const { toast } = useToast()
 
-  const loadFeedbacks = useCallback(async (professionalId: string, filters?: ProfessionalFeedbackFilters) => {
-    setLoading(true)
+  const fetchFeedbacks = useCallback(async () => {
+    setIsLoading(true)
     setError(null)
-
     try {
-      const response = await getProfessionalFeedbacks(professionalId, filters)
-      if (response.success) {
-        setFeedbacks(response.data)
-      } else {
-        setError(response.message)
+      const { data, error } = await professionalFeedbackApi.getMyFeedbacks(filters)
+
+      if (error) {
+        throw new Error(error)
+      }
+
+      if (data) {
+        setFeedbacks(data.data || [])
       }
     } catch (err) {
-      setError("Erro ao carregar feedbacks")
+      setError(err instanceof Error ? err : new Error("Failed to fetch feedbacks"))
+      toast({
+        title: "Error",
+        description: "Failed to fetch feedbacks. Please try again.",
+        variant: "destructive",
+      })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
-  }, [])
+  }, [filters, toast])
 
-  const loadFeedback = useCallback(async (professionalId: string, feedbackId: string) => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await getProfessionalFeedback(professionalId, feedbackId)
-      if (response.success) {
-        setSelectedFeedback(response.data)
-      } else {
-        setError(response.message)
-      }
-    } catch (err) {
-      setError("Erro ao carregar feedback")
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const respondToFeedback = useCallback(
-    async (professionalId: string, feedbackId: string, response: string): Promise<boolean> => {
-      setLoading(true)
+  const createFeedback = useCallback(
+    async (data: CreateFeedbackData) => {
+      setIsLoading(true)
       setError(null)
-
       try {
-        const result = await respondToProfessionalFeedback(professionalId, feedbackId, response)
-        if (result.success) {
-          // Atualizar o feedback na lista
-          setFeedbacks((prev) => prev.map((feedback) => (feedback.id === feedbackId ? result.data : feedback)))
+        const { data: newFeedback, error } = await professionalFeedbackApi.create(data)
 
-          // Atualizar o feedback selecionado se for o mesmo
-          if (selectedFeedback?.id === feedbackId) {
-            setSelectedFeedback(result.data)
-          }
-
-          return true
-        } else {
-          setError(result.message)
-          return false
+        if (error) {
+          throw new Error(error)
         }
+
+        if (newFeedback) {
+          setFeedbacks((prev) => [newFeedback, ...prev])
+          toast({
+            title: "Success",
+            description: "Feedback has been submitted successfully.",
+          })
+          return newFeedback
+        }
+        return null
       } catch (err) {
-        setError("Erro ao responder feedback")
-        return false
+        setError(err instanceof Error ? err : new Error("Failed to create feedback"))
+        toast({
+          title: "Error",
+          description: "Failed to submit feedback. Please try again.",
+          variant: "destructive",
+        })
+        throw err
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     },
-    [selectedFeedback],
+    [toast],
   )
 
-  const markAsRead = useCallback(
-    async (professionalId: string, feedbackId: string): Promise<boolean> => {
+  const addComment = useCallback(
+    async (feedbackId: number, comment: string) => {
+      setIsLoading(true)
       setError(null)
-
       try {
-        const result = await markProfessionalFeedbackAsRead(professionalId, feedbackId)
-        if (result.success) {
-          // Atualizar o feedback na lista
-          setFeedbacks((prev) => prev.map((feedback) => (feedback.id === feedbackId ? result.data : feedback)))
+        const { data: updatedFeedback, error } = await professionalFeedbackApi.addComment(feedbackId, comment)
 
-          // Atualizar o feedback selecionado se for o mesmo
-          if (selectedFeedback?.id === feedbackId) {
-            setSelectedFeedback(result.data)
-          }
-
-          return true
-        } else {
-          setError(result.message)
-          return false
+        if (error) {
+          throw new Error(error)
         }
-      } catch (err) {
-        setError("Erro ao marcar feedback como lido")
-        return false
-      }
-    },
-    [selectedFeedback],
-  )
 
-  const markAllAsRead = useCallback(
-    async (professionalId: string): Promise<boolean> => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const result = await markAllProfessionalFeedbacksAsRead(professionalId)
-        if (result.success) {
-          // Recarregar feedbacks para refletir as mudanças
-          await loadFeedbacks(professionalId)
-          return true
-        } else {
-          setError(result.message)
-          return false
+        if (updatedFeedback) {
+          setFeedbacks((prev) => prev.map((feedback) => (feedback.id === feedbackId ? updatedFeedback : feedback)))
+          toast({
+            title: "Success",
+            description: "Comment has been added successfully.",
+          })
+          return updatedFeedback
         }
+        return null
       } catch (err) {
-        setError("Erro ao marcar todos os feedbacks como lidos")
-        return false
+        setError(err instanceof Error ? err : new Error("Failed to add comment"))
+        toast({
+          title: "Error",
+          description: "Failed to add comment. Please try again.",
+          variant: "destructive",
+        })
+        throw err
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     },
-    [loadFeedbacks],
+    [toast],
   )
 
-  const loadStats = useCallback(async (professionalId: string, period?: "week" | "month" | "quarter" | "year") => {
-    setError(null)
+  const getFeedbackById = useCallback(
+    async (id: number) => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const { data, error } = await professionalFeedbackApi.getById(id)
 
-    try {
-      const response = await getProfessionalFeedbackStats(professionalId, period)
-      if (response.success) {
-        setStats(response.data)
-      } else {
-        setError(response.message)
+        if (error) {
+          throw new Error(error)
+        }
+
+        return data || null
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error(`Failed to fetch feedback with ID ${id}`))
+        toast({
+          title: "Error",
+          description: "Failed to fetch feedback details. Please try again.",
+          variant: "destructive",
+        })
+        return null
+      } finally {
+        setIsLoading(false)
       }
-    } catch (err) {
-      setError("Erro ao carregar estatísticas")
-    }
+    },
+    [toast],
+  )
+
+  const resetFilters = useCallback(() => {
+    setFilters({ status: "all" })
   }, [])
 
-  const clearError = useCallback(() => {
-    setError(null)
-  }, [])
+  useEffect(() => {
+    fetchFeedbacks()
+  }, [fetchFeedbacks])
 
-  const value: ProfessionalFeedbackContextType = {
-    feedbacks,
-    selectedFeedback,
-    stats,
-    loading,
-    error,
-    loadFeedbacks,
-    loadFeedback,
-    respondToFeedback,
-    markAsRead,
-    markAllAsRead,
-    loadStats,
-    setSelectedFeedback,
-    clearError,
-  }
-
-  return <ProfessionalFeedbackContext.Provider value={value}>{children}</ProfessionalFeedbackContext.Provider>
+  return (
+    <ProfessionalFeedbackContext.Provider
+      value={{
+        feedbacks,
+        isLoading,
+        error,
+        filters,
+        setFilters,
+        resetFilters,
+        fetchFeedbacks,
+        createFeedback,
+        addComment,
+        getFeedbackById,
+      }}
+    >
+      {children}
+    </ProfessionalFeedbackContext.Provider>
+  )
 }
 
 export function useProfessionalFeedbackContext() {

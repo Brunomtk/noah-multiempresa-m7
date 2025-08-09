@@ -1,121 +1,104 @@
-import { useCompanyPaymentsContext } from "@/contexts/company-payments-context"
-import type { Payment } from "@/types/payment"
-import { format } from "date-fns"
+"use client"
 
-export const useCompanyPayments = () => {
+import { useCompanyPaymentsContext } from "@/contexts/company-payments-context"
+import { useCallback } from "react"
+
+export function useCompanyPayments() {
   const context = useCompanyPaymentsContext()
 
   // Format date for display
-  const formatDate = (dateString?: string) => {
+  const formatDate = useCallback((dateString?: string) => {
     if (!dateString) return "N/A"
-    return format(new Date(dateString), "PPP")
-  }
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(new Date(dateString))
+  }, [])
 
   // Format currency for display
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatCurrency = useCallback((amount: number) => {
+    return new Intl.NumberFormat("pt-BR", {
       style: "currency",
-      currency: "USD",
+      currency: "BRL",
     }).format(amount)
-  }
+  }, [])
 
   // Get status color for UI
-  const getStatusColor = (status: Payment["status"]) => {
+  const getStatusColor = useCallback((status: number) => {
     switch (status) {
-      case "paid":
+      case 1: // Paid
         return "border-green-500 text-green-500"
-      case "pending":
+      case 0: // Pending
         return "border-amber-500 text-amber-500"
-      case "overdue":
+      case 2: // Overdue
         return "border-red-500 text-red-500"
-      case "cancelled":
+      case 3: // Cancelled
         return "border-gray-500 text-gray-500"
       default:
         return "border-gray-500 text-gray-500"
     }
-  }
+  }, [])
 
   // Get status badge color for UI
-  const getStatusBadgeColor = (status: Payment["status"]) => {
+  const getStatusBadgeColor = useCallback((status: number) => {
     switch (status) {
-      case "paid":
+      case 1: // Paid
         return "bg-green-500/10 text-green-500 border-green-500/20"
-      case "pending":
+      case 0: // Pending
         return "bg-amber-500/10 text-amber-500 border-amber-500/20"
-      case "overdue":
+      case 2: // Overdue
         return "bg-red-500/10 text-red-500 border-red-500/20"
-      case "cancelled":
+      case 3: // Cancelled
         return "bg-gray-500/10 text-gray-500 border-gray-500/20"
       default:
         return "bg-gray-500/10 text-gray-500 border-gray-500/20"
     }
-  }
+  }, [])
 
   // Get status label for display
-  const getStatusLabel = (status: Payment["status"]) => {
+  const getStatusLabel = useCallback((status: number) => {
     switch (status) {
-      case "paid":
-        return "Completed"
-      case "pending":
-        return "Pending"
-      case "overdue":
-        return "Overdue"
-      case "cancelled":
-        return "Cancelled"
+      case 1:
+        return "Pago"
+      case 0:
+        return "Pendente"
+      case 2:
+        return "Vencido"
+      case 3:
+        return "Cancelado"
       default:
-        return "Unknown"
+        return "Desconhecido"
     }
-  }
+  }, [])
 
   // Get payment method label for display
-  const getMethodLabel = (method?: Payment["method"]) => {
-    if (!method) return "N/A"
+  const getMethodLabel = useCallback((method?: number) => {
+    if (method === undefined) return "N/A"
 
     switch (method) {
-      case "credit_card":
-        return "Credit Card"
-      case "debit_card":
-        return "Debit Card"
-      case "bank_transfer":
-        return "Bank Transfer"
-      case "pix":
+      case 0:
+        return "Cartão de Crédito"
+      case 1:
+        return "Cartão de Débito"
+      case 2:
+        return "Transferência Bancária"
+      case 3:
         return "PIX"
       default:
-        return method
+        return "Desconhecido"
     }
-  }
+  }, [])
 
   // Check if a payment is overdue
-  const isOverdue = (payment: Payment) => {
-    if (payment.status === "paid" || payment.status === "cancelled") return false
+  const isOverdue = useCallback((payment: any) => {
+    if (payment.status === 1 || payment.status === 3) return false // Paid or Cancelled
 
     const dueDate = new Date(payment.dueDate)
     const today = new Date()
 
     return dueDate < today
-  }
-
-  // Update filters and fetch payments
-  const updateFilters = (newFilters: Partial<Omit<typeof context.filters, "companyId">>) => {
-    const updatedFilters = { ...newFilters }
-    context.setFilters(updatedFilters)
-    context.fetchPayments(updatedFilters)
-  }
-
-  // Get payment statistics
-  const getStatistics = () => {
-    return (
-      context.statistics || {
-        totalAmount: 0,
-        pendingAmount: 0,
-        overdueAmount: 0,
-        completedAmount: 0,
-        pendingCount: 0,
-        overdueCount: 0,
-        completedCount: 0,
-      }
-    )
-  }
+  }, [])
 
   return {
     ...context,
@@ -126,7 +109,5 @@ export const useCompanyPayments = () => {
     getStatusLabel,
     getMethodLabel,
     isOverdue,
-    updateFilters,
-    getStatistics,
   }
 }

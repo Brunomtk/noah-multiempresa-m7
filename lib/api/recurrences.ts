@@ -1,405 +1,306 @@
-import type { Recurrence } from "@/types/recurrence"
-import { apiDelay } from "./utils"
+import type { Recurrence, RecurrenceFilters, RecurrenceResponse } from "@/types/recurrence"
+import { fetchApi } from "./utils"
 
-// Get all recurrences
+// Helper function to convert time string to TimeSpan format
+function timeToTimeSpan(timeString: string): string {
+  if (!timeString) return "09:00:00"
+
+  // If it's already in HH:MM format, add seconds
+  if (timeString.match(/^\d{2}:\d{2}$/)) {
+    return `${timeString}:00`
+  }
+
+  // If it's already in HH:MM:SS format, return as is
+  if (timeString.match(/^\d{2}:\d{2}:\d{2}$/)) {
+    return timeString
+  }
+
+  // Default fallback
+  return "09:00:00"
+}
+
+export const recurrencesApi = {
+  // Get all recurrences with filters
+  async getAll(filters?: RecurrenceFilters): Promise<RecurrenceResponse> {
+    try {
+      const params = new URLSearchParams()
+
+      if (filters?.name) params.append("Name", filters.name)
+      if (filters?.description) params.append("Description", filters.description)
+      if (filters?.status) params.append("Status", filters.status)
+      if (filters?.type) params.append("Type", filters.type)
+      if (filters?.search) params.append("Search", filters.search)
+      if (filters?.companyId) params.append("CompanyId", filters.companyId.toString())
+      if (filters?.teamId) params.append("TeamId", filters.teamId.toString())
+      if (filters?.customerId) params.append("CustomerId", filters.customerId.toString())
+      if (filters?.startDate) params.append("StartDate", filters.startDate)
+      if (filters?.endDate) params.append("EndDate", filters.endDate)
+      if (filters?.pageNumber) params.append("PageNumber", filters.pageNumber.toString())
+      if (filters?.pageSize) params.append("PageSize", filters.pageSize.toString())
+
+      const queryString = params.toString()
+      const url = queryString ? `/Recurrence?${queryString}` : "/Recurrence"
+
+      console.log("Fetching recurrences from:", url)
+      const response = await fetchApi(url)
+      console.log("Recurrences API response:", response)
+
+      return {
+        results: response.results || [],
+        currentPage: response.currentPage || 1,
+        pageCount: response.pageCount || 1,
+        pageSize: response.pageSize || 10,
+        totalItems: response.totalItems || 0,
+        firstRowOnPage: response.firstRowOnPage || 1,
+        lastRowOnPage: response.lastRowOnPage || 0,
+      }
+    } catch (error) {
+      console.error("Failed to fetch recurrences:", error)
+      throw error
+    }
+  },
+
+  // Get recurrence by ID
+  async getById(id: number): Promise<Recurrence> {
+    try {
+      console.log("Fetching recurrence by ID:", id)
+      const response = await fetchApi(`/Recurrence/${id}`)
+      console.log("Recurrence by ID response:", response)
+      return response
+    } catch (error) {
+      console.error(`Failed to fetch recurrence with ID ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Create new recurrence
+  async create(
+    data: Omit<Recurrence, "id" | "createdDate" | "updatedDate" | "customer" | "team" | "company">,
+  ): Promise<Recurrence> {
+    try {
+      // Create the DTO object with correct capitalized field names
+      const dto = {
+        Title: data.title?.trim() || "",
+        CustomerId: data.customerId || 0,
+        Address: data.address?.trim() || "",
+        TeamId: data.teamId || null,
+        CompanyId: data.companyId || 0,
+        Frequency: data.frequency || 1,
+        Day: data.day || 1,
+        Time: timeToTimeSpan(data.time || "09:00"),
+        Duration: data.duration || 60,
+        Status: data.status || 1,
+        Type: data.type || 1,
+        StartDate: data.startDate || new Date().toISOString(),
+        EndDate: data.endDate || null,
+        Notes: data.notes?.trim() || null,
+      }
+
+      const requestData = { dto }
+
+      console.log("Creating recurrence with DTO:", requestData)
+      const response = await fetchApi("/Recurrence", {
+        method: "POST",
+        body: JSON.stringify(requestData),
+      })
+      console.log("Create recurrence response:", response)
+      return response
+    } catch (error) {
+      console.error("Failed to create recurrence:", error)
+      throw error
+    }
+  },
+
+  // Update recurrence
+  async update(id: number, data: Partial<Recurrence>): Promise<Recurrence> {
+    try {
+      // Create the DTO object with correct capitalized field names
+      const dto = {
+        Title: data.title?.trim() || "",
+        CustomerId: data.customerId || 0,
+        Address: data.address?.trim() || "",
+        TeamId: data.teamId || null,
+        CompanyId: data.companyId || 0,
+        Frequency: data.frequency || 1,
+        Day: data.day || 1,
+        Time: timeToTimeSpan(data.time || "09:00"),
+        Duration: data.duration || 60,
+        Status: data.status || 1,
+        Type: data.type || 1,
+        StartDate: data.startDate || new Date().toISOString(),
+        EndDate: data.endDate || null,
+        Notes: data.notes?.trim() || null,
+        LastExecution: data.lastExecution || null,
+        NextExecution: data.nextExecution || null,
+      }
+
+      const requestData = { dto }
+
+      console.log("Updating recurrence with DTO:", requestData)
+      const response = await fetchApi(`/Recurrence/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(requestData),
+      })
+      console.log("Update recurrence response:", response)
+      return response
+    } catch (error) {
+      console.error(`Failed to update recurrence with ID ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Delete recurrence
+  async delete(id: number): Promise<void> {
+    try {
+      console.log("Deleting recurrence with ID:", id)
+      await fetchApi(`/Recurrence/${id}`, {
+        method: "DELETE",
+      })
+      console.log("Recurrence deleted successfully")
+    } catch (error) {
+      console.error(`Failed to delete recurrence with ID ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Get companies for dropdown
+  async getCompanies(): Promise<any[]> {
+    try {
+      console.log("Fetching companies for recurrence dropdown")
+
+      // Try different endpoints
+      const endpoints = ["/Companies", "/Company"]
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetchApi(`${endpoint}?pageSize=100`)
+          console.log(`Companies from ${endpoint}:`, response)
+
+          if (response.results && Array.isArray(response.results)) {
+            return response.results
+          } else if (Array.isArray(response)) {
+            return response
+          }
+        } catch (error) {
+          console.log(`Failed to fetch from ${endpoint}, trying next...`)
+          continue
+        }
+      }
+
+      return []
+    } catch (error) {
+      console.error("Failed to fetch companies:", error)
+      return []
+    }
+  },
+
+  // Get customers for dropdown
+  async getCustomers(companyId?: number): Promise<any[]> {
+    try {
+      console.log("Fetching customers for recurrence dropdown", { companyId })
+
+      const params = new URLSearchParams()
+      if (companyId) params.append("CompanyId", companyId.toString())
+      params.append("PageSize", "100")
+
+      const queryString = params.toString()
+      const url = queryString ? `/Customer?${queryString}` : "/Customer?PageSize=100"
+
+      const response = await fetchApi(url)
+      console.log("Customers response:", response)
+
+      if (response.results && Array.isArray(response.results)) {
+        return response.results
+      } else if (Array.isArray(response)) {
+        return response
+      }
+
+      return []
+    } catch (error) {
+      console.error("Failed to fetch customers:", error)
+      return []
+    }
+  },
+
+  // Get teams for dropdown
+  async getTeams(companyId?: number): Promise<any[]> {
+    try {
+      console.log("Fetching teams for recurrence dropdown", { companyId })
+
+      const params = new URLSearchParams()
+      if (companyId) params.append("CompanyId", companyId.toString())
+      params.append("PageSize", "100")
+
+      const queryString = params.toString()
+      const url = queryString ? `/Team?${queryString}` : "/Team?PageSize=100"
+
+      const response = await fetchApi(url)
+      console.log("Teams response:", response)
+
+      if (response.results && Array.isArray(response.results)) {
+        return response.results
+      } else if (Array.isArray(response)) {
+        return response
+      }
+
+      return []
+    } catch (error) {
+      console.error("Failed to fetch teams:", error)
+      return []
+    }
+  },
+}
+
+// Legacy functions for backward compatibility
 export async function getRecurrences(): Promise<Recurrence[]> {
-  try {
-    // Simulate API call
-    await apiDelay(800)
-
-    // In a real implementation, this would be:
-    // return await fetchApi<Recurrence[]>('/recurrences', {
-    //   headers: getAuthHeader(),
-    // });
-
-    // For now, return mock data
-    return mockRecurrences
-  } catch (error) {
-    console.error("Failed to fetch recurrences:", error)
-    throw error
-  }
+  const response = await recurrencesApi.getAll()
+  return response.results
 }
 
-// Get recurrence by ID
 export async function getRecurrenceById(id: string): Promise<Recurrence> {
-  try {
-    await apiDelay(500)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence>(`/recurrences/${id}`, {
-    //   headers: getAuthHeader(),
-    // });
-
-    const recurrence = mockRecurrences.find((r) => r.id === id)
-    if (!recurrence) {
-      throw new Error(`Recurrence with ID ${id} not found`)
-    }
-
-    return recurrence
-  } catch (error) {
-    console.error(`Failed to fetch recurrence with ID ${id}:`, error)
-    throw error
-  }
+  return await recurrencesApi.getById(Number.parseInt(id))
 }
 
-// Create a new recurrence
-export async function createRecurrence(data: Omit<Recurrence, "id" | "createdAt" | "updatedAt">): Promise<Recurrence> {
-  try {
-    await apiDelay(1000)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence>('/recurrences', {
-    //   method: 'POST',
-    //   headers: {
-    //     ...getAuthHeader(),
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(data),
-    // });
-
-    const newRecurrence: Recurrence = {
-      id: `rec_${Math.random().toString(36).substring(2, 11)}`,
-      ...data,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-
-    // In a real app, this would be handled by the backend
-    mockRecurrences.push(newRecurrence)
-
-    return newRecurrence
-  } catch (error) {
-    console.error("Failed to create recurrence:", error)
-    throw error
-  }
+export async function createRecurrence(
+  data: Omit<Recurrence, "id" | "createdDate" | "updatedDate" | "customer" | "team" | "company">,
+): Promise<Recurrence> {
+  return await recurrencesApi.create(data)
 }
 
-// Update an existing recurrence
 export async function updateRecurrence(id: string, data: Partial<Recurrence>): Promise<Recurrence> {
-  try {
-    await apiDelay(1000)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence>(`/recurrences/${id}`, {
-    //   method: 'PUT',
-    //   headers: {
-    //     ...getAuthHeader(),
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(data),
-    // });
-
-    const index = mockRecurrences.findIndex((r) => r.id === id)
-    if (index === -1) {
-      throw new Error(`Recurrence with ID ${id} not found`)
-    }
-
-    const updatedRecurrence = {
-      ...mockRecurrences[index],
-      ...data,
-      updatedAt: new Date().toISOString(),
-    }
-
-    mockRecurrences[index] = updatedRecurrence
-
-    return updatedRecurrence
-  } catch (error) {
-    console.error(`Failed to update recurrence with ID ${id}:`, error)
-    throw error
-  }
+  return await recurrencesApi.update(Number.parseInt(id), data)
 }
 
-// Delete a recurrence
 export async function deleteRecurrence(id: string): Promise<void> {
-  try {
-    await apiDelay(800)
-
-    // In a real implementation:
-    // await fetchApi(`/recurrences/${id}`, {
-    //   method: 'DELETE',
-    //   headers: getAuthHeader(),
-    // });
-
-    const index = mockRecurrences.findIndex((r) => r.id === id)
-    if (index === -1) {
-      throw new Error(`Recurrence with ID ${id} not found`)
-    }
-
-    mockRecurrences.splice(index, 1)
-  } catch (error) {
-    console.error(`Failed to delete recurrence with ID ${id}:`, error)
-    throw error
-  }
+  return await recurrencesApi.delete(Number.parseInt(id))
 }
 
-// Get recurrences by company ID
 export async function getRecurrencesByCompany(companyId: string): Promise<Recurrence[]> {
-  try {
-    await apiDelay(800)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence[]>(`/companies/${companyId}/recurrences`, {
-    //   headers: getAuthHeader(),
-    // });
-
-    return mockRecurrences.filter((r) => r.companyId === companyId)
-  } catch (error) {
-    console.error(`Failed to fetch recurrences for company ${companyId}:`, error)
-    throw error
-  }
+  const response = await recurrencesApi.getAll({ companyId: Number.parseInt(companyId) })
+  return response.results
 }
 
-// Get recurrences by customer ID
 export async function getRecurrencesByCustomer(customerId: string): Promise<Recurrence[]> {
-  try {
-    await apiDelay(800)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence[]>(`/customers/${customerId}/recurrences`, {
-    //   headers: getAuthHeader(),
-    // });
-
-    return mockRecurrences.filter((r) => r.customerId === customerId)
-  } catch (error) {
-    console.error(`Failed to fetch recurrences for customer ${customerId}:`, error)
-    throw error
-  }
+  const response = await recurrencesApi.getAll({ customerId: Number.parseInt(customerId) })
+  return response.results
 }
 
-// Get recurrences by team ID
 export async function getRecurrencesByTeam(teamId: string): Promise<Recurrence[]> {
-  try {
-    await apiDelay(800)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence[]>(`/teams/${teamId}/recurrences`, {
-    //   headers: getAuthHeader(),
-    // });
-
-    return mockRecurrences.filter((r) => r.teamId === teamId)
-  } catch (error) {
-    console.error(`Failed to fetch recurrences for team ${teamId}:`, error)
-    throw error
-  }
+  const response = await recurrencesApi.getAll({ teamId: Number.parseInt(teamId) })
+  return response.results
 }
 
-// Filter recurrences by status
 export async function getRecurrencesByStatus(status: string): Promise<Recurrence[]> {
-  try {
-    await apiDelay(500)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence[]>(`/recurrences?status=${status}`, {
-    //   headers: getAuthHeader(),
-    // });
-
-    return mockRecurrences.filter((r) => r.status === status)
-  } catch (error) {
-    console.error(`Failed to fetch recurrences with status ${status}:`, error)
-    throw error
-  }
+  const response = await recurrencesApi.getAll({ status })
+  return response.results
 }
 
-// Filter recurrences by type
 export async function getRecurrencesByType(type: string): Promise<Recurrence[]> {
-  try {
-    await apiDelay(500)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence[]>(`/recurrences?type=${type}`, {
-    //   headers: getAuthHeader(),
-    // });
-
-    return mockRecurrences.filter((r) => r.type === type)
-  } catch (error) {
-    console.error(`Failed to fetch recurrences with type ${type}:`, error)
-    throw error
-  }
+  const response = await recurrencesApi.getAll({ type })
+  return response.results
 }
 
-// Search recurrences by title or customer name
 export async function searchRecurrences(query: string): Promise<Recurrence[]> {
-  try {
-    await apiDelay(500)
-
-    // In a real implementation:
-    // return await fetchApi<Recurrence[]>(`/recurrences/search?q=${encodeURIComponent(query)}`, {
-    //   headers: getAuthHeader(),
-    // });
-
-    const lowercaseQuery = query.toLowerCase()
-    return mockRecurrences.filter(
-      (r) =>
-        r.title.toLowerCase().includes(lowercaseQuery) ||
-        (r.customerName && r.customerName.toLowerCase().includes(lowercaseQuery)),
-    )
-  } catch (error) {
-    console.error(`Failed to search recurrences with query "${query}":`, error)
-    throw error
-  }
+  const response = await recurrencesApi.getAll({ search: query })
+  return response.results
 }
-
-// Mock data for recurrences
-const mockRecurrences: Recurrence[] = [
-  {
-    id: "rec_1",
-    title: "Weekly Office Cleaning",
-    customerId: "cust_1",
-    customerName: "Tech Solutions Ltd",
-    address: "123 Main St, Suite 500",
-    teamId: "team_1",
-    teamName: "Team Alpha",
-    companyId: "comp_1",
-    frequency: "weekly",
-    day: 1, // Monday
-    time: "09:00",
-    duration: 120,
-    status: "active",
-    type: "regular",
-    startDate: "2025-01-15",
-    endDate: "2025-12-31",
-    notes: "Focus on kitchen and meeting rooms",
-    lastExecution: "2025-05-20",
-    nextExecution: "2025-05-27",
-    createdAt: "2025-01-10T12:00:00Z",
-    updatedAt: "2025-05-20T15:30:00Z",
-  },
-  {
-    id: "rec_2",
-    title: "Bi-weekly Deep Cleaning",
-    customerId: "cust_2",
-    customerName: "ABC Consulting",
-    address: "456 Oak Ave, Floor 3",
-    teamId: "team_2",
-    teamName: "Team Beta",
-    companyId: "comp_1",
-    frequency: "biweekly",
-    day: 3, // Wednesday
-    time: "14:00",
-    duration: 240,
-    status: "active",
-    type: "deep",
-    startDate: "2025-02-05",
-    endDate: "2025-12-31",
-    notes: "Include carpet cleaning",
-    lastExecution: "2025-05-15",
-    nextExecution: "2025-05-29",
-    createdAt: "2025-02-01T09:15:00Z",
-    updatedAt: "2025-05-15T17:45:00Z",
-  },
-  {
-    id: "rec_3",
-    title: "Monthly Window Cleaning",
-    customerId: "cust_3",
-    customerName: "XYZ Commerce",
-    address: "789 Pine St",
-    teamId: "team_3",
-    teamName: "Team Gamma",
-    companyId: "comp_2",
-    frequency: "monthly",
-    day: 5, // First Friday
-    time: "10:00",
-    duration: 180,
-    status: "active",
-    type: "specialized",
-    startDate: "2025-01-03",
-    endDate: "2025-12-31",
-    notes: "External windows on floors 1-3",
-    lastExecution: "2025-05-03",
-    nextExecution: "2025-06-07",
-    createdAt: "2024-12-20T14:30:00Z",
-    updatedAt: "2025-05-03T13:20:00Z",
-  },
-  {
-    id: "rec_4",
-    title: "Daily Morning Cleaning",
-    customerId: "cust_4",
-    customerName: "Delta Industries",
-    address: "101 Maple Dr, Building B",
-    teamId: "team_1",
-    teamName: "Team Alpha",
-    companyId: "comp_2",
-    frequency: "daily",
-    day: 0, // Every weekday
-    time: "06:00",
-    duration: 90,
-    status: "active",
-    type: "regular",
-    startDate: "2025-03-01",
-    endDate: "2025-12-31",
-    notes: "Before office hours",
-    lastExecution: "2025-05-24",
-    nextExecution: "2025-05-27",
-    createdAt: "2025-02-15T11:45:00Z",
-    updatedAt: "2025-05-24T07:30:00Z",
-  },
-  {
-    id: "rec_5",
-    title: "Quarterly Deep Cleaning",
-    customerId: "cust_5",
-    customerName: "Omega Services",
-    address: "202 Elm St, Suite 100",
-    teamId: "team_2",
-    teamName: "Team Beta",
-    companyId: "comp_3",
-    frequency: "monthly",
-    day: 1, // First Monday of quarter
-    time: "08:00",
-    duration: 480,
-    status: "paused",
-    type: "deep",
-    startDate: "2025-01-06",
-    endDate: "2025-12-31",
-    notes: "Full day deep cleaning",
-    lastExecution: "2025-04-07",
-    nextExecution: "2025-07-07",
-    createdAt: "2024-12-15T10:00:00Z",
-    updatedAt: "2025-04-07T18:15:00Z",
-  },
-  {
-    id: "rec_6",
-    title: "Weekly Carpet Cleaning",
-    customerId: "cust_6",
-    customerName: "Global Tech",
-    address: "303 Cedar Rd",
-    teamId: "team_3",
-    teamName: "Team Gamma",
-    companyId: "comp_3",
-    frequency: "weekly",
-    day: 5, // Friday
-    time: "16:00",
-    duration: 120,
-    status: "active",
-    type: "specialized",
-    startDate: "2025-02-07",
-    endDate: "2025-12-31",
-    notes: "Focus on high-traffic areas",
-    lastExecution: "2025-05-23",
-    nextExecution: "2025-05-30",
-    createdAt: "2025-02-01T15:30:00Z",
-    updatedAt: "2025-05-23T18:45:00Z",
-  },
-  {
-    id: "rec_7",
-    title: "Monthly HVAC Cleaning",
-    customerId: "cust_7",
-    customerName: "Innovate Inc",
-    address: "404 Birch Blvd, Floor 5",
-    teamId: "team_1",
-    teamName: "Team Alpha",
-    companyId: "comp_4",
-    frequency: "monthly",
-    day: 31, // Last day
-    time: "09:00",
-    duration: 360,
-    status: "completed",
-    type: "specialized",
-    startDate: "2025-01-25",
-    endDate: "2025-05-31",
-    notes: "HVAC system maintenance and cleaning",
-    lastExecution: "2025-05-25",
-    nextExecution: null,
-    createdAt: "2025-01-15T09:00:00Z",
-    updatedAt: "2025-05-25T16:30:00Z",
-  },
-]

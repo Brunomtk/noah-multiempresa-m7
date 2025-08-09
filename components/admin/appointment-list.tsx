@@ -1,166 +1,199 @@
 "use client"
 
-import { format } from "date-fns"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Edit, Eye, MapPin, Trash2, Users } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Calendar, Clock, MapPin, User, Users, Eye, Edit, Trash2 } from "lucide-react"
+import { format } from "date-fns"
+import type { Appointment } from "@/types/appointment"
 
 interface AppointmentListProps {
-  appointments: any[]
-  onViewDetails: (appointment: any) => void
-  onEdit: (appointment: any) => void
-  onDelete: (appointment: any) => void
+  appointments: Appointment[]
+  onViewDetails: (appointment: Appointment) => void
+  onEdit: (appointment: Appointment) => void
+  onDelete: (appointment: Appointment) => void
+}
+
+const getStatusBadge = (status: number) => {
+  switch (status) {
+    case 0:
+      return (
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+          Scheduled
+        </Badge>
+      )
+    case 1:
+      return (
+        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+          In Progress
+        </Badge>
+      )
+    case 2:
+      return (
+        <Badge variant="secondary" className="bg-green-100 text-green-800">
+          Completed
+        </Badge>
+      )
+    case 3:
+      return (
+        <Badge variant="secondary" className="bg-red-100 text-red-800">
+          Cancelled
+        </Badge>
+      )
+    default:
+      return <Badge variant="secondary">Unknown</Badge>
+  }
+}
+
+const getTypeBadge = (type: number) => {
+  switch (type) {
+    case 0:
+      return (
+        <Badge variant="outline" className="border-gray-300 text-gray-700">
+          Regular
+        </Badge>
+      )
+    case 1:
+      return (
+        <Badge variant="outline" className="border-purple-300 text-purple-700">
+          Deep Cleaning
+        </Badge>
+      )
+    case 2:
+      return (
+        <Badge variant="outline" className="border-orange-300 text-orange-700">
+          Specialized
+        </Badge>
+      )
+    default:
+      return <Badge variant="outline">Unknown</Badge>
+  }
 }
 
 export function AppointmentList({ appointments, onViewDetails, onEdit, onDelete }: AppointmentListProps) {
-  // Sort appointments by date
-  const sortedAppointments = [...appointments].sort((a, b) => a.start.getTime() - b.start.getTime())
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "scheduled":
-        return { label: "Scheduled", className: "border-blue-500 text-blue-500" }
-      case "in_progress":
-        return { label: "In Progress", className: "border-yellow-500 text-yellow-500" }
-      case "completed":
-        return { label: "Completed", className: "border-green-500 text-green-500" }
-      case "cancelled":
-        return { label: "Cancelled", className: "border-red-500 text-red-500" }
-      default:
-        return { label: status, className: "border-gray-500 text-gray-500" }
-    }
-  }
-
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case "regular":
-        return { label: "Regular", className: "border-blue-400 text-blue-400" }
-      case "deep":
-        return { label: "Deep", className: "border-purple-400 text-purple-400" }
-      case "specialized":
-        return { label: "Specialized", className: "border-orange-400 text-orange-400" }
-      default:
-        return { label: type, className: "border-gray-400 text-gray-400" }
-    }
+  if (!appointments || appointments.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+        <h3 className="text-lg font-medium text-white mb-2">No appointments found</h3>
+        <p className="text-gray-400">Create your first appointment to get started.</p>
+      </div>
+    )
   }
 
   return (
-    <TooltipProvider>
-      <div className="rounded-md border border-[#2a3349] overflow-hidden">
-        <Table>
-          <TableHeader className="bg-[#1a2234]">
-            <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
-              <TableHead className="text-white">Service</TableHead>
-              <TableHead className="text-white">Date & Time</TableHead>
-              <TableHead className="text-white">Customer</TableHead>
-              <TableHead className="text-white">Team</TableHead>
-              <TableHead className="text-white">Type</TableHead>
-              <TableHead className="text-white">Status</TableHead>
-              <TableHead className="text-white text-center">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedAppointments.map((appointment) => (
-              <TableRow key={appointment.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
-                <TableCell className="font-medium text-white">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-[#2a3349] p-1.5 rounded-md">
-                      <Calendar className="h-4 w-4 text-[#06b6d4]" />
-                    </div>
-                    {appointment.title}
-                  </div>
-                </TableCell>
-                <TableCell className="text-gray-400">
+    <div className="grid gap-4">
+      {appointments.map((appointment) => (
+        <Card key={appointment.id} className="bg-[#1a2234] border-[#2a3349] hover:border-[#06b6d4] transition-colors">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 space-y-3">
+                {/* Header */}
+                <div className="flex items-start justify-between">
                   <div>
-                    <div>{format(appointment.start, "MMM d, yyyy")}</div>
-                    <div className="text-xs">
-                      {format(appointment.start, "h:mm a")} - {format(appointment.end, "h:mm a")}
+                    <h3 className="text-lg font-semibold text-white mb-1">{appointment.title}</h3>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(appointment.status)}
+                      {getTypeBadge(appointment.type)}
                     </div>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="text-white">{appointment.customer}</div>
-                    <div className="flex items-center text-xs text-gray-400 mt-1">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {appointment.address}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-gray-400">
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-[#06b6d4]" />
-                    {appointment.team}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewDetails(appointment)}
+                      className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEdit(appointment)}
+                      className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDelete(appointment)}
+                      className="text-gray-400 hover:text-red-400 hover:bg-[#2a3349]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={getTypeBadge(appointment.type).className}>
-                    {getTypeBadge(appointment.type).label}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
-                    {getStatusBadge(appointment.status).label}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-center gap-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onViewDetails(appointment)}
-                          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>View Details</p>
-                      </TooltipContent>
-                    </Tooltip>
+                </div>
 
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onEdit(appointment)}
-                          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Edit</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onDelete(appointment)}
-                          className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Delete</p>
-                      </TooltipContent>
-                    </Tooltip>
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Date & Time */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Calendar className="h-4 w-4" />
+                      <span className="text-sm font-medium">Date & Time</span>
+                    </div>
+                    <div className="text-white">
+                      <div className="text-sm">{format(new Date(appointment.start), "MMM dd, yyyy")}</div>
+                      <div className="text-xs text-gray-400 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {format(new Date(appointment.start), "HH:mm")} - {format(new Date(appointment.end), "HH:mm")}
+                      </div>
+                    </div>
                   </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </TooltipProvider>
+
+                  {/* Customer */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <User className="h-4 w-4" />
+                      <span className="text-sm font-medium">Customer</span>
+                    </div>
+                    <div className="text-white">
+                      <div className="text-sm">{appointment.customer?.name || "N/A"}</div>
+                      <div className="text-xs text-gray-400">{appointment.customer?.phone || ""}</div>
+                    </div>
+                  </div>
+
+                  {/* Team & Professional */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Users className="h-4 w-4" />
+                      <span className="text-sm font-medium">Team</span>
+                    </div>
+                    <div className="text-white">
+                      <div className="text-sm">{appointment.team?.name || "N/A"}</div>
+                      <div className="text-xs text-gray-400">{appointment.professional?.name || ""}</div>
+                    </div>
+                  </div>
+
+                  {/* Address */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <MapPin className="h-4 w-4" />
+                      <span className="text-sm font-medium">Address</span>
+                    </div>
+                    <div className="text-white">
+                      <div className="text-sm truncate" title={appointment.address}>
+                        {appointment.address}
+                      </div>
+                      <div className="text-xs text-gray-400">{appointment.company?.name || ""}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {appointment.notes && (
+                  <div className="pt-2 border-t border-[#2a3349]">
+                    <p className="text-sm text-gray-400">
+                      <span className="font-medium">Notes:</span> {appointment.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }

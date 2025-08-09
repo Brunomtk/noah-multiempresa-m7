@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,221 +20,86 @@ import {
   Mail,
   MessageSquare,
   AlertCircle,
-  Package,
-  HistoryIcon,
   CalendarClock,
   X,
   ExternalLink,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { format, addDays, subDays, isToday } from "date-fns"
+import { useProfessionalSchedule } from "@/hooks/use-professional-schedule"
+import type { Appointment } from "@/types/appointment"
 
 export default function ProfessionalSchedule() {
   const [view, setView] = useState("day")
-  const [selectedAppointment, setSelectedAppointment] = useState(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [currentDate, setCurrentDate] = useState(new Date())
 
-  // Sample data for appointments
-  const appointments = [
-    {
-      id: 1,
-      title: "Residential Cleaning",
-      date: "2023-05-27",
-      displayDate: "Tomorrow, 05/27/2023",
-      time: "10:00 - 12:00",
-      startTime: "10:00",
-      endTime: "12:00",
-      location: "Tree Park Residential, House 15",
-      address: "123 Tree Park Avenue, Apt 15, New York, NY 10001",
-      status: "Scheduled",
-      client: {
-        name: "John Smith",
-        phone: "(555) 123-4567",
-        email: "john.smith@example.com",
-        image: "/placeholder.svg?height=40&width=40&query=JS",
-      },
-      service: {
-        type: "Standard Cleaning",
-        duration: "2 hours",
-        frequency: "Weekly",
-        price: "$120.00",
-        rooms: ["Living Room", "Kitchen", "2 Bathrooms", "2 Bedrooms"],
-      },
-      notes:
-        "Client has a dog, please make sure the gate is closed at all times. Use the provided eco-friendly cleaning products only.",
-      materials: ["All-purpose cleaner", "Glass cleaner", "Microfiber cloths", "Vacuum cleaner"],
-      history: [
-        { date: "05/20/2023", status: "Completed", notes: "Client was very satisfied" },
-        { date: "05/13/2023", status: "Completed", notes: "Finished 15 minutes early" },
-        { date: "05/06/2023", status: "Completed", notes: "No special observations" },
-      ],
-    },
-    {
-      id: 2,
-      title: "Commercial Cleaning",
-      date: "2023-05-29",
-      displayDate: "05/29/2023",
-      time: "14:00 - 17:00",
-      startTime: "14:00",
-      endTime: "17:00",
-      location: "Business Office, Tower B, 3rd floor",
-      address: "456 Business Avenue, Tower B, 3rd Floor, New York, NY 10002",
-      status: "Scheduled",
-      client: {
-        name: "Acme Corporation",
-        phone: "(555) 987-6543",
-        email: "facilities@acmecorp.com",
-        image: "/placeholder.svg?height=40&width=40&query=AC",
-      },
-      service: {
-        type: "Deep Office Cleaning",
-        duration: "3 hours",
-        frequency: "Bi-weekly",
-        price: "$250.00",
-        rooms: ["Reception", "Conference Room", "Open Office Space", "Executive Offices", "Restrooms", "Kitchen"],
-      },
-      notes:
-        "Security check-in required at the main entrance. Cleaning must be done after business hours. Special attention to the conference room as there's a meeting scheduled for the next morning.",
-      materials: ["Commercial disinfectant", "Floor cleaner", "Carpet cleaner", "Industrial vacuum", "Window cleaner"],
-      history: [
-        { date: "05/15/2023", status: "Completed", notes: "Extra attention to conference room as requested" },
-        { date: "05/01/2023", status: "Completed", notes: "Replaced air fresheners in all rooms" },
-        { date: "04/15/2023", status: "Rescheduled", notes: "Building closed for maintenance" },
-      ],
-    },
-    {
-      id: 3,
-      title: "Post-Construction Cleaning",
-      date: "2023-06-01",
-      displayDate: "06/01/2023",
-      time: "08:00 - 13:00",
-      startTime: "08:00",
-      endTime: "13:00",
-      location: "New Horizon Condominium, Block A, Apt 202",
-      address: "789 New Horizon Lane, Block A, Apt 202, New York, NY 10003",
-      status: "Scheduled",
-      client: {
-        name: "New Horizon Properties",
-        phone: "(555) 456-7890",
-        email: "projects@newhorizon.com",
-        image: "/placeholder.svg?height=40&width=40&query=NH",
-      },
-      service: {
-        type: "Post-Construction Deep Clean",
-        duration: "5 hours",
-        frequency: "One-time",
-        price: "$450.00",
-        rooms: ["Entire 2-bedroom apartment", "Balcony", "Hallway"],
-      },
-      notes:
-        "Construction was just completed. Focus on removing dust, paint spots, and construction debris. Property manager will provide access and will be present during the service.",
-      materials: [
-        "Heavy-duty vacuum",
-        "Paint remover",
-        "Dust masks",
-        "Protective gloves",
-        "Industrial cleaning agents",
-      ],
-      history: [],
-    },
-    {
-      id: 4,
-      title: "Office Deep Cleaning",
-      date: "2023-05-25", // Today
-      displayDate: "Today, 05/25/2023",
-      time: "09:00 - 11:30",
-      startTime: "09:00",
-      endTime: "11:30",
-      location: "Downtown Office Complex, Building C",
-      address: "789 Business District, Building C, New York, NY 10004",
-      status: "In Progress",
-      client: {
-        name: "Tech Innovations Inc",
-        phone: "(555) 222-3333",
-        email: "facilities@techinnovations.com",
-        image: "/placeholder.svg?height=40&width=40&query=TI",
-      },
-      service: {
-        type: "Office Deep Cleaning",
-        duration: "2.5 hours",
-        frequency: "Monthly",
-        price: "$180.00",
-        rooms: ["Open Office Area", "Executive Suite", "Conference Rooms", "Break Room", "Restrooms"],
-      },
-      notes:
-        "Focus on sanitizing all surfaces. The CEO will be hosting clients tomorrow, so pay special attention to the executive suite and main conference room.",
-      materials: ["Sanitizer", "Glass cleaner", "Floor polish", "Dusting tools", "Air fresheners"],
-      history: [
-        { date: "04/25/2023", status: "Completed", notes: "All areas cleaned as requested" },
-        { date: "03/25/2023", status: "Completed", notes: "Additional carpet cleaning performed" },
-      ],
-    },
-    {
-      id: 5,
-      title: "Residential Maintenance",
-      date: "2023-05-25", // Today
-      displayDate: "Today, 05/25/2023",
-      time: "14:00 - 16:00",
-      startTime: "14:00",
-      endTime: "16:00",
-      location: "Sunset Apartments, Unit 303",
-      address: "456 Sunset Boulevard, Unit 303, New York, NY 10005",
-      status: "Scheduled",
-      client: {
-        name: "Emma Johnson",
-        phone: "(555) 444-5555",
-        email: "emma.johnson@example.com",
-        image: "/placeholder.svg?height=40&width=40&query=EJ",
-      },
-      service: {
-        type: "Regular Maintenance",
-        duration: "2 hours",
-        frequency: "Weekly",
-        price: "$100.00",
-        rooms: ["Living Room", "Kitchen", "Bathroom", "Bedroom"],
-      },
-      notes:
-        "Client has allergies, please use the hypoallergenic cleaning products provided. The cat should be kept in the bedroom during cleaning.",
-      materials: ["Hypoallergenic cleaner", "Microfiber cloths", "HEPA vacuum", "Natural air freshener"],
-      history: [
-        { date: "05/18/2023", status: "Completed", notes: "Client was very satisfied" },
-        { date: "05/11/2023", status: "Completed", notes: "Extra attention to kitchen as requested" },
-      ],
-    },
-  ]
+  const {
+    appointments,
+    isLoading,
+    error,
+    fetchAppointments,
+    fetchAppointmentsByDateRange,
+    scheduleSummary,
+    fetchScheduleSummary,
+  } = useProfessionalSchedule()
+
+  // Memoize date strings to prevent unnecessary re-renders
+  const dateRange = useMemo(() => {
+    const startDate = format(subDays(currentDate, 30), "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    const endDate = format(addDays(currentDate, 30), "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    return { startDate, endDate }
+  }, [currentDate])
+
+  // Fetch appointments when date range changes
+  useEffect(() => {
+    fetchAppointmentsByDateRange(dateRange.startDate, dateRange.endDate)
+  }, [dateRange.startDate, dateRange.endDate, fetchAppointmentsByDateRange])
+
+  // Fetch schedule summary only once on mount
+  useEffect(() => {
+    const now = new Date()
+    fetchScheduleSummary(now.getMonth() + 1, now.getFullYear())
+  }, [fetchScheduleSummary])
 
   // Get appointments for the current day
-  const getTodayAppointments = () => {
+  const getTodayAppointments = useMemo(() => {
     const formattedDate = format(currentDate, "yyyy-MM-dd")
-    return appointments.filter((appointment) => appointment.date === formattedDate)
-  }
+    return appointments.filter((appointment) => {
+      const appointmentDate = format(new Date(appointment.start), "yyyy-MM-dd")
+      return appointmentDate === formattedDate
+    })
+  }, [appointments, currentDate])
 
   // Generate hours for the day view (8 AM to 8 PM)
-  const generateDayHours = () => {
+  const generateDayHours = useMemo(() => {
     const hours = []
     for (let i = 8; i <= 20; i++) {
       const hour = i < 10 ? `0${i}:00` : `${i}:00`
-      const appointments = getTodayAppointments().filter((appointment) => {
-        const startHour = Number.parseInt(appointment.startTime.split(":")[0])
+      const appointmentsForHour = getTodayAppointments.filter((appointment) => {
+        const startHour = new Date(appointment.start).getHours()
         return startHour === i
       })
 
       hours.push({
         hour,
-        appointments,
+        appointments: appointmentsForHour,
       })
     }
     return hours
-  }
+  }, [getTodayAppointments])
 
   // Generate days for the week view
-  const generateWeekDays = () => {
+  const generateWeekDays = useMemo(() => {
     const days = []
     for (let i = -3; i <= 3; i++) {
       const date = i === 0 ? currentDate : i < 0 ? subDays(currentDate, Math.abs(i)) : addDays(currentDate, i)
       const formattedDate = format(date, "yyyy-MM-dd")
-      const dayAppointments = appointments.filter((appointment) => appointment.date === formattedDate)
+      const dayAppointments = appointments.filter((appointment) => {
+        const appointmentDate = format(new Date(appointment.start), "yyyy-MM-dd")
+        return appointmentDate === formattedDate
+      })
 
       days.push({
         date,
@@ -245,21 +110,44 @@ export default function ProfessionalSchedule() {
       })
     }
     return days
-  }
+  }, [currentDate, appointments])
 
   // Generate days for the month view
-  const generateMonthDays = () => {
+  const generateMonthDays = useMemo(() => {
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDayOfWeek = firstDay.getDay()
+
     const days = []
-    for (let i = 1; i <= 31; i++) {
+
+    // Add empty cells for days before the 1st
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push({ day: null, hasAppointment: false, appointments: [] })
+    }
+
+    // Add actual days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day)
+      const formattedDate = format(date, "yyyy-MM-dd")
+      const dayAppointments = appointments.filter((appointment) => {
+        const appointmentDate = format(new Date(appointment.start), "yyyy-MM-dd")
+        return appointmentDate === formattedDate
+      })
+
       days.push({
-        day: i,
-        hasAppointment: [5, 12, 18, 23, 25, 27, 29].includes(i),
+        day,
+        hasAppointment: dayAppointments.length > 0,
+        appointments: dayAppointments,
       })
     }
-    return days
-  }
 
-  const handleViewDetails = (appointment) => {
+    return days
+  }, [currentDate, appointments])
+
+  const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setDetailsOpen(true)
   }
@@ -295,20 +183,58 @@ export default function ProfessionalSchedule() {
   }
 
   // Get status badge styling
-  const getStatusBadge = (status) => {
-    switch (status.toLowerCase()) {
-      case "scheduled":
+  const getStatusBadge = (status: number) => {
+    switch (status) {
+      case 0:
         return { label: "Scheduled", className: "bg-blue-50 text-blue-700 border-blue-200" }
-      case "in progress":
-      case "in_progress":
+      case 1:
         return { label: "In Progress", className: "bg-yellow-50 text-yellow-700 border-yellow-200" }
-      case "completed":
+      case 2:
         return { label: "Completed", className: "bg-green-50 text-green-700 border-green-200" }
-      case "cancelled":
+      case 3:
         return { label: "Cancelled", className: "bg-red-50 text-red-700 border-red-200" }
       default:
-        return { label: status, className: "bg-gray-50 text-gray-700 border-gray-200" }
+        return { label: "Unknown", className: "bg-gray-50 text-gray-700 border-gray-200" }
     }
+  }
+
+  // Get type label
+  const getTypeLabel = (type: number) => {
+    switch (type) {
+      case 0:
+        return "Residential"
+      case 1:
+        return "Commercial"
+      case 2:
+        return "Industrial"
+      default:
+        return "Unknown"
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading schedule...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto" />
+          <p className="mt-2 text-red-600">{error}</p>
+          <Button onClick={() => fetchAppointments()} className="mt-2">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -352,12 +278,12 @@ export default function ProfessionalSchedule() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Day View - Improved */}
+          {/* Day View */}
           {view === "day" && (
             <div className="space-y-6">
               <div className="border rounded-lg overflow-hidden">
                 <div className="grid grid-cols-1 divide-y">
-                  {generateDayHours().map((hourData, i) => (
+                  {generateDayHours.map((hourData, i) => (
                     <div
                       key={i}
                       className={`p-2 min-h-[100px] ${hourData.appointments.length > 0 ? "bg-primary/5" : ""}`}
@@ -380,15 +306,16 @@ export default function ProfessionalSchedule() {
                             </div>
                             <div className="text-xs flex items-center mt-1">
                               <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                              <span className="truncate">{appointment.location}</span>
+                              <span className="truncate">{appointment.address}</span>
                             </div>
                             <div className="text-xs flex items-center mt-1">
                               <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {appointment.time}
+                              {format(new Date(appointment.start), "HH:mm")} -{" "}
+                              {format(new Date(appointment.end), "HH:mm")}
                             </div>
                             <div className="text-xs flex items-center mt-1">
                               <Users className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {appointment.client.name}
+                              {appointment.customer?.name || "No customer"}
                             </div>
                           </div>
                         ))}
@@ -401,8 +328,8 @@ export default function ProfessionalSchedule() {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Today's Appointments</h3>
                 <div className="space-y-3">
-                  {getTodayAppointments().length > 0 ? (
-                    getTodayAppointments().map((appointment) => (
+                  {getTodayAppointments.length > 0 ? (
+                    getTodayAppointments.map((appointment) => (
                       <div key={appointment.id} className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="space-y-1">
@@ -410,29 +337,33 @@ export default function ProfessionalSchedule() {
                               <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
                                 {getStatusBadge(appointment.status).label}
                               </Badge>
-                              <span className="text-sm text-muted-foreground">{appointment.time}</span>
+                              <span className="text-sm text-muted-foreground">
+                                {format(new Date(appointment.start), "HH:mm")} -{" "}
+                                {format(new Date(appointment.end), "HH:mm")}
+                              </span>
+                              <Badge variant="secondary">{getTypeLabel(appointment.type)}</Badge>
                             </div>
                             <h3 className="font-semibold">{appointment.title}</h3>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <MapPin className="h-4 w-4" />
-                              <span>{appointment.location}</span>
+                              <span>{appointment.address}</span>
                             </div>
                           </div>
                           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-8 w-8">
                                 <AvatarImage
-                                  src={appointment.client.image || "/placeholder.svg"}
-                                  alt={appointment.client.name}
+                                  src={`/placeholder.svg?height=32&width=32&query=${appointment.customer?.name || "Customer"}`}
+                                  alt={appointment.customer?.name || "Customer"}
                                 />
                                 <AvatarFallback>
-                                  {appointment.client.name
-                                    .split(" ")
+                                  {appointment.customer?.name
+                                    ?.split(" ")
                                     .map((n) => n[0])
-                                    .join("")}
+                                    .join("") || "C"}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-sm">{appointment.client.name}</span>
+                              <span className="text-sm">{appointment.customer?.name || "No customer"}</span>
                             </div>
                             <Button variant="outline" size="sm" onClick={() => handleViewDetails(appointment)}>
                               View Details
@@ -453,7 +384,7 @@ export default function ProfessionalSchedule() {
           {view === "week" && (
             <div className="space-y-6">
               <div className="grid grid-cols-7 gap-2">
-                {generateWeekDays().map((day, i) => (
+                {generateWeekDays.map((day, i) => (
                   <div key={i} className="text-center">
                     <div className={`font-medium mb-2 ${day.isToday ? "text-primary" : ""}`}>{day.dayName}</div>
                     <div
@@ -471,7 +402,7 @@ export default function ProfessionalSchedule() {
                           className="mx-1 my-1 px-1 py-1 text-xs bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
                           onClick={() => handleViewDetails(appointment)}
                         >
-                          {appointment.startTime} - {appointment.title}
+                          {format(new Date(appointment.start), "HH:mm")} - {appointment.title}
                         </div>
                       ))}
                     </div>
@@ -480,41 +411,51 @@ export default function ProfessionalSchedule() {
               </div>
 
               <div className="mt-8 space-y-4">
-                <h3 className="text-lg font-semibold mb-4">Upcoming Appointments</h3>
+                <h3 className="text-lg font-semibold mb-4">Week Appointments</h3>
 
-                {appointments.map((appointment) => (
-                  <div key={appointment.id} className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
-                            {getStatusBadge(appointment.status).label}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">{appointment.displayDate}</span>
+                {appointments.length > 0 ? (
+                  appointments.map((appointment) => (
+                    <div key={appointment.id} className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
+                              {getStatusBadge(appointment.status).label}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              {format(new Date(appointment.start), "MMM dd, yyyy")}
+                            </span>
+                            <Badge variant="secondary">{getTypeLabel(appointment.type)}</Badge>
+                          </div>
+                          <h3 className="font-semibold">{appointment.title}</h3>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MapPin className="h-4 w-4" />
+                            <span>{appointment.address}</span>
+                          </div>
                         </div>
-                        <h3 className="font-semibold">{appointment.title}</h3>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          <span>{appointment.location}</span>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">
+                              {format(new Date(appointment.start), "HH:mm")} -{" "}
+                              {format(new Date(appointment.end), "HH:mm")}
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto bg-transparent"
+                            onClick={() => handleViewDetails(appointment)}
+                          >
+                            View Details
+                          </Button>
                         </div>
-                      </div>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{appointment.time}</span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="ml-auto"
-                          onClick={() => handleViewDetails(appointment)}
-                        >
-                          View Details
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">No appointments found</div>
+                )}
               </div>
             </div>
           )}
@@ -529,84 +470,35 @@ export default function ProfessionalSchedule() {
                   </div>
                 ))}
 
-                {/* Empty cells for days before the 1st */}
-                {[...Array(3)].map((_, i) => (
+                {generateMonthDays.map((dayData, i) => (
                   <div
-                    key={`empty-${i}`}
-                    className="h-24 p-1 border border-dashed text-muted-foreground/30 text-sm"
-                  ></div>
-                ))}
-
-                {/* Actual days of the month */}
-                {generateMonthDays().map((dayData, i) => (
-                  <div
-                    key={`day-${i}`}
-                    className={`h-24 p-1 border ${dayData.hasAppointment ? "bg-primary/5 border-primary/20" : ""}`}
+                    key={i}
+                    className={`h-24 p-1 border ${
+                      dayData.day === null
+                        ? "border-dashed text-muted-foreground/30"
+                        : dayData.hasAppointment
+                          ? "bg-primary/5 border-primary/20"
+                          : ""
+                    }`}
                   >
-                    <div className="text-sm">{dayData.day}</div>
-                    {dayData.day === 5 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[0])}
-                      >
-                        10:00 - Residential
-                      </div>
-                    )}
-                    {dayData.day === 12 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[1])}
-                      >
-                        14:00 - Office
-                      </div>
-                    )}
-                    {dayData.day === 18 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[2])}
-                      >
-                        09:00 - Hospital
-                      </div>
-                    )}
-                    {dayData.day === 23 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[0])}
-                      >
-                        11:00 - School
-                      </div>
-                    )}
-                    {dayData.day === 25 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[3])}
-                      >
-                        09:00 - Office
-                      </div>
-                    )}
-                    {dayData.day === 25 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[4])}
-                      >
-                        14:00 - Residential
-                      </div>
-                    )}
-                    {dayData.day === 27 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[0])}
-                      >
-                        10:00 - Residential
-                      </div>
-                    )}
-                    {dayData.day === 29 && (
-                      <div
-                        className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
-                        onClick={() => handleViewDetails(appointments[1])}
-                      >
-                        14:00 - Commercial
-                      </div>
+                    {dayData.day && (
+                      <>
+                        <div className="text-sm">{dayData.day}</div>
+                        {dayData.appointments.slice(0, 2).map((appointment) => (
+                          <div
+                            key={appointment.id}
+                            className="mt-1 text-xs bg-primary/10 text-primary rounded p-0.5 truncate cursor-pointer hover:bg-primary/20"
+                            onClick={() => handleViewDetails(appointment)}
+                          >
+                            {format(new Date(appointment.start), "HH:mm")} - {appointment.title}
+                          </div>
+                        ))}
+                        {dayData.appointments.length > 2 && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            +{dayData.appointments.length - 2} more
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ))}
@@ -620,7 +512,7 @@ export default function ProfessionalSchedule() {
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col">
                           <span className="text-muted-foreground text-sm">Total Appointments</span>
-                          <span className="text-2xl font-bold">12</span>
+                          <span className="text-2xl font-bold">{scheduleSummary?.totalAppointments || 0}</span>
                         </div>
                         <Calendar className="h-8 w-8 text-primary" />
                       </div>
@@ -632,7 +524,7 @@ export default function ProfessionalSchedule() {
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col">
                           <span className="text-muted-foreground text-sm">Clients Served</span>
-                          <span className="text-2xl font-bold">8</span>
+                          <span className="text-2xl font-bold">{scheduleSummary?.clientsServed || 0}</span>
                         </div>
                         <Users className="h-8 w-8 text-primary" />
                       </div>
@@ -644,7 +536,7 @@ export default function ProfessionalSchedule() {
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col">
                           <span className="text-muted-foreground text-sm">Completion Rate</span>
-                          <span className="text-2xl font-bold">100%</span>
+                          <span className="text-2xl font-bold">{scheduleSummary?.completionRate || 0}%</span>
                         </div>
                         <CheckCircle className="h-8 w-8 text-primary" />
                       </div>
@@ -657,7 +549,7 @@ export default function ProfessionalSchedule() {
         </CardContent>
       </Card>
 
-      {/* Appointment Details Dialog - Improved */}
+      {/* Appointment Details Dialog */}
       {selectedAppointment && (
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh]">
@@ -679,7 +571,8 @@ export default function ProfessionalSchedule() {
                     <div className="flex items-center gap-2 mt-1">
                       <CalendarClock className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">
-                        {selectedAppointment.displayDate}, {selectedAppointment.time}
+                        {format(new Date(selectedAppointment.start), "PPP, p")} -{" "}
+                        {format(new Date(selectedAppointment.end), "p")}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -694,67 +587,31 @@ export default function ProfessionalSchedule() {
                     <h4 className="font-medium mb-2">Service Details</h4>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Type:</span> {selectedAppointment.service.type}
+                        <span className="text-muted-foreground">Type:</span> {getTypeLabel(selectedAppointment.type)}
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Duration:</span> {selectedAppointment.service.duration}
+                        <span className="text-muted-foreground">Status:</span>{" "}
+                        {getStatusBadge(selectedAppointment.status).label}
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Frequency:</span>{" "}
-                        {selectedAppointment.service.frequency}
+                        <span className="text-muted-foreground">Company:</span>{" "}
+                        {selectedAppointment.company?.name || "N/A"}
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Price:</span> {selectedAppointment.service.price}
+                        <span className="text-muted-foreground">Team:</span> {selectedAppointment.team?.name || "N/A"}
                       </div>
-                    </div>
-                    <div className="mt-2 text-sm">
-                      <span className="text-muted-foreground">Areas:</span>{" "}
-                      {selectedAppointment.service.rooms.join(", ")}
                     </div>
                   </div>
 
-                  <Separator />
-
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="h-4 w-4 text-amber-500" />
-                      <h4 className="font-medium">Special Instructions</h4>
-                    </div>
-                    <p className="text-sm">{selectedAppointment.notes}</p>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Package className="h-4 w-4 text-primary" />
-                      <h4 className="font-medium">Required Materials</h4>
-                    </div>
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      {selectedAppointment.materials.map((material, index) => (
-                        <li key={index}>{material}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {selectedAppointment.history.length > 0 && (
+                  {selectedAppointment.notes && (
                     <>
                       <Separator />
                       <div>
                         <div className="flex items-center gap-2 mb-2">
-                          <HistoryIcon className="h-4 w-4 text-primary" />
-                          <h4 className="font-medium">Service History</h4>
+                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                          <h4 className="font-medium">Notes</h4>
                         </div>
-                        <div className="space-y-2">
-                          {selectedAppointment.history.map((record, index) => (
-                            <div key={index} className="text-sm border-l-2 border-primary/20 pl-3 py-1">
-                              <div className="font-medium">
-                                {record.date} - {record.status}
-                              </div>
-                              <div className="text-muted-foreground">{record.notes}</div>
-                            </div>
-                          ))}
-                        </div>
+                        <p className="text-sm">{selectedAppointment.notes}</p>
                       </div>
                     </>
                   )}
@@ -770,38 +627,44 @@ export default function ProfessionalSchedule() {
                       <div className="flex items-center gap-3 mb-3">
                         <Avatar>
                           <AvatarImage
-                            src={selectedAppointment.client.image || "/placeholder.svg"}
-                            alt={selectedAppointment.client.name}
+                            src={`/placeholder.svg?height=40&width=40&query=${selectedAppointment.customer?.name || "Customer"}`}
+                            alt={selectedAppointment.customer?.name || "Customer"}
                           />
                           <AvatarFallback>
-                            {selectedAppointment.client.name
-                              .split(" ")
+                            {selectedAppointment.customer?.name
+                              ?.split(" ")
                               .map((n) => n[0])
-                              .join("")}
+                              .join("") || "C"}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium">{selectedAppointment.client.name}</div>
+                          <div className="font-medium">{selectedAppointment.customer?.name || "No customer"}</div>
                           <div className="text-xs text-muted-foreground">Client</div>
                         </div>
                       </div>
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span>{selectedAppointment.client.phone}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span>{selectedAppointment.client.email}</span>
-                        </div>
+                        {selectedAppointment.customer?.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span>{selectedAppointment.customer.phone}</span>
+                          </div>
+                        )}
+                        {selectedAppointment.customer?.email && (
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <span>{selectedAppointment.customer.email}</span>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                     <CardFooter className="flex gap-2 pt-0">
-                      <Button variant="outline" size="sm" className="w-full">
-                        <Phone className="h-4 w-4 mr-2" />
-                        Call
-                      </Button>
-                      <Button variant="outline" size="sm" className="w-full">
+                      {selectedAppointment.customer?.phone && (
+                        <Button variant="outline" size="sm" className="w-full bg-transparent">
+                          <Phone className="h-4 w-4 mr-2" />
+                          Call
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" className="w-full bg-transparent">
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Message
                       </Button>
@@ -813,15 +676,18 @@ export default function ProfessionalSchedule() {
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Check In
                     </Button>
-                    <Button variant="outline" className="w-full">
+                    <Button variant="outline" className="w-full bg-transparent">
                       <MapPin className="h-4 w-4 mr-2" />
                       Get Directions
                     </Button>
-                    <Button variant="outline" className="w-full">
+                    <Button variant="outline" className="w-full bg-transparent">
                       <CalendarClock className="h-4 w-4 mr-2" />
                       Reschedule
                     </Button>
-                    <Button variant="outline" className="w-full text-red-500 hover:text-red-500 hover:bg-red-50">
+                    <Button
+                      variant="outline"
+                      className="w-full text-red-500 hover:text-red-500 hover:bg-red-50 bg-transparent"
+                    >
                       <X className="h-4 w-4 mr-2" />
                       Cancel Appointment
                     </Button>

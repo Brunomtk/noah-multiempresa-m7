@@ -1,338 +1,257 @@
 "use client"
 
-import { useState } from "react"
-import type { Appointment } from "@/types/appointment"
-import {
-  getAppointments,
-  getAppointmentById,
-  createAppointment,
-  updateAppointment,
-  deleteAppointment,
-  getAppointmentsByCompany,
-  getAppointmentsByTeam,
-  getAppointmentsByProfessional,
-  getAppointmentsByCustomer,
-  getAppointmentsByDateRange,
-} from "@/lib/api/appointments"
-import { useToast } from "./use-toast"
+import { useState, useCallback } from "react"
+import { appointmentsApi } from "@/lib/api/appointments"
+import type { Appointment, CreateAppointmentData, UpdateAppointmentData, AppointmentFilters } from "@/types/appointment"
+import { useToast } from "@/hooks/use-toast"
 
-export function useAppointments() {
+interface UseAppointmentsReturn {
+  appointments: Appointment[]
+  isLoading: boolean
+  error: string | null
+  pagination: {
+    currentPage: number
+    pageCount: number
+    pageSize: number
+    totalItems: number
+    firstRowOnPage: number
+    lastRowOnPage: number
+  }
+  fetchAppointments: (filters?: AppointmentFilters) => Promise<void>
+  getAppointmentById: (id: number) => Promise<Appointment | null>
+  addAppointment: (data: CreateAppointmentData) => Promise<boolean>
+  updateAppointment: (id: number, data: UpdateAppointmentData) => Promise<boolean>
+  removeAppointment: (id: number) => Promise<boolean>
+}
+
+export function useAppointments(): UseAppointmentsReturn {
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [appointment, setAppointment] = useState<Appointment | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    pageCount: 1,
+    pageSize: 10,
+    totalItems: 0,
+    firstRowOnPage: 1,
+    lastRowOnPage: 0,
+  })
   const { toast } = useToast()
 
-  // Format appointments to have Date objects instead of strings
-  const formatAppointment = (appointment: Appointment): Appointment => {
-    return {
-      ...appointment,
-      start: new Date(appointment.start),
-      end: new Date(appointment.end),
-    } as unknown as Appointment
-  }
+  const fetchAppointments = useCallback(
+    async (filters: AppointmentFilters = {}) => {
+      setIsLoading(true)
+      setError(null)
 
-  const formatAppointments = (appointments: Appointment[]): Appointment[] => {
-    return appointments.map(formatAppointment)
-  }
+      try {
+        const response = await appointmentsApi.getAppointments(filters)
 
-  // Fetch all appointments
-  const fetchAppointments = async (filters?: Record<string, any>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getAppointments(filters)
-      const formattedData = formatAppointments(data)
-      setAppointments(formattedData)
-      return formattedData
-    } catch (err) {
-      const errorMessage = "Failed to fetch appointments"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return []
-    } finally {
-      setIsLoading(false)
-    }
-  }
+        if (response.error) {
+          setError(response.error)
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          })
+          return
+        }
 
-  // Fetch a single appointment by ID
-  const fetchAppointmentById = async (id: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getAppointmentById(id)
-      const formattedData = formatAppointment(data)
-      setAppointment(formattedData)
-      return formattedData
-    } catch (err) {
-      const errorMessage = "Failed to fetch appointment details"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return null
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Create a new appointment
-  const addAppointment = async (data: Omit<Appointment, "id" | "createdAt" | "updatedAt">) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      // Convert Date objects to ISO strings for the API
-      const apiData = {
-        ...data,
-        start: data.start instanceof Date ? data.start.toISOString() : data.start,
-        end: data.end instanceof Date ? data.end.toISOString() : data.end,
+        if (response.data) {
+          setAppointments(response.data.results || [])
+          setPagination({
+            currentPage: response.data.currentPage || 1,
+            pageCount: response.data.pageCount || 1,
+            pageSize: response.data.pageSize || 10,
+            totalItems: response.data.totalItems || 0,
+            firstRowOnPage: response.data.firstRowOnPage || 1,
+            lastRowOnPage: response.data.lastRowOnPage || 0,
+          })
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to fetch appointments"
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
       }
+    },
+    [toast],
+  )
 
-      const newAppointment = await createAppointment(apiData)
-      const formattedAppointment = formatAppointment(newAppointment)
+  const getAppointmentById = useCallback(
+    async (id: number): Promise<Appointment | null> => {
+      setIsLoading(true)
+      setError(null)
 
-      setAppointments((prev) => [...prev, formattedAppointment])
-      toast({
-        title: "Success",
-        description: "Appointment created successfully",
-      })
+      try {
+        const response = await appointmentsApi.getAppointmentById(id)
 
-      return formattedAppointment
-    } catch (err) {
-      const errorMessage = "Failed to create appointment"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return null
-    } finally {
-      setIsLoading(false)
-    }
-  }
+        if (response.error) {
+          setError(response.error)
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          })
+          return null
+        }
 
-  // Update an existing appointment
-  const updateExistingAppointment = async (
-    id: string,
-    data: Partial<Omit<Appointment, "id" | "createdAt" | "updatedAt">>,
-  ) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      // Convert Date objects to ISO strings for the API
-      const apiData = {
-        ...data,
-        start: data.start instanceof Date ? data.start.toISOString() : data.start,
-        end: data.end instanceof Date ? data.end.toISOString() : data.end,
+        return response.data || null
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to fetch appointment"
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return null
+      } finally {
+        setIsLoading(false)
       }
+    },
+    [toast],
+  )
 
-      const updatedAppointment = await updateAppointment(id, apiData)
-      const formattedAppointment = formatAppointment(updatedAppointment)
+  const addAppointment = useCallback(
+    async (data: CreateAppointmentData): Promise<boolean> => {
+      setIsLoading(true)
+      setError(null)
 
-      setAppointments((prev) => prev.map((appointment) => (appointment.id === id ? formattedAppointment : appointment)))
+      try {
+        const response = await appointmentsApi.createAppointment(data)
 
-      if (appointment?.id === id) {
-        setAppointment(formattedAppointment)
+        if (response.error) {
+          setError(response.error)
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          })
+          return false
+        }
+
+        toast({
+          title: "Success",
+          description: "Appointment created successfully",
+        })
+
+        // Refresh appointments list
+        await fetchAppointments()
+        return true
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to create appointment"
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return false
+      } finally {
+        setIsLoading(false)
       }
+    },
+    [fetchAppointments, toast],
+  )
 
-      toast({
-        title: "Success",
-        description: "Appointment updated successfully",
-      })
+  const updateAppointment = useCallback(
+    async (id: number, data: UpdateAppointmentData): Promise<boolean> => {
+      setIsLoading(true)
+      setError(null)
 
-      return formattedAppointment
-    } catch (err) {
-      const errorMessage = "Failed to update appointment"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return null
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      try {
+        const response = await appointmentsApi.updateAppointment(id, data)
 
-  // Delete an appointment
-  const removeAppointment = async (id: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      await deleteAppointment(id)
-      setAppointments((prev) => prev.filter((appointment) => appointment.id !== id))
+        if (response.error) {
+          setError(response.error)
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          })
+          return false
+        }
 
-      if (appointment?.id === id) {
-        setAppointment(null)
+        toast({
+          title: "Success",
+          description: "Appointment updated successfully",
+        })
+
+        // Refresh appointments list
+        await fetchAppointments()
+        return true
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to update appointment"
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return false
+      } finally {
+        setIsLoading(false)
       }
+    },
+    [fetchAppointments, toast],
+  )
 
-      toast({
-        title: "Success",
-        description: "Appointment deleted successfully",
-      })
+  const removeAppointment = useCallback(
+    async (id: number): Promise<boolean> => {
+      setIsLoading(true)
+      setError(null)
 
-      return true
-    } catch (err) {
-      const errorMessage = "Failed to delete appointment"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return false
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      try {
+        const response = await appointmentsApi.deleteAppointment(id)
 
-  // Fetch appointments by company
-  const fetchAppointmentsByCompany = async (companyId: string, filters?: Record<string, any>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getAppointmentsByCompany(companyId, filters)
-      const formattedData = formatAppointments(data)
-      setAppointments(formattedData)
-      return formattedData
-    } catch (err) {
-      const errorMessage = "Failed to fetch company appointments"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return []
-    } finally {
-      setIsLoading(false)
-    }
-  }
+        if (response.error) {
+          setError(response.error)
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          })
+          return false
+        }
 
-  // Fetch appointments by team
-  const fetchAppointmentsByTeam = async (teamId: string, filters?: Record<string, any>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getAppointmentsByTeam(teamId, filters)
-      const formattedData = formatAppointments(data)
-      setAppointments(formattedData)
-      return formattedData
-    } catch (err) {
-      const errorMessage = "Failed to fetch team appointments"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return []
-    } finally {
-      setIsLoading(false)
-    }
-  }
+        toast({
+          title: "Success",
+          description: "Appointment deleted successfully",
+        })
 
-  // Fetch appointments by professional
-  const fetchAppointmentsByProfessional = async (professionalId: string, filters?: Record<string, any>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getAppointmentsByProfessional(professionalId, filters)
-      const formattedData = formatAppointments(data)
-      setAppointments(formattedData)
-      return formattedData
-    } catch (err) {
-      const errorMessage = "Failed to fetch professional appointments"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return []
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Fetch appointments by customer
-  const fetchAppointmentsByCustomer = async (customerId: string, filters?: Record<string, any>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getAppointmentsByCustomer(customerId, filters)
-      const formattedData = formatAppointments(data)
-      setAppointments(formattedData)
-      return formattedData
-    } catch (err) {
-      const errorMessage = "Failed to fetch customer appointments"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return []
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Fetch appointments by date range
-  const fetchAppointmentsByDateRange = async (startDate: string, endDate: string, filters?: Record<string, any>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getAppointmentsByDateRange(startDate, endDate, filters)
-      const formattedData = formatAppointments(data)
-      setAppointments(formattedData)
-      return formattedData
-    } catch (err) {
-      const errorMessage = "Failed to fetch appointments for date range"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      console.error(err)
-      return []
-    } finally {
-      setIsLoading(false)
-    }
-  }
+        // Refresh appointments list
+        await fetchAppointments()
+        return true
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to delete appointment"
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return false
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [fetchAppointments, toast],
+  )
 
   return {
     appointments,
-    appointment,
     isLoading,
     error,
+    pagination,
     fetchAppointments,
-    fetchAppointmentById,
+    getAppointmentById,
     addAppointment,
-    updateAppointment: updateExistingAppointment,
+    updateAppointment,
     removeAppointment,
-    fetchAppointmentsByCompany,
-    fetchAppointmentsByTeam,
-    fetchAppointmentsByProfessional,
-    fetchAppointmentsByCustomer,
-    fetchAppointmentsByDateRange,
   }
 }

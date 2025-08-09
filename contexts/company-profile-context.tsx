@@ -2,48 +2,110 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { toast } from "@/components/ui/use-toast"
-import { companyProfileApi } from "@/lib/api/company-profile"
+import { fetchApi } from "@/lib/api/utils"
+
+interface CompanyData {
+  id: number
+  name: string
+  cnpj: string
+  responsible: string
+  email: string
+  phone: string
+  planId: number
+  status: number
+  createdDate: string
+  updatedDate: string
+}
+
+interface UserData {
+  name: string
+  email: string
+  password: string
+  role: string
+  status: number
+  avatar: string | null
+  companyId: number
+  professionalId: number
+  id: number
+  createdDate: string
+  updatedDate: string
+}
 
 interface CompanyProfileContextType {
-  profile: any | null
+  company: CompanyData | null
+  user: UserData | null
   loading: boolean
   error: string | null
-  fetchProfile: () => Promise<void>
-  updateProfile: (profileData: any) => Promise<boolean>
-  updateLogo: (logoFile: File) => Promise<boolean>
-  updateBusinessHours: (businessHours: any) => Promise<boolean>
-  updateNotificationSettings: (notificationSettings: any) => Promise<boolean>
-  updateSecuritySettings: (securitySettings: any) => Promise<boolean>
-  updatePassword: (currentPassword: string, newPassword: string) => Promise<boolean>
-  toggleTwoFactorAuth: (enable: boolean) => Promise<any>
-  updateSocialMedia: (socialMedia: any) => Promise<boolean>
-  deactivateAccount: (reason: string, password: string) => Promise<boolean>
+  fetchCompany: () => Promise<void>
+  updateCompany: (companyData: Partial<CompanyData>) => Promise<boolean>
+}
+
+// Function to decode JWT token
+function decodeJWT(token: string) {
+  try {
+    const base64Url = token.split(".")[1]
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    )
+    return JSON.parse(jsonPayload)
+  } catch (error) {
+    console.error("Error decoding JWT:", error)
+    return null
+  }
+}
+
+// Helper function to get token
+function getToken(): string | null {
+  if (typeof window !== "undefined") {
+    return (
+      localStorage.getItem("noah_token") ||
+      localStorage.getItem("authToken") ||
+      localStorage.getItem("token")
+    )
+  }
+  return null
 }
 
 const CompanyProfileContext = createContext<CompanyProfileContextType | undefined>(undefined)
 
 export function CompanyProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<any | null>(null)
+  const [company, setCompany] = useState<CompanyData | null>(null)
+  const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchProfile = async () => {
+  const fetchCompany = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const response = await companyProfileApi.getCompanyProfile()
-
-      if (response.success && response.data) {
-        setProfile(response.data)
-      } else {
-        setError(response.error || "Failed to fetch company profile")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to fetch company profile",
-          variant: "destructive",
-        })
+      const token = getToken()
+      if (!token) {
+        throw new Error("No authentication token found. Please login again.")
       }
+
+      // Decode JWT to get user ID
+      const decodedToken = decodeJWT(token)
+      if (!decodedToken || !decodedToken.UserId) {
+        throw new Error("Invalid token. Please login again.")
+      }
+      const userId = decodedToken.UserId
+
+      // First, get user data to get companyId
+      const userData: UserData = await fetchApi<UserData>(`/Users/${userId}`)
+      setUser(userData)
+
+      if (!userData.companyId) {
+        throw new Error("User is not associated with a company")
+      }
+
+      // Now fetch company data using the companyId from user
+      const companyData: CompanyData = await fetchApi<CompanyData>(`/Companies/${userData.companyId}`)
+      setCompany(companyData)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
@@ -57,338 +119,43 @@ export function CompanyProfileProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const updateProfile = async (profileData: any): Promise<boolean> => {
+  const updateCompany = async (companyDataPartial: Partial<CompanyData>): Promise<boolean> => {
+    if (!company) return false
+
     setLoading(true)
     setError(null)
 
     try {
-      const response = await companyProfileApi.updateCompanyProfile(profileData)
+      const token = getToken()
+      if (!token) {
+        throw new Error("No authentication token found. Please login again.")
+      }
 
-      if (response.success && response.data) {
-        setProfile(response.data)
+      const updateData = {
+        name: companyDataPartial.name ?? company.name,
+        cnpj: companyDataPartial.cnpj ?? company.cnpj,
+        responsible: companyDataPartial.responsible ?? company.responsible,
+        email: companyDataPartial.email ?? company.email,
+        phone: companyDataPartial.phone ?? company.phone,
+        planId: companyDataPartial.planId ?? company.planId,
+        status: companyDataPartial.status ?? company.status,
+      }
+
+      const result = await fetchApi<boolean>(`/Companies/${company.id}`, {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      })
+
+      if (result) {
+        // Fetch updated company data
+        await fetchCompany()
         toast({
           title: "Success",
-          description: "Profile updated successfully",
+          description: "Company profile updated successfully",
         })
         return true
       } else {
-        setError(response.error || "Failed to update profile")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update profile",
-          variant: "destructive",
-        })
-        return false
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateLogo = async (logoFile: File): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.updateCompanyLogo(logoFile)
-
-      if (response.success && response.data) {
-        setProfile((prev: any) => ({
-          ...prev,
-          logo: response.data.logo,
-        }))
-        toast({
-          title: "Success",
-          description: "Logo updated successfully",
-        })
-        return true
-      } else {
-        setError(response.error || "Failed to update logo")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update logo",
-          variant: "destructive",
-        })
-        return false
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateBusinessHours = async (businessHours: any): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.updateBusinessHours(businessHours)
-
-      if (response.success && response.data) {
-        setProfile(response.data)
-        toast({
-          title: "Success",
-          description: "Business hours updated successfully",
-        })
-        return true
-      } else {
-        setError(response.error || "Failed to update business hours")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update business hours",
-          variant: "destructive",
-        })
-        return false
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateNotificationSettings = async (notificationSettings: any): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.updateNotificationSettings(notificationSettings)
-
-      if (response.success && response.data) {
-        setProfile(response.data)
-        toast({
-          title: "Success",
-          description: "Notification settings updated successfully",
-        })
-        return true
-      } else {
-        setError(response.error || "Failed to update notification settings")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update notification settings",
-          variant: "destructive",
-        })
-        return false
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateSecuritySettings = async (securitySettings: any): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.updateSecuritySettings(securitySettings)
-
-      if (response.success && response.data) {
-        setProfile(response.data)
-        toast({
-          title: "Success",
-          description: "Security settings updated successfully",
-        })
-        return true
-      } else {
-        setError(response.error || "Failed to update security settings")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update security settings",
-          variant: "destructive",
-        })
-        return false
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updatePassword = async (currentPassword: string, newPassword: string): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.updatePassword(currentPassword, newPassword)
-
-      if (response.success && response.data) {
-        setProfile((prev: any) => ({
-          ...prev,
-          securitySettings: {
-            ...prev.securitySettings,
-            passwordLastChanged: response.data.passwordLastChanged,
-          },
-        }))
-        toast({
-          title: "Success",
-          description: "Password updated successfully",
-        })
-        return true
-      } else {
-        setError(response.error || "Failed to update password")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update password",
-          variant: "destructive",
-        })
-        return false
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const toggleTwoFactorAuth = async (enable: boolean): Promise<any> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.toggleTwoFactorAuth(enable)
-
-      if (response.success && response.data) {
-        setProfile((prev: any) => ({
-          ...prev,
-          securitySettings: {
-            ...prev.securitySettings,
-            twoFactorAuth: response.data.twoFactorAuth,
-          },
-        }))
-        toast({
-          title: "Success",
-          description: `Two-factor authentication ${enable ? "enabled" : "disabled"} successfully`,
-        })
-        return response.data
-      } else {
-        setError(response.error || "Failed to update two-factor authentication")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update two-factor authentication",
-          variant: "destructive",
-        })
-        return null
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateSocialMedia = async (socialMedia: any): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.updateSocialMedia(socialMedia)
-
-      if (response.success && response.data) {
-        setProfile(response.data)
-        toast({
-          title: "Success",
-          description: "Social media links updated successfully",
-        })
-        return true
-      } else {
-        setError(response.error || "Failed to update social media links")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to update social media links",
-          variant: "destructive",
-        })
-        return false
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const deactivateAccount = async (reason: string, password: string): Promise<boolean> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await companyProfileApi.deactivateAccount(reason, password)
-
-      if (response.success && response.data) {
-        toast({
-          title: "Account Deactivated",
-          description: "Your account has been deactivated successfully",
-        })
-        return true
-      } else {
-        setError(response.error || "Failed to deactivate account")
-        toast({
-          title: "Error",
-          description: response.error || "Failed to deactivate account",
-          variant: "destructive",
-        })
-        return false
+        throw new Error("Failed to update company profile")
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
@@ -406,34 +173,29 @@ export function CompanyProfileProvider({ children }: { children: ReactNode }) {
 
   // Load initial data
   useEffect(() => {
-    fetchProfile()
+    fetchCompany()
   }, [])
 
-  const value = {
-    profile,
+  const value: CompanyProfileContextType = {
+    company,
+    user,
     loading,
     error,
-    fetchProfile,
-    updateProfile,
-    updateLogo,
-    updateBusinessHours,
-    updateNotificationSettings,
-    updateSecuritySettings,
-    updatePassword,
-    toggleTwoFactorAuth,
-    updateSocialMedia,
-    deactivateAccount,
+    fetchCompany,
+    updateCompany,
   }
 
-  return <CompanyProfileContext.Provider value={value}>{children}</CompanyProfileContext.Provider>
+  return (
+    <CompanyProfileContext.Provider value={value}>
+      {children}
+    </CompanyProfileContext.Provider>
+  )
 }
 
 export function useCompanyProfileContext() {
   const context = useContext(CompanyProfileContext)
-
   if (context === undefined) {
     throw new Error("useCompanyProfileContext must be used within a CompanyProfileProvider")
   }
-
   return context
 }

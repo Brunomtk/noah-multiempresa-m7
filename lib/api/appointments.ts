@@ -1,83 +1,185 @@
-import type { Appointment } from "@/types/appointment"
-import { apiRequest } from "./utils"
+import { fetchApi } from "./utils"
+import type {
+  Appointment,
+  CreateAppointmentData,
+  UpdateAppointmentData,
+  AppointmentFilters,
+  AppointmentResponse,
+} from "@/types/appointment"
 
-// Get all appointments
-export async function getAppointments(filters?: Record<string, any>): Promise<Appointment[]> {
-  const queryParams = filters ? new URLSearchParams(filters as Record<string, string>).toString() : ""
-  const url = `/appointments${queryParams ? `?${queryParams}` : ""}`
-  return apiRequest<Appointment[]>({ url, method: "GET" })
+export const appointmentsApi = {
+  // Get paginated appointments
+  async getAppointments(filters: AppointmentFilters = {}): Promise<{ data?: AppointmentResponse; error?: string }> {
+    try {
+      const params = new URLSearchParams()
+
+      if (filters.page) params.append("page", filters.page.toString())
+      if (filters.pageSize) params.append("pageSize", filters.pageSize.toString())
+      if (filters.status !== undefined) params.append("status", filters.status.toString())
+      if (filters.search) params.append("search", filters.search)
+      if (filters.companyId) params.append("companyId", filters.companyId.toString())
+      if (filters.customerId) params.append("customerId", filters.customerId.toString())
+      if (filters.teamId) params.append("teamId", filters.teamId.toString())
+      if (filters.professionalId) params.append("professionalId", filters.professionalId.toString())
+      if (filters.startDate) params.append("startDate", filters.startDate)
+      if (filters.endDate) params.append("endDate", filters.endDate)
+
+      const queryString = params.toString()
+      const url = queryString ? `/Appointment?${queryString}` : "/Appointment"
+
+      const response = await fetchApi(url)
+      return { data: response }
+    } catch (error) {
+      console.error("Error fetching appointments:", error)
+      return { error: error instanceof Error ? error.message : "Failed to fetch appointments" }
+    }
+  },
+
+  // Get appointment by ID
+  async getAppointmentById(id: number): Promise<{ data?: Appointment; error?: string }> {
+    try {
+      const response = await fetchApi(`/Appointment/${id}`)
+      return { data: response }
+    } catch (error) {
+      console.error("Error fetching appointment:", error)
+      return { error: error instanceof Error ? error.message : "Failed to fetch appointment" }
+    }
+  },
+
+  // Create new appointment
+  async createAppointment(appointmentData: CreateAppointmentData): Promise<{ data?: Appointment; error?: string }> {
+    try {
+      console.log("Creating appointment with data:", appointmentData)
+
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
+          : null
+
+      const response = await fetch("https://localhost:44394/api/Appointment", {
+        method: "POST",
+        headers: {
+          accept: "*/*",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(appointmentData),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // Verificar se a resposta é JSON ou texto
+      const contentType = response.headers.get("content-type")
+      let responseData
+
+      if (contentType && contentType.includes("application/json")) {
+        responseData = await response.json()
+      } else {
+        // Se não for JSON, tratar como texto (mensagem de sucesso)
+        const textResponse = await response.text()
+        console.log("Appointment created successfully:", textResponse)
+
+        // Retornar um objeto simulado já que a API retorna apenas uma mensagem
+        responseData = {
+          id: Date.now(), // ID temporário
+          ...appointmentData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      }
+
+      return { data: responseData }
+    } catch (error) {
+      console.error("Error creating appointment:", error)
+      return { error: error instanceof Error ? error.message : "Failed to create appointment" }
+    }
+  },
+
+  // Update appointment
+  async updateAppointment(
+    id: number,
+    appointmentData: UpdateAppointmentData,
+  ): Promise<{ data?: Appointment; error?: string }> {
+    try {
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
+          : null
+
+      const response = await fetch(`https://localhost:44394/api/Appointment/${id}`, {
+        method: "PUT",
+        headers: {
+          accept: "*/*",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(appointmentData),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // Verificar se a resposta é JSON ou texto
+      const contentType = response.headers.get("content-type")
+      let responseData
+
+      if (contentType && contentType.includes("application/json")) {
+        responseData = await response.json()
+      } else {
+        // Se não for JSON, tratar como texto (mensagem de sucesso)
+        const textResponse = await response.text()
+        console.log("Appointment updated successfully:", textResponse)
+
+        // Retornar um objeto simulado já que a API retorna apenas uma mensagem
+        responseData = {
+          id,
+          ...appointmentData,
+          updatedAt: new Date().toISOString(),
+        }
+      }
+
+      return { data: responseData }
+    } catch (error) {
+      console.error("Error updating appointment:", error)
+      return { error: error instanceof Error ? error.message : "Failed to update appointment" }
+    }
+  },
+
+  // Delete appointment
+  async deleteAppointment(id: number): Promise<{ success?: boolean; error?: string }> {
+    try {
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
+          : null
+
+      const response = await fetch(`https://localhost:44394/api/Appointment/${id}`, {
+        method: "DELETE",
+        headers: {
+          accept: "*/*",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error("Error deleting appointment:", error)
+      return { error: error instanceof Error ? error.message : "Failed to delete appointment" }
+    }
+  },
 }
 
-// Get a single appointment by ID
-export async function getAppointmentById(id: string): Promise<Appointment> {
-  return apiRequest<Appointment>({ url: `/appointments/${id}`, method: "GET" })
-}
-
-// Create a new appointment
-export async function createAppointment(
-  data: Omit<Appointment, "id" | "createdAt" | "updatedAt">,
-): Promise<Appointment> {
-  return apiRequest<Appointment>({ url: "/appointments", method: "POST", data })
-}
-
-// Update an existing appointment
-export async function updateAppointment(
-  id: string,
-  data: Partial<Omit<Appointment, "id" | "createdAt" | "updatedAt">>,
-): Promise<Appointment> {
-  return apiRequest<Appointment>({ url: `/appointments/${id}`, method: "PUT", data })
-}
-
-// Delete an appointment
-export async function deleteAppointment(id: string): Promise<void> {
-  return apiRequest<void>({ url: `/appointments/${id}`, method: "DELETE" })
-}
-
-// Get appointments by company ID
-export async function getAppointmentsByCompany(
-  companyId: string,
-  filters?: Record<string, any>,
-): Promise<Appointment[]> {
-  const queryParams = new URLSearchParams((filters as Record<string, string>) || {})
-  queryParams.append("companyId", companyId)
-  return apiRequest<Appointment[]>({ url: `/appointments?${queryParams.toString()}`, method: "GET" })
-}
-
-// Get appointments by team ID
-export async function getAppointmentsByTeam(teamId: string, filters?: Record<string, any>): Promise<Appointment[]> {
-  const queryParams = new URLSearchParams((filters as Record<string, string>) || {})
-  queryParams.append("teamId", teamId)
-  return apiRequest<Appointment[]>({ url: `/appointments?${queryParams.toString()}`, method: "GET" })
-}
-
-// Get appointments by professional ID
-export async function getAppointmentsByProfessional(
-  professionalId: string,
-  filters?: Record<string, any>,
-): Promise<Appointment[]> {
-  const queryParams = new URLSearchParams((filters as Record<string, string>) || {})
-  queryParams.append("professionalId", professionalId)
-  return apiRequest<Appointment[]>({ url: `/appointments?${queryParams.toString()}`, method: "GET" })
-}
-
-// Get appointments by customer ID
-export async function getAppointmentsByCustomer(
-  customerId: string,
-  filters?: Record<string, any>,
-): Promise<Appointment[]> {
-  const queryParams = new URLSearchParams((filters as Record<string, string>) || {})
-  queryParams.append("customerId", customerId)
-  return apiRequest<Appointment[]>({ url: `/appointments?${queryParams.toString()}`, method: "GET" })
-}
-
-// Get appointments by date range
-export async function getAppointmentsByDateRange(
-  startDate: string,
-  endDate: string,
-  filters?: Record<string, any>,
-): Promise<Appointment[]> {
-  const queryParams = new URLSearchParams((filters as Record<string, string>) || {})
-  queryParams.append("startDate", startDate)
-  queryParams.append("endDate", endDate)
-  return apiRequest<Appointment[]>({ url: `/appointments?${queryParams.toString()}`, method: "GET" })
-}
+// Funções de compatibilidade para o contexto existente
+export const getAppointments = appointmentsApi.getAppointments
+export const getAppointmentById = appointmentsApi.getAppointmentById
+export const createAppointment = appointmentsApi.createAppointment
+export const updateAppointment = appointmentsApi.updateAppointment
+export const deleteAppointment = appointmentsApi.deleteAppointment

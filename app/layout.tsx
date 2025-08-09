@@ -2,28 +2,30 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "./providers"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Noah - Multi empresas",
-  description: "Professional service management platform",
-  generator: "v0.dev",
-  icons: {
-    icon: "/logo.png", // Define o favicon usando a sua logo
-  },
+  title: "Cleaning Platform",
+  description: "Professional cleaning management platform",
+    generator: 'v0.dev'
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>
-          {children}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          <Providers>{children}</Providers>
           <Toaster />
-        </Providers>
+        </ThemeProvider>
       </body>
     </html>
   )

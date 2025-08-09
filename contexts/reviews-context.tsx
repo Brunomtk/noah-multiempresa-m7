@@ -1,318 +1,220 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useToast } from "@/hooks/use-toast"
-import {
-  getReviews,
-  getReviewById,
-  createReview,
-  updateReview,
-  deleteReview,
-  getReviewsByCompany,
-  getReviewsByProfessional,
-  getReviewsByCustomer,
-  getReviewsByStatus,
-  getReviewsByRating,
-  searchReviews,
-  addReviewResponse,
-} from "@/lib/api/reviews"
-import type { Review, ReviewFormData, ReviewFilters } from "@/types/review"
+import type React from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { reviewsApi } from "@/lib/api/reviews"
+import type { Review, ReviewFilters } from "@/types/review"
 
 interface ReviewsContextType {
   reviews: Review[]
+  filteredReviews: Review[]
+  filters: ReviewFilters
+  pagination: {
+    currentPage: number
+    totalPages: number
+    totalItems: number
+    itemsPerPage: number
+  }
   isLoading: boolean
   error: string | null
-  filters: ReviewFilters
-  fetchReviews: () => Promise<void>
-  fetchReviewById: (id: string) => Promise<Review | null>
-  addReview: (reviewData: ReviewFormData) => Promise<Review>
-  editReview: (id: string, reviewData: Partial<ReviewFormData>) => Promise<Review>
-  removeReview: (id: string) => Promise<void>
-  fetchReviewsByCompany: (companyId: string) => Promise<void>
-  fetchReviewsByProfessional: (professionalId: string) => Promise<void>
-  fetchReviewsByCustomer: (customerId: string) => Promise<void>
-  fetchReviewsByStatus: (status: string) => Promise<void>
-  fetchReviewsByRating: (rating: number) => Promise<void>
-  searchReviewsQuery: (query: string) => Promise<void>
-  respondToReview: (id: string, response: string) => Promise<Review>
-  setFilters: (newFilters: Partial<ReviewFilters>) => void
-  resetFilters: () => void
-  filteredReviews: Review[]
-}
+  selectedReview: Review | null
 
-const defaultFilters: ReviewFilters = {
-  status: "all",
-  rating: "all",
-  searchQuery: "",
+  // Actions
+  setFilters: (filters: Partial<ReviewFilters>) => void
+  setCurrentPage: (page: number) => void
+  fetchReviews: () => Promise<void>
+  createReview: (data: any) => Promise<void>
+  updateReview: (id: number, data: any) => Promise<void>
+  deleteReview: (id: number) => Promise<void>
+  addResponse: (id: number, response: string) => Promise<void>
+  setSelectedReview: (review: Review | null) => void
+  clearError: () => void
 }
 
 const ReviewsContext = createContext<ReviewsContextType | undefined>(undefined)
 
-export function ReviewsProvider({ children }: { children: ReactNode }) {
+export function ReviewsProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [filters, setFiltersState] = useState<ReviewFilters>({
+    status: "all",
+    rating: "all",
+    searchQuery: "",
+    pageNumber: 1,
+    pageSize: 10,
+  })
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+  })
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<ReviewFilters>(defaultFilters)
-  const { toast } = useToast()
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null)
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     setIsLoading(true)
     setError(null)
+
     try {
-      const data = await getReviews()
-      setReviews(data)
+      const { data, error: apiError } = await reviewsApi.getReviews(filters)
+
+      if (apiError) {
+        setError(apiError)
+        setReviews([])
+        setPagination({
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: 0,
+          itemsPerPage: 10,
+        })
+      } else if (data) {
+        setReviews(data.data || [])
+        setPagination(
+          data.meta || {
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: 0,
+            itemsPerPage: 10,
+          },
+        )
+      }
     } catch (err) {
+      console.error("Error fetching reviews:", err)
       setError("Failed to fetch reviews")
-      toast({
-        title: "Error",
-        description: "Failed to fetch reviews. Please try again.",
-        variant: "destructive",
-      })
+      setReviews([])
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [filters])
 
-  const fetchReviewById = async (id: string) => {
-    setIsLoading(true)
+  const setFilters = useCallback((newFilters: Partial<ReviewFilters>) => {
+    setFiltersState((prev) => ({
+      ...prev,
+      ...newFilters,
+      pageNumber: newFilters.pageNumber || 1, // Reset to first page when filters change
+    }))
+  }, [])
+
+  const setCurrentPage = useCallback(
+    (page: number) => {
+      setFilters({ pageNumber: page })
+    },
+    [setFilters],
+  )
+
+  const createReview = useCallback(
+    async (data: any) => {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const { data: newReview, error: apiError } = await reviewsApi.create(data)
+
+        if (apiError) {
+          setError(apiError)
+          throw new Error(apiError)
+        } else if (newReview) {
+          await fetchReviews() // Refresh the list
+        }
+      } catch (err) {
+        console.error("Error creating review:", err)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [fetchReviews],
+  )
+
+  const updateReview = useCallback(
+    async (id: number, data: any) => {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const { data: updatedReview, error: apiError } = await reviewsApi.update(id, data)
+
+        if (apiError) {
+          setError(apiError)
+          throw new Error(apiError)
+        } else if (updatedReview) {
+          await fetchReviews() // Refresh the list
+        }
+      } catch (err) {
+        console.error("Error updating review:", err)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [fetchReviews],
+  )
+
+  const deleteReview = useCallback(
+    async (id: number) => {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const { error: apiError } = await reviewsApi.delete(id)
+
+        if (apiError) {
+          setError(apiError)
+          throw new Error(apiError)
+        } else {
+          await fetchReviews() // Refresh the list
+        }
+      } catch (err) {
+        console.error("Error deleting review:", err)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [fetchReviews],
+  )
+
+  const addResponse = useCallback(
+    async (id: number, response: string) => {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const { data: updatedReview, error: apiError } = await reviewsApi.addResponse(id, response)
+
+        if (apiError) {
+          setError(apiError)
+          throw new Error(apiError)
+        } else if (updatedReview) {
+          await fetchReviews() // Refresh the list
+        }
+      } catch (err) {
+        console.error("Error adding response:", err)
+        throw err
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [fetchReviews],
+  )
+
+  const clearError = useCallback(() => {
     setError(null)
-    try {
-      const review = await getReviewById(id)
-      return review
-    } catch (err) {
-      setError(`Failed to fetch review with ID ${id}`)
-      toast({
-        title: "Error",
-        description: `Failed to fetch review details. Please try again.`,
-        variant: "destructive",
-      })
-      return null
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const addReview = async (reviewData: ReviewFormData) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const newReview = await createReview(reviewData)
-      setReviews((prev) => [...prev, newReview])
-      toast({
-        title: "Success",
-        description: "Review added successfully.",
-      })
-      return newReview
-    } catch (err) {
-      setError("Failed to add review")
-      toast({
-        title: "Error",
-        description: "Failed to add review. Please try again.",
-        variant: "destructive",
-      })
-      throw err
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const editReview = async (id: string, reviewData: Partial<ReviewFormData>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const updatedReview = await updateReview(id, reviewData)
-      setReviews((prev) => prev.map((review) => (review.id === id ? updatedReview : review)))
-      toast({
-        title: "Success",
-        description: "Review updated successfully.",
-      })
-      return updatedReview
-    } catch (err) {
-      setError(`Failed to update review with ID ${id}`)
-      toast({
-        title: "Error",
-        description: "Failed to update review. Please try again.",
-        variant: "destructive",
-      })
-      throw err
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const removeReview = async (id: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      await deleteReview(id)
-      setReviews((prev) => prev.filter((review) => review.id !== id))
-      toast({
-        title: "Success",
-        description: "Review deleted successfully.",
-      })
-    } catch (err) {
-      setError(`Failed to delete review with ID ${id}`)
-      toast({
-        title: "Error",
-        description: "Failed to delete review. Please try again.",
-        variant: "destructive",
-      })
-      throw err
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchReviewsByCompany = async (companyId: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getReviewsByCompany(companyId)
-      setReviews(data)
-    } catch (err) {
-      setError(`Failed to fetch reviews for company ${companyId}`)
-      toast({
-        title: "Error",
-        description: "Failed to fetch company reviews. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchReviewsByProfessional = async (professionalId: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getReviewsByProfessional(professionalId)
-      setReviews(data)
-    } catch (err) {
-      setError(`Failed to fetch reviews for professional ${professionalId}`)
-      toast({
-        title: "Error",
-        description: "Failed to fetch professional reviews. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchReviewsByCustomer = async (customerId: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getReviewsByCustomer(customerId)
-      setReviews(data)
-    } catch (err) {
-      setError(`Failed to fetch reviews for customer ${customerId}`)
-      toast({
-        title: "Error",
-        description: "Failed to fetch customer reviews. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchReviewsByStatus = async (status: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getReviewsByStatus(status)
-      setReviews(data)
-    } catch (err) {
-      setError(`Failed to fetch reviews with status ${status}`)
-      toast({
-        title: "Error",
-        description: "Failed to fetch reviews by status. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchReviewsByRating = async (rating: number) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await getReviewsByRating(rating)
-      setReviews(data)
-    } catch (err) {
-      setError(`Failed to fetch reviews with rating ${rating}`)
-      toast({
-        title: "Error",
-        description: "Failed to fetch reviews by rating. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const searchReviewsQuery = async (query: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data = await searchReviews(query)
-      setReviews(data)
-    } catch (err) {
-      setError(`Failed to search reviews with query ${query}`)
-      toast({
-        title: "Error",
-        description: "Failed to search reviews. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const respondToReview = async (id: string, response: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const updatedReview = await addReviewResponse(id, response)
-      setReviews((prev) => prev.map((review) => (review.id === id ? updatedReview : review)))
-      toast({
-        title: "Success",
-        description: "Response added successfully.",
-      })
-      return updatedReview
-    } catch (err) {
-      setError(`Failed to add response to review with ID ${id}`)
-      toast({
-        title: "Error",
-        description: "Failed to add response. Please try again.",
-        variant: "destructive",
-      })
-      throw err
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const updateFilters = (newFilters: Partial<ReviewFilters>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }))
-  }
-
-  const resetFilters = () => {
-    setFilters(defaultFilters)
-  }
+  }, [])
 
   // Apply filters to reviews
   const getFilteredReviews = () => {
+    if (!Array.isArray(reviews)) return []
+
     return reviews.filter((review) => {
       // Filter by status
-      if (filters.status !== "all" && review.status !== filters.status) {
+      if (filters.status !== "all" && review.status.toString() !== filters.status) {
         return false
       }
 
       // Filter by rating
-      if (filters.rating !== "all" && review.rating !== Number.parseInt(filters.rating)) {
+      if (filters.rating !== "all" && review.rating.toString() !== filters.rating) {
         return false
       }
 
@@ -323,7 +225,8 @@ export function ReviewsProvider({ children }: { children: ReactNode }) {
           review.customerName?.toLowerCase().includes(query) ||
           review.professionalName?.toLowerCase().includes(query) ||
           review.companyName?.toLowerCase().includes(query) ||
-          review.comment?.toLowerCase().includes(query)
+          review.comment?.toLowerCase().includes(query) ||
+          review.serviceType?.toLowerCase().includes(query)
         )
       }
 
@@ -331,44 +234,39 @@ export function ReviewsProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  // Load reviews on initial mount
+  const filteredReviews = getFilteredReviews()
+
+  // Fetch reviews when filters change
   useEffect(() => {
     fetchReviews()
-  }, [])
+  }, [fetchReviews])
 
-  return (
-    <ReviewsContext.Provider
-      value={{
-        reviews,
-        isLoading,
-        error,
-        filters,
-        fetchReviews,
-        fetchReviewById,
-        addReview,
-        editReview,
-        removeReview,
-        fetchReviewsByCompany,
-        fetchReviewsByProfessional,
-        fetchReviewsByCustomer,
-        fetchReviewsByStatus,
-        fetchReviewsByRating,
-        searchReviewsQuery,
-        respondToReview,
-        setFilters: updateFilters,
-        resetFilters,
-        filteredReviews: getFilteredReviews(),
-      }}
-    >
-      {children}
-    </ReviewsContext.Provider>
-  )
+  const value: ReviewsContextType = {
+    reviews,
+    filteredReviews,
+    filters,
+    pagination,
+    isLoading,
+    error,
+    selectedReview,
+    setFilters,
+    setCurrentPage,
+    fetchReviews,
+    createReview,
+    updateReview,
+    deleteReview,
+    addResponse,
+    setSelectedReview,
+    clearError,
+  }
+
+  return <ReviewsContext.Provider value={value}>{children}</ReviewsContext.Provider>
 }
 
-export function useReviewsContext() {
+export function useReviews() {
   const context = useContext(ReviewsContext)
   if (context === undefined) {
-    throw new Error("useReviewsContext must be used within a ReviewsProvider")
+    throw new Error("useReviews must be used within a ReviewsProvider")
   }
   return context
 }

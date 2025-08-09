@@ -13,7 +13,7 @@ import {
   deleteCompanyNotification,
   updateCompanyNotification,
 } from "@/lib/api/company-notifications"
-import type { Notification } from "@/types/notification"
+import type { Notification, NotificationUpdateData } from "@/types/notification"
 
 interface CompanyNotificationFilters {
   type: string
@@ -57,7 +57,7 @@ interface CompanyNotificationsContextType {
   fetchNotifications: (companyId: string) => Promise<void>
   fetchNotificationById: (companyId: string, id: string) => Promise<void>
   sendNotification: (companyId: string, data: CompanyNotificationFormData) => Promise<void>
-  updateNotification: (companyId: string, id: string, data: Partial<Notification>) => Promise<void>
+  updateNotification: (companyId: string, id: string, data: Partial<NotificationUpdateData>) => Promise<void>
   deleteNotification: (companyId: string, id: string) => Promise<void>
 
   // Notification actions
@@ -69,7 +69,7 @@ interface CompanyNotificationsContextType {
 
   // Stats
   fetchStats: (companyId: string) => Promise<void>
-  fetchUnreadCount: (companyId: string) => Promise<void>
+  fetchUnreadCount: (userId: string) => Promise<void>
 }
 
 const defaultFilters: CompanyNotificationFilters = {
@@ -198,19 +198,21 @@ export function CompanyNotificationsProvider({ children }: { children: ReactNode
   }
 
   // Update an existing notification
-  const updateNotification = async (companyId: string, id: string, data: Partial<Notification>) => {
+  const updateNotification = async (companyId: string, id: string, data: Partial<NotificationUpdateData>) => {
     setLoading(true)
     setError(null)
     try {
-      const updatedNotification = await updateCompanyNotification(companyId, id, data)
+      const updatedNotification = await updateCompanyNotification(companyId, id, data as NotificationUpdateData)
 
       // Update the notifications list
       setNotifications((prevNotifications) =>
-        prevNotifications.map((notification) => (notification.id === id ? updatedNotification : notification)),
+        prevNotifications.map((notification) =>
+          notification.id.toString() === id ? updatedNotification : notification,
+        ),
       )
 
       // Update selected notification if it's the one being edited
-      if (selectedNotification && selectedNotification.id === id) {
+      if (selectedNotification && selectedNotification.id.toString() === id) {
         setSelectedNotification(updatedNotification)
       }
 
@@ -241,10 +243,12 @@ export function CompanyNotificationsProvider({ children }: { children: ReactNode
       await deleteCompanyNotification(companyId, id)
 
       // Remove from the notifications list
-      setNotifications((prevNotifications) => prevNotifications.filter((notification) => notification.id !== id))
+      setNotifications((prevNotifications) =>
+        prevNotifications.filter((notification) => notification.id.toString() !== id),
+      )
 
       // Clear selected notification if it's the one being deleted
-      if (selectedNotification && selectedNotification.id === id) {
+      if (selectedNotification && selectedNotification.id.toString() === id) {
         setSelectedNotification(null)
       }
 
@@ -276,11 +280,13 @@ export function CompanyNotificationsProvider({ children }: { children: ReactNode
 
       // Update the notifications list
       setNotifications((prevNotifications) =>
-        prevNotifications.map((notification) => (notification.id === id ? updatedNotification : notification)),
+        prevNotifications.map((notification) =>
+          notification.id.toString() === id ? updatedNotification : notification,
+        ),
       )
 
       // Update selected notification if it's the one being marked as read
-      if (selectedNotification && selectedNotification.id === id) {
+      if (selectedNotification && selectedNotification.id.toString() === id) {
         setSelectedNotification(updatedNotification)
       }
 
@@ -323,10 +329,10 @@ export function CompanyNotificationsProvider({ children }: { children: ReactNode
     }
   }
 
-  // Fetch unread notifications count for a company
-  const fetchUnreadCount = async (companyId: string) => {
+  // Fetch unread notifications count for a user
+  const fetchUnreadCount = async (userId: string) => {
     try {
-      const count = await getCompanyUnreadNotificationsCount(companyId)
+      const count = await getCompanyUnreadNotificationsCount(userId)
       setUnreadCount(count)
     } catch (err) {
       console.error("Failed to fetch unread notifications count:", err)

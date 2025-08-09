@@ -1,49 +1,82 @@
-// GPS Tracking Types
-export interface GPSTracking {
-  id: string
-  professionalId: string
-  professionalName?: string
-  companyId: string
-  companyName?: string
-  vehicle: string
-  location: {
-    latitude: number
-    longitude: number
-    address: string
-    accuracy: number
-  }
-  speed: number
-  status: "active" | "inactive"
-  battery: number
-  notes?: string
-  timestamp: string
-  createdAt: string
-  updatedAt: string
+export interface GPSLocation {
+  latitude: number
+  longitude: number
+  address: string
+  accuracy: number
 }
 
-export interface GPSTrackingFormData {
-  professionalId: string
-  professionalName?: string
-  companyId: string
-  companyName?: string
+export interface GPSTracking {
+  id: number
+  professionalId: number
+  professionalName: string
+  companyId: number
+  companyName: string
+  vehicle: string
+  location: GPSLocation
+  speed: number
+  status: number // 1 = active, 2 = inactive
+  battery: number
+  notes: string
+  timestamp: string
+  createdDate: string
+  updatedDate: string
+}
+
+export interface GPSTrackingCreateRequest {
+  professionalId: number
+  professionalName: string
+  companyId: number
+  companyName: string
   vehicle: string
   latitude: number
   longitude: number
   address: string
   accuracy: number
   speed: number
-  status: "active" | "inactive"
+  status: number
   battery: number
-  notes?: string
+  notes: string
+  timestamp: string
+}
+
+export interface GPSTrackingUpdateRequest {
+  professionalId: number
+  professionalName: string
+  companyId: number
+  companyName: string
+  vehicle: string
+  latitude: number
+  longitude: number
+  address: string
+  accuracy: number
+  speed: number
+  status: number
+  battery: number
+  notes: string
+  timestamp: string
+}
+
+export interface GPSTrackingPagedResponse {
+  data: GPSTracking[]
+  meta: {
+    currentPage: number
+    totalPages: number
+    totalItems: number
+    itemsPerPage: number
+  }
 }
 
 export interface GPSTrackingFilters {
-  status?: "active" | "inactive" | "all"
+  status?: number | "all"
+  professionalId?: number
   companyId?: string
-  professionalId?: string
   searchQuery?: string
-  dateRange?: {
-    from: Date
-    to: Date
-  }
+  dateFrom?: string
+  dateTo?: string
+  pageNumber?: number
+  pageSize?: number
+}
+
+export interface CompanyGPSTrackingFilters extends Omit<GPSTrackingFilters, "companyId"> {
+  teamId?: string
 }

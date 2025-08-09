@@ -3,11 +3,12 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { MapPin, Car, Clock, Battery, Gauge, Wifi, FileText } from "lucide-react"
+import type { GPSTracking } from "@/types/gps-tracking"
 
 interface GpsTrackingDetailsModalProps {
   isOpen: boolean
   onClose: () => void
-  gpsData: any
+  gpsData: GPSTracking | null
 }
 
 export function GpsTrackingDetailsModal({ isOpen, onClose, gpsData }: GpsTrackingDetailsModalProps) {
@@ -22,6 +23,14 @@ export function GpsTrackingDetailsModal({ isOpen, onClose, gpsData }: GpsTrackin
       hour: "2-digit",
       minute: "2-digit",
     }).format(date)
+  }
+
+  const getStatusText = (status: number) => {
+    return status === 1 ? "Active" : "Inactive"
+  }
+
+  const getStatusColor = (status: number) => {
+    return status === 1 ? "border-green-500 text-green-500" : "border-red-500 text-red-500"
   }
 
   return (
@@ -39,14 +48,11 @@ export function GpsTrackingDetailsModal({ isOpen, onClose, gpsData }: GpsTrackin
 
         <div className="space-y-6 mt-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">{gpsData.professional}</h3>
-            <Badge
-              variant="outline"
-              className={
-                gpsData.status === "active" ? "border-green-500 text-green-500" : "border-red-500 text-red-500"
-              }
-            >
-              {gpsData.status === "active" ? "Active" : "Inactive"}
+            <h3 className="text-xl font-semibold">
+              {gpsData.professionalName || `Professional ${gpsData.professionalId}`}
+            </h3>
+            <Badge variant="outline" className={getStatusColor(gpsData.status)}>
+              {getStatusText(gpsData.status)}
             </Badge>
           </div>
 
@@ -57,9 +63,9 @@ export function GpsTrackingDetailsModal({ isOpen, onClose, gpsData }: GpsTrackin
                   <MapPin className="h-4 w-4" />
                   <span className="text-sm">Location</span>
                 </div>
-                <p className="font-medium">{gpsData.address}</p>
+                <p className="font-medium">{gpsData.location.address}</p>
                 <p className="text-sm text-gray-400 mt-1">
-                  {gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}
+                  {gpsData.location.latitude.toFixed(6)}, {gpsData.location.longitude.toFixed(6)}
                 </p>
               </div>
 
@@ -76,7 +82,7 @@ export function GpsTrackingDetailsModal({ isOpen, onClose, gpsData }: GpsTrackin
                   <Clock className="h-4 w-4" />
                   <span className="text-sm">Last Update</span>
                 </div>
-                <p className="font-medium">{formatDate(gpsData.lastUpdate)}</p>
+                <p className="font-medium">{formatDate(gpsData.timestamp)}</p>
               </div>
             </div>
 
@@ -102,7 +108,7 @@ export function GpsTrackingDetailsModal({ isOpen, onClose, gpsData }: GpsTrackin
                   <Wifi className="h-4 w-4" />
                   <span className="text-sm">GPS Accuracy</span>
                 </div>
-                <p className="font-medium">±{gpsData.accuracy} meters</p>
+                <p className="font-medium">±{gpsData.location.accuracy} meters</p>
               </div>
             </div>
           </div>
@@ -122,11 +128,19 @@ export function GpsTrackingDetailsModal({ isOpen, onClose, gpsData }: GpsTrackin
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-400">Company:</span>
-                <span className="ml-2">{gpsData.company}</span>
+                <span className="ml-2">{gpsData.companyName || `Company ${gpsData.companyId}`}</span>
               </div>
               <div>
                 <span className="text-gray-400">Tracking ID:</span>
                 <span className="ml-2">{gpsData.id}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Created:</span>
+                <span className="ml-2">{formatDate(gpsData.createdDate)}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Updated:</span>
+                <span className="ml-2">{formatDate(gpsData.updatedDate)}</span>
               </div>
             </div>
           </div>

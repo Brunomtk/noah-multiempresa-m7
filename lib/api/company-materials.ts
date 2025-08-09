@@ -1,233 +1,61 @@
-import type { Material, MaterialTransaction, MaterialCategory, MaterialSupplier, MaterialOrder } from "@/types/material"
-import type { PaginatedResponse, PaginationParams } from "@/types/api"
-import { apiRequest } from "./utils"
+import type {
+  Material,
+  MaterialsResponse,
+  MaterialFilters,
+  CreateMaterialRequest,
+  UpdateMaterialRequest,
+} from "@/types/material"
+import { fetchApi } from "@/lib/api/utils"
 
-// Interface para filtros de materiais
-export interface MaterialFilters {
-  search?: string
-  category?: string
-  status?: "all" | "in-stock" | "low-stock" | "out-of-stock"
-  sortBy?: "name" | "quantity" | "lastUsed" | "category"
-  sortOrder?: "asc" | "desc"
-}
+const BASE_URL = "/Materials"
 
-// Interface para parâmetros de uso de material
-export interface UseMaterialParams {
-  materialId: string
-  quantity: number
-  reason: string
-  appointmentId?: string
-  notes?: string
-}
-
-// Interface para parâmetros de adição de material
-export interface AddMaterialStockParams {
-  materialId: string
-  quantity: number
-  source: string
-  invoiceNumber?: string
-  cost?: number
-  expiryDate?: string
-  notes?: string
-}
-
-// Interface para parâmetros de criação/atualização de material
-export interface MaterialParams {
-  name: string
-  category: string
-  unit: string
-  quantity: number
-  minStock: number
-  maxStock?: number
-  price?: number
-  supplierId?: string
-  notes?: string
-}
-
-// API para materiais da empresa
 export const companyMaterialsApi = {
-  // Listar materiais da empresa com paginação e filtros
-  list: async (
-    companyId: string,
-    params: PaginationParams & MaterialFilters = {},
-  ): Promise<PaginatedResponse<Material>> => {
-    const queryParams = new URLSearchParams()
-
-    // Adicionar parâmetros de paginação
-    if (params.page) queryParams.append("page", params.page.toString())
-    if (params.limit) queryParams.append("limit", params.limit.toString())
-
-    // Adicionar filtros
-    if (params.search) queryParams.append("search", params.search)
-    if (params.category) queryParams.append("category", params.category)
-    if (params.status && params.status !== "all") queryParams.append("status", params.status)
-    if (params.sortBy) queryParams.append("sortBy", params.sortBy)
-    if (params.sortOrder) queryParams.append("sortOrder", params.sortOrder)
-
-    // Sempre filtrar por companyId
-    queryParams.append("companyId", companyId)
-
-    return apiRequest(`/api/materials?${queryParams.toString()}`)
+  async list(filters: MaterialFilters = {}): Promise<MaterialsResponse> {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, String(value))
+      }
+    })
+    return fetchApi<MaterialsResponse>(`${BASE_URL}?${params.toString()}`)
   },
 
-  // Obter detalhes de um material específico
-  get: async (materialId: string, companyId: string): Promise<Material> => {
-    return apiRequest(`/api/materials/${materialId}?companyId=${companyId}`)
+  async getById(id: number): Promise<Material> {
+    return fetchApi<Material>(`${BASE_URL}/${id}`)
   },
 
-  // Criar um novo material
-  create: async (companyId: string, data: MaterialParams): Promise<Material> => {
-    return apiRequest("/api/materials", {
+  async create(data: CreateMaterialRequest): Promise<Material> {
+    return fetchApi<Material>(BASE_URL, {
       method: "POST",
-      body: JSON.stringify({ ...data, companyId }),
+      body: JSON.stringify(data),
     })
   },
 
-  // Atualizar um material existente
-  update: async (materialId: string, companyId: string, data: Partial<MaterialParams>): Promise<Material> => {
-    return apiRequest(`/api/materials/${materialId}`, {
+  async update(id: number, data: UpdateMaterialRequest): Promise<void> {
+    return fetchApi<void>(`${BASE_URL}/${id}`, {
       method: "PUT",
-      body: JSON.stringify({ ...data, companyId }),
+      body: JSON.stringify(data),
     })
   },
 
-  // Excluir um material
-  delete: async (materialId: string, companyId: string): Promise<void> => {
-    return apiRequest(`/api/materials/${materialId}?companyId=${companyId}`, {
+  async delete(id: number): Promise<void> {
+    return fetchApi<void>(`${BASE_URL}/${id}`, {
       method: "DELETE",
     })
   },
 
-  // Registrar uso de material (saída de estoque)
-  useMaterial: async (companyId: string, params: UseMaterialParams): Promise<MaterialTransaction> => {
-    return apiRequest("/api/materials/transactions", {
-      method: "POST",
-      body: JSON.stringify({
-        ...params,
-        companyId,
-        type: "out",
-      }),
-    })
+  // Mocked functions for transactions and orders as endpoints were not provided
+  async getTransactions(materialId: number): Promise<any[]> {
+    console.log(`Fetching transactions for material ${materialId}`)
+    // In a real scenario, this would be an API call:
+    // return fetchApi(`/api/Materials/${materialId}/transactions`);
+    return Promise.resolve([]) // Returning empty array for now
   },
 
-  // Adicionar estoque de material (entrada)
-  addStock: async (companyId: string, params: AddMaterialStockParams): Promise<MaterialTransaction> => {
-    return apiRequest("/api/materials/transactions", {
-      method: "POST",
-      body: JSON.stringify({
-        ...params,
-        companyId,
-        type: "in",
-      }),
-    })
-  },
-
-  // Obter histórico de transações de um material
-  getTransactions: async (
-    materialId: string,
-    companyId: string,
-    params: PaginationParams = {},
-  ): Promise<PaginatedResponse<MaterialTransaction>> => {
-    const queryParams = new URLSearchParams()
-
-    // Adicionar parâmetros de paginação
-    if (params.page) queryParams.append("page", params.page.toString())
-    if (params.limit) queryParams.append("limit", params.limit.toString())
-
-    // Sempre filtrar por companyId e materialId
-    queryParams.append("companyId", companyId)
-    queryParams.append("materialId", materialId)
-
-    return apiRequest(`/api/materials/transactions?${queryParams.toString()}`)
-  },
-
-  // Obter categorias de materiais
-  getCategories: async (companyId: string): Promise<MaterialCategory[]> => {
-    return apiRequest(`/api/materials/categories?companyId=${companyId}`)
-  },
-
-  // Criar uma nova categoria de material
-  createCategory: async (companyId: string, name: string): Promise<MaterialCategory> => {
-    return apiRequest("/api/materials/categories", {
-      method: "POST",
-      body: JSON.stringify({ name, companyId }),
-    })
-  },
-
-  // Obter fornecedores de materiais
-  getSuppliers: async (companyId: string): Promise<MaterialSupplier[]> => {
-    return apiRequest(`/api/materials/suppliers?companyId=${companyId}`)
-  },
-
-  // Criar um novo fornecedor
-  createSupplier: async (
-    companyId: string,
-    data: { name: string; email?: string; phone?: string; address?: string },
-  ): Promise<MaterialSupplier> => {
-    return apiRequest("/api/materials/suppliers", {
-      method: "POST",
-      body: JSON.stringify({ ...data, companyId }),
-    })
-  },
-
-  // Obter pedidos de materiais
-  getOrders: async (companyId: string, params: PaginationParams = {}): Promise<PaginatedResponse<MaterialOrder>> => {
-    const queryParams = new URLSearchParams()
-
-    // Adicionar parâmetros de paginação
-    if (params.page) queryParams.append("page", params.page.toString())
-    if (params.limit) queryParams.append("limit", params.limit.toString())
-
-    // Sempre filtrar por companyId
-    queryParams.append("companyId", companyId)
-
-    return apiRequest(`/api/materials/orders?${queryParams.toString()}`)
-  },
-
-  // Criar um novo pedido de material
-  createOrder: async (
-    companyId: string,
-    data: { supplierId: string; items: Array<{ materialId: string; quantity: number; price?: number }> },
-  ): Promise<MaterialOrder> => {
-    return apiRequest("/api/materials/orders", {
-      method: "POST",
-      body: JSON.stringify({ ...data, companyId }),
-    })
-  },
-
-  // Atualizar status de um pedido
-  updateOrderStatus: async (
-    orderId: string,
-    companyId: string,
-    status: "pending" | "confirmed" | "shipped" | "delivered" | "cancelled",
-  ): Promise<MaterialOrder> => {
-    return apiRequest(`/api/materials/orders/${orderId}/status`, {
-      method: "PUT",
-      body: JSON.stringify({ status, companyId }),
-    })
-  },
-
-  // Obter estatísticas de uso de materiais
-  getUsageStats: async (
-    companyId: string,
-    params: { startDate?: string; endDate?: string; materialId?: string; categoryId?: string },
-  ): Promise<any> => {
-    const queryParams = new URLSearchParams()
-
-    // Adicionar filtros
-    if (params.startDate) queryParams.append("startDate", params.startDate)
-    if (params.endDate) queryParams.append("endDate", params.endDate)
-    if (params.materialId) queryParams.append("materialId", params.materialId)
-    if (params.categoryId) queryParams.append("categoryId", params.categoryId)
-
-    // Sempre filtrar por companyId
-    queryParams.append("companyId", companyId)
-
-    return apiRequest(`/api/materials/stats/usage?${queryParams.toString()}`)
-  },
-
-  // Obter materiais com estoque baixo
-  getLowStockMaterials: async (companyId: string): Promise<Material[]> => {
-    return apiRequest(`/api/materials/low-stock?companyId=${companyId}`)
+  async getOrders(materialId: number): Promise<any[]> {
+    console.log(`Fetching orders for material ${materialId}`)
+    // In a real scenario, this would be an API call:
+    // return fetchApi(`/api/Materials/${materialId}/orders`);
+    return Promise.resolve([]) // Returning empty array for now
   },
 }

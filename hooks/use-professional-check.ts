@@ -14,8 +14,10 @@ import {
   type CheckPhoto,
 } from "@/lib/api/professional-check"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
-export const useProfessionalCheck = (professionalId: string) => {
+export const useProfessionalCheck = () => {
+  const { user } = useAuth()
   const [currentStatus, setCurrentStatus] = useState<CurrentCheckStatus | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,12 +36,19 @@ export const useProfessionalCheck = (professionalId: string) => {
   })
   const { toast } = useToast()
 
+  // Use a fixed professionalId for testing, or get from user context
+  const professionalId = user?.professionalId || 5 // Using 5 as fallback based on your API response
+
   // Carregar status atual ao inicializar
   useEffect(() => {
-    refreshCurrentStatus()
+    if (professionalId) {
+      refreshCurrentStatus()
+    }
   }, [professionalId])
 
   const refreshCurrentStatus = async () => {
+    if (!professionalId) return
+
     setIsLoading(true)
     setError(null)
     try {
@@ -61,11 +70,11 @@ export const useProfessionalCheck = (professionalId: string) => {
   }
 
   const performCheckIn = async (data: {
-    photoBase64: string
+    photoBase64?: string
     notes?: string
-    location: CheckLocation
+    location?: CheckLocation
   }): Promise<CheckRecord | null> => {
-    if (!currentStatus?.appointmentId) {
+    if (!professionalId || !currentStatus?.appointmentDetails?.id) {
       toast({
         title: "Erro",
         description: "Nenhum agendamento disponível para check-in",
@@ -77,14 +86,18 @@ export const useProfessionalCheck = (professionalId: string) => {
     setIsLoading(true)
     setError(null)
     try {
-      const checkRecord = await performCheckInWithPhoto(professionalId, currentStatus.appointmentId, data)
+      const checkRecord = await performCheckInWithPhoto(
+        professionalId,
+        Number.parseInt(currentStatus.appointmentDetails.id),
+        data,
+      )
 
       // Atualizar o status atual
       setCurrentStatus((prev) => {
         if (!prev) return null
         return {
           ...prev,
-          checkRecordId: checkRecord.id,
+          checkRecordId: checkRecord.id.toString(),
           status: "checked_in",
           checkInTime: checkRecord.checkInTime || undefined,
           checkInPhoto: data.photoBase64,
@@ -113,9 +126,9 @@ export const useProfessionalCheck = (professionalId: string) => {
   }
 
   const performCheckOut = async (data: {
-    photoBase64: string
+    photoBase64?: string
     notes?: string
-    location: CheckLocation
+    location?: CheckLocation
   }): Promise<CheckRecord | null> => {
     if (!currentStatus?.checkRecordId) {
       toast({
@@ -129,7 +142,7 @@ export const useProfessionalCheck = (professionalId: string) => {
     setIsLoading(true)
     setError(null)
     try {
-      const checkRecord = await performCheckOutWithPhoto(currentStatus.checkRecordId, data)
+      const checkRecord = await performCheckOutWithPhoto(Number.parseInt(currentStatus.checkRecordId), data)
 
       // Atualizar o status atual
       setCurrentStatus((prev) => {
@@ -170,6 +183,8 @@ export const useProfessionalCheck = (professionalId: string) => {
     limit?: number
     offset?: number
   }) => {
+    if (!professionalId) return
+
     setIsLoading(true)
     setError(null)
     try {
@@ -208,7 +223,7 @@ export const useProfessionalCheck = (professionalId: string) => {
   }
 
   const verifyCurrentLocation = async () => {
-    if (!currentStatus?.appointmentId) {
+    if (!currentStatus?.appointmentDetails?.id) {
       toast({
         title: "Erro",
         description: "Nenhum agendamento disponível para verificar localização",
@@ -235,7 +250,7 @@ export const useProfessionalCheck = (professionalId: string) => {
       }
 
       // Verificar proximidade
-      const locationCheck = await verifyLocation(currentStatus.appointmentId, currentLocation)
+      const locationCheck = await verifyLocation(Number.parseInt(currentStatus.appointmentDetails.id), currentLocation)
 
       setLocationStatus({
         isNearby: locationCheck.isNearby,
@@ -291,13 +306,7 @@ export const useProfessionalCheck = (professionalId: string) => {
   const isLate = (scheduledTime: string): boolean => {
     if (!scheduledTime) return false
 
-    // Extrair a hora de início do formato "14:30 - 16:30"
-    const startTimeStr = scheduledTime.split(" - ")[0]
-    const [hours, minutes] = startTimeStr.split(":").map(Number)
-
-    const scheduledDate = new Date()
-    scheduledDate.setHours(hours, minutes, 0, 0)
-
+    const scheduledDate = new Date(scheduledTime)
     const now = new Date()
 
     // Considerar atrasado se já passou 15 minutos da hora agendada

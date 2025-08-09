@@ -9,6 +9,7 @@ export interface Company {
   planId: number
   status: number // 1 = active, 0 = inactive
   plan?: Plan | null
+  planName?: string // From paged response
   users?: User[] | null
   createdDate: string
   updatedDate: string
@@ -43,7 +44,7 @@ export interface User {
   updatedDate: string
 }
 
-export interface CreateCompanyData {
+export interface CompanyCreateRequest {
   name: string
   cnpj: string
   responsible: string
@@ -53,7 +54,7 @@ export interface CreateCompanyData {
   status: number
 }
 
-export interface UpdateCompanyData {
+export interface CompanyUpdateRequest {
   name?: string
   cnpj?: string
   responsible?: string
@@ -61,4 +62,17 @@ export interface UpdateCompanyData {
   phone?: string
   planId?: number
   status?: number
+}
+
+export interface CompanyFilters {
+  status?: number | string
+  searchQuery?: string
+  planId?: number
+  pageNumber?: number
+  pageSize?: number
+}
+
+export interface CompanyPagedResponse {
+  pageCount: number
+  result: Company[]
 }

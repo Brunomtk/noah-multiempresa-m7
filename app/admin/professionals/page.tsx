@@ -21,8 +21,34 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { professionalsApi } from "@/lib/api/professionals"
-import type { Professional, CreateProfessionalRequest, UpdateProfessionalRequest } from "@/types"
+
+// importa fetchApi do seu utils central
+import { fetchApi } from "@/lib/api/utils"
+
+interface Professional {
+  id: number
+  name: string
+  cpf: string
+  email: string
+  phone: string
+  teamId: number
+  companyId: number
+  status: string
+  rating: number | null
+  completedServices: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface Team {
+  id: number
+  name: string
+}
+
+interface Company {
+  id: number
+  name: string
+}
 
 export default function ProfessionalsPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([])
@@ -35,51 +61,38 @@ export default function ProfessionalsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [teamFilter, setTeamFilter] = useState("all")
   const [companyFilter, setCompanyFilter] = useState("all")
-  const [teams, setTeams] = useState<{ id: number; name: string }[]>([])
-  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [isLoadingFilters, setIsLoadingFilters] = useState(true)
   const { toast } = useToast()
 
-  // Load professionals on component mount
+  // Carrega dados iniciais: profissionais, times e empresas
   useEffect(() => {
     loadInitialData()
   }, [])
 
-  // Reload professionals when filters change
+  // Recarrega profissionais quando filtros mudam
   useEffect(() => {
     if (!isLoadingFilters) {
       loadProfessionals()
     }
   }, [statusFilter, teamFilter, companyFilter, searchQuery, isLoadingFilters])
 
-  const loadInitialData = async () => {
+  async function loadInitialData() {
     setIsLoading(true)
     setIsLoadingFilters(true)
 
     try {
-      // Load all data in parallel
-      const [professionalsResponse, teamsResponse, companiesResponse] = await Promise.all([
-        professionalsApi.getProfessionals(1, 100, statusFilter, teamFilter, searchQuery, companyFilter),
-        professionalsApi.getTeams(),
-        professionalsApi.getCompanies(),
+      const [profs, tms, cps] = await Promise.all([
+        // endpoints em utils já adicionam o baseUrl + "/api"
+        fetchApi<Professional[]>("/Professional"),
+        fetchApi<{ results: Team[] }>("/Team?page=1&pageSize=100&status=all"),
+        fetchApi<Company[]>("/Companies"),
       ])
 
-      // Set professionals
-      if (professionalsResponse.data) {
-        setProfessionals(professionalsResponse.data)
-      }
-
-      // Set teams
-      if (teamsResponse.data) {
-        console.log("Loaded teams:", teamsResponse.data)
-        setTeams(teamsResponse.data)
-      }
-
-      // Set companies
-      if (companiesResponse.data) {
-        console.log("Loaded companies:", companiesResponse.data)
-        setCompanies(companiesResponse.data)
-      }
+      setProfessionals(Array.isArray(profs) ? profs : [])
+      setTeams(tms.results || [])
+      setCompanies(Array.isArray(cps) ? cps : [])
     } catch (error) {
       console.error("Failed to load initial data:", error)
       toast({
@@ -87,32 +100,20 @@ export default function ProfessionalsPage() {
         description: "Failed to load data",
         variant: "destructive",
       })
+      setProfessionals([])
+      setTeams([])
+      setCompanies([])
     } finally {
       setIsLoading(false)
       setIsLoadingFilters(false)
     }
   }
 
-  const loadProfessionals = async () => {
+  async function loadProfessionals() {
     try {
-      const response = await professionalsApi.getProfessionals(
-        1,
-        100,
-        statusFilter,
-        teamFilter,
-        searchQuery,
-        companyFilter,
-      )
-
-      if (response.data) {
-        setProfessionals(response.data)
-      } else if (response.error) {
-        toast({
-          title: "Error",
-          description: response.error,
-          variant: "destructive",
-        })
-      }
+      // você pode incluir query params de filtros aqui também, se quiser
+      const all = await fetchApi<Professional[]>("/Professional")
+      setProfessionals(Array.isArray(all) ? all : [])
     } catch (error) {
       console.error("Failed to load professionals:", error)
       toast({
@@ -120,114 +121,67 @@ export default function ProfessionalsPage() {
         description: "Failed to load professionals",
         variant: "destructive",
       })
+      setProfessionals([])
     }
   }
 
-  const handleAddProfessional = async (data: CreateProfessionalRequest) => {
+  async function handleAddProfessional(data: any) {
     try {
-      const response = await professionalsApi.createProfessional(data)
-
-      if (response.data) {
-        toast({
-          title: "Success",
-          description: "Professional created successfully",
-        })
-        setIsModalOpen(false)
-        loadProfessionals()
-      } else if (response.error) {
-        toast({
-          title: "Error",
-          description: response.error,
-          variant: "destructive",
-        })
-      }
+      await fetchApi("/Professional", {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+      toast({ title: "Success", description: "Professional created successfully" })
+      setIsModalOpen(false)
+      loadProfessionals()
     } catch (error) {
       console.error("Failed to create professional:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create professional",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to create professional", variant: "destructive" })
     }
   }
 
-  const handleEditProfessional = async (data: UpdateProfessionalRequest) => {
+  async function handleEditProfessional(data: any) {
     if (!selectedProfessional) return
-
     try {
-      const response = await professionalsApi.updateProfessional(selectedProfessional.id.toString(), data)
-
-      if (response.data) {
-        toast({
-          title: "Success",
-          description: "Professional updated successfully",
-        })
-        setSelectedProfessional(null)
-        setIsModalOpen(false)
-        loadProfessionals()
-      } else if (response.error) {
-        toast({
-          title: "Error",
-          description: response.error,
-          variant: "destructive",
-        })
-      }
+      await fetchApi(`/Professional/${selectedProfessional.id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      })
+      toast({ title: "Success", description: "Professional updated successfully" })
+      setSelectedProfessional(null)
+      setIsModalOpen(false)
+      loadProfessionals()
     } catch (error) {
       console.error("Failed to update professional:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update professional",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to update professional", variant: "destructive" })
     }
   }
 
-  const handleDeleteProfessional = async () => {
+  async function handleDeleteProfessional() {
     if (!professionalToDelete) return
-
     try {
-      const response = await professionalsApi.deleteProfessional(professionalToDelete.id.toString())
-
-      if (response.status === 200 || response.status === 204) {
-        toast({
-          title: "Success",
-          description: "Professional deleted successfully",
-          variant: "destructive",
-        })
-        setProfessionalToDelete(null)
-        loadProfessionals()
-      } else if (response.error) {
-        toast({
-          title: "Error",
-          description: response.error,
-          variant: "destructive",
-        })
-      }
+      await fetchApi(`/Professional/${professionalToDelete.id}`, { method: "DELETE" })
+      toast({ title: "Success", description: "Professional deleted successfully", variant: "destructive" })
+      setProfessionalToDelete(null)
+      loadProfessionals()
     } catch (error) {
       console.error("Failed to delete professional:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete professional",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to delete professional", variant: "destructive" })
     }
   }
 
-  const handleViewDetails = (professional: Professional) => {
-    setSelectedProfessional(professional)
+  const handleViewDetails = (prof: Professional) => {
+    setSelectedProfessional(prof)
     setIsDetailsModalOpen(true)
   }
 
-  const handleEdit = (professional: Professional) => {
-    setSelectedProfessional(professional)
+  const handleEdit = (prof: Professional) => {
+    setSelectedProfessional(prof)
     setIsModalOpen(true)
   }
 
-  const handleViewSchedule = (professional: Professional) => {
-    toast({
-      title: "Professional Schedule",
-      description: `Viewing schedule for ${professional.name}`,
-    })
+  const handleViewSchedule = (prof: Professional) => {
+    toast({ title: "Schedule", description: `Viewing schedule for ${prof.name}` })
   }
 
   const getStatusBadge = (status: string) => {
@@ -241,15 +195,20 @@ export default function ProfessionalsPage() {
     }
   }
 
-  const getTeamName = (teamId: number) => {
-    const team = teams.find((t) => t.id === teamId)
-    return team ? team.name : `Team ${teamId}`
-  }
+  const getTeamName = (teamId: number) => teams.find((t) => t.id === teamId)?.name || `Team ${teamId}`
+  const getCompanyName = (companyId: number) =>
+    companies.find((c) => c.id === companyId)?.name || `Company ${companyId}`
 
-  const getCompanyName = (companyId: number) => {
-    const company = companies.find((c) => c.id === companyId)
-    return company ? company.name : `Company ${companyId}`
-  }
+  const filteredProfessionals = professionals.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.cpf.includes(searchQuery) ||
+      p.email.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === "all" || p.status === statusFilter
+    const matchesTeam = teamFilter === "all" || p.teamId.toString() === teamFilter
+    const matchesCompany = companyFilter === "all" || p.companyId.toString() === companyFilter
+    return matchesSearch && matchesStatus && matchesTeam && matchesCompany
+  })
 
   if (isLoading) {
     return (
@@ -258,7 +217,6 @@ export default function ProfessionalsPage() {
       </div>
     )
   }
-
   return (
     <TooltipProvider>
       <div className="space-y-6">
@@ -359,7 +317,8 @@ export default function ProfessionalsPage() {
 
         {/* Debug info */}
         <div className="text-xs text-gray-500">
-          Teams loaded: {teams.length} | Companies loaded: {companies.length} | Professionals: {professionals.length}
+          Teams loaded: {teams.length} | Companies loaded: {companies.length} | Professionals: {professionals.length} |
+          Filtered: {filteredProfessionals.length}
         </div>
 
         <div className="rounded-md border border-[#2a3349] overflow-hidden">
@@ -377,7 +336,7 @@ export default function ProfessionalsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {professionals.map((professional) => (
+              {filteredProfessionals.map((professional) => (
                 <TableRow key={professional.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
                   <TableCell className="font-medium text-white">
                     <div className="flex items-center gap-3">
@@ -486,7 +445,7 @@ export default function ProfessionalsPage() {
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-400">
-            Showing <span className="font-medium text-white">{professionals.length}</span> professionals
+            Showing <span className="font-medium text-white">{filteredProfessionals.length}</span> professionals
           </p>
           <div className="flex gap-2">
             <Button

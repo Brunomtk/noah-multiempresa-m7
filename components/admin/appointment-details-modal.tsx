@@ -1,18 +1,75 @@
 "use client"
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Edit, MapPin, Trash2, User, Users } from "lucide-react"
-import { format } from "date-fns"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Calendar, Clock, MapPin, User, Users, Building, FileText, Edit, Trash2 } from "lucide-react"
+import { format, isValid } from "date-fns"
+import type { Appointment } from "@/types/appointment"
 
 interface AppointmentDetailsModalProps {
   isOpen: boolean
   onClose: () => void
-  appointment: any
-  onEdit: (appointment: any) => void
-  onDelete: (appointment: any) => void
+  appointment: Appointment | null
+  onEdit: (appointment: Appointment) => void
+  onDelete: (appointment: Appointment) => void
+}
+
+const getStatusBadge = (status: number) => {
+  switch (status) {
+    case 0:
+      return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Scheduled</Badge>
+    case 1:
+      return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">In Progress</Badge>
+    case 2:
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Completed</Badge>
+    case 3:
+      return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Cancelled</Badge>
+    default:
+      return <Badge variant="secondary">Unknown</Badge>
+  }
+}
+
+const getTypeBadge = (type: number) => {
+  switch (type) {
+    case 0:
+      return (
+        <Badge variant="outline" className="border-gray-300 text-gray-700">
+          Regular
+        </Badge>
+      )
+    case 1:
+      return (
+        <Badge variant="outline" className="border-purple-300 text-purple-700">
+          Deep Cleaning
+        </Badge>
+      )
+    case 2:
+      return (
+        <Badge variant="outline" className="border-orange-300 text-orange-700">
+          Specialized
+        </Badge>
+      )
+    default:
+      return <Badge variant="outline">Unknown</Badge>
+  }
+}
+
+const formatDate = (dateValue: any, formatString: string) => {
+  if (!dateValue) return "N/A"
+
+  const date = new Date(dateValue)
+  if (!isValid(date)) return "Invalid date"
+
+  return format(date, formatString)
 }
 
 export function AppointmentDetailsModal({
@@ -24,132 +81,172 @@ export function AppointmentDetailsModal({
 }: AppointmentDetailsModalProps) {
   if (!appointment) return null
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "scheduled":
-        return { label: "Scheduled", className: "border-blue-500 text-blue-500" }
-      case "in_progress":
-        return { label: "In Progress", className: "border-yellow-500 text-yellow-500" }
-      case "completed":
-        return { label: "Completed", className: "border-green-500 text-green-500" }
-      case "cancelled":
-        return { label: "Cancelled", className: "border-red-500 text-red-500" }
-      default:
-        return { label: status, className: "border-gray-500 text-gray-500" }
-    }
-  }
-
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case "regular":
-        return { label: "Regular Cleaning", className: "border-blue-400 text-blue-400" }
-      case "deep":
-        return { label: "Deep Cleaning", className: "border-purple-400 text-purple-400" }
-      case "specialized":
-        return { label: "Specialized Service", className: "border-orange-400 text-orange-400" }
-      default:
-        return { label: type, className: "border-gray-400 text-gray-400" }
-    }
-  }
+  const startDate = new Date(appointment.start)
+  const endDate = new Date(appointment.end)
+  const isStartValid = isValid(startDate)
+  const isEndValid = isValid(endDate)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] bg-[#1a2234] border-[#2a3349] text-white">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-[#06b6d4]" />
-            Appointment Details
-          </DialogTitle>
-          <DialogDescription className="text-gray-400">Complete information about the appointment</DialogDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <DialogTitle className="text-xl">{appointment.title}</DialogTitle>
+              <DialogDescription className="text-gray-400 mt-1">Appointment details and information</DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              {getStatusBadge(appointment.status)}
+              {getTypeBadge(appointment.type)}
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">{appointment.title}</h3>
-            <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
-              {getStatusBadge(appointment.status).label}
-            </Badge>
-          </div>
-
-          <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-            <div className="flex items-center gap-2 text-gray-400 mb-2">
-              <Clock className="h-4 w-4" />
-              <span className="text-sm">Date & Time</span>
+        <div className="space-y-6">
+          {/* Date & Time */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[#06b6d4]">
+              <Calendar className="h-5 w-5" />
+              <h3 className="font-semibold">Date & Time</h3>
             </div>
-            <p className="font-medium">{format(appointment.start, "EEEE, MMMM d, yyyy")}</p>
-            <p className="text-gray-400">
-              {format(appointment.start, "h:mm a")} - {format(appointment.end, "h:mm a")}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <User className="h-4 w-4" />
-                <span className="text-sm">Customer</span>
+            <div className="grid grid-cols-2 gap-4 pl-7">
+              <div>
+                <p className="text-sm text-gray-400">Date</p>
+                <p className="text-white font-medium">
+                  {isStartValid ? format(startDate, "EEEE, MMMM d, yyyy") : "Invalid date"}
+                </p>
               </div>
-              <p className="font-medium">{appointment.customer}</p>
-            </div>
-
-            <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <Users className="h-4 w-4" />
-                <span className="text-sm">Assigned Team</span>
+              <div>
+                <p className="text-sm text-gray-400">Time</p>
+                <p className="text-white font-medium flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  {isStartValid && isEndValid
+                    ? `${format(startDate, "HH:mm")} - ${format(endDate, "HH:mm")}`
+                    : "Invalid time"}
+                </p>
               </div>
-              <p className="font-medium">{appointment.team}</p>
             </div>
           </div>
-
-          <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-            <div className="flex items-center gap-2 text-gray-400 mb-2">
-              <MapPin className="h-4 w-4" />
-              <span className="text-sm">Service Address</span>
-            </div>
-            <p className="font-medium">{appointment.address}</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className={getTypeBadge(appointment.type).className}>
-              {getTypeBadge(appointment.type).label}
-            </Badge>
-            <span className="text-sm text-gray-400">
-              Duration: {Math.round((appointment.end - appointment.start) / (1000 * 60 * 60))} hours
-            </span>
-          </div>
-
-          {appointment.notes && (
-            <div className="bg-[#0f172a] p-4 rounded-lg border border-[#2a3349]">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <span className="text-sm">Notes</span>
-              </div>
-              <p className="text-gray-400">{appointment.notes}</p>
-            </div>
-          )}
 
           <Separator className="bg-[#2a3349]" />
 
-          <div className="flex justify-end gap-2">
+          {/* Location */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[#06b6d4]">
+              <MapPin className="h-5 w-5" />
+              <h3 className="font-semibold">Location</h3>
+            </div>
+            <div className="pl-7">
+              <p className="text-white">{appointment.address}</p>
+            </div>
+          </div>
+
+          <Separator className="bg-[#2a3349]" />
+
+          {/* People */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[#06b6d4]">
+              <User className="h-5 w-5" />
+              <h3 className="font-semibold">People</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-7">
+              <div>
+                <p className="text-sm text-gray-400">Customer</p>
+                <p className="text-white font-medium">{appointment.customer?.name || "N/A"}</p>
+                {appointment.customer?.phone && <p className="text-sm text-gray-400">{appointment.customer.phone}</p>}
+                {appointment.customer?.email && <p className="text-sm text-gray-400">{appointment.customer.email}</p>}
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Professional</p>
+                <p className="text-white font-medium">{appointment.professional?.name || "N/A"}</p>
+                {appointment.professional?.phone && (
+                  <p className="text-sm text-gray-400">{appointment.professional.phone}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-[#2a3349]" />
+
+          {/* Organization */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[#06b6d4]">
+              <Building className="h-5 w-5" />
+              <h3 className="font-semibold">Organization</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-7">
+              <div>
+                <p className="text-sm text-gray-400">Company</p>
+                <p className="text-white font-medium">{appointment.company?.name || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Team</p>
+                <p className="text-white font-medium flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  {appointment.team?.name || "N/A"}
+                </p>
+                {appointment.team?.region && <p className="text-sm text-gray-400">{appointment.team.region}</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {appointment.notes && (
+            <>
+              <Separator className="bg-[#2a3349]" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-[#06b6d4]">
+                  <FileText className="h-5 w-5" />
+                  <h3 className="font-semibold">Notes</h3>
+                </div>
+                <div className="pl-7">
+                  <p className="text-gray-300 whitespace-pre-wrap">{appointment.notes}</p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Metadata */}
+          <Separator className="bg-[#2a3349]" />
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-gray-400">Created</p>
+              <p className="text-white">{formatDate(appointment.createdDate, "MMM d, yyyy 'at' HH:mm")}</p>
+            </div>
+            <div>
+              <p className="text-gray-400">Last Updated</p>
+              <p className="text-white">{formatDate(appointment.updatedDate, "MMM d, yyyy 'at' HH:mm")}</p>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+          >
+            Close
+          </Button>
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               onClick={() => onEdit(appointment)}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
             <Button
-              variant="outline"
-              onClick={() => {
-                onDelete(appointment)
-                onClose()
-              }}
-              className="border-[#2a3349] text-red-500 hover:bg-[#2a3349] hover:text-red-400"
+              variant="destructive"
+              onClick={() => onDelete(appointment)}
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
           </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

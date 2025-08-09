@@ -1,241 +1,395 @@
 import type { CheckRecord } from "@/types/check-record"
 
-// Mock data for development
-const mockCheckRecords: CheckRecord[] = [
-  {
-    id: "cr1",
-    professionalId: "prof1",
-    professionalName: "John Doe",
-    companyId: "comp1",
-    customerId: "cust1",
-    customerName: "ABC Corporation",
-    appointmentId: "app1",
-    address: "123 Main St, Suite 100, New York, NY 10001",
-    teamId: "team1",
-    teamName: "Team Alpha",
-    checkInTime: "2024-01-26T08:55:00Z",
-    checkOutTime: "2024-01-26T17:05:00Z",
-    status: "checked_out",
-    serviceType: "regular",
-    notes: "All tasks completed successfully",
-    createdAt: "2024-01-26T08:00:00Z",
-    updatedAt: "2024-01-26T17:05:00Z",
-  },
-  {
-    id: "cr2",
-    professionalId: "prof2",
-    professionalName: "Jane Smith",
-    companyId: "comp1",
-    customerId: "cust2",
-    customerName: "XYZ Industries",
-    appointmentId: "app2",
-    address: "456 Industrial Ave, Warehouse B, Chicago, IL 60607",
-    teamId: "team2",
-    teamName: "Team Beta",
-    checkInTime: "2024-01-26T10:15:00Z",
-    checkOutTime: null,
-    status: "checked_in",
-    serviceType: "deep",
-    notes: "In progress, estimated completion at 6:00 PM",
-    createdAt: "2024-01-26T10:00:00Z",
-    updatedAt: "2024-01-26T10:15:00Z",
-  },
-  {
-    id: "cr3",
-    professionalId: "prof3",
-    professionalName: "Mike Johnson",
-    companyId: "comp1",
-    customerId: "cust3",
-    customerName: "Tech Solutions Inc",
-    appointmentId: "app3",
-    address: "789 Business Blvd, Branch Office, San Francisco, CA 94105",
-    teamId: "team1",
-    teamName: "Team Alpha",
-    checkInTime: null,
-    checkOutTime: null,
-    status: "pending",
-    serviceType: "specialized",
-    notes: "",
-    createdAt: "2024-01-26T11:00:00Z",
-    updatedAt: "2024-01-26T11:00:00Z",
-  },
-]
+const API_BASE_URL = "https://localhost:44394"
+
+// Helper function to make API calls with authentication
+const apiCall = async (url: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem("noah_token")
+
+  if (!token) {
+    throw new Error("No authentication token found")
+  }
+
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  return response.json()
+}
 
 // Type for filtering check records
 export interface CheckRecordFilters {
-  professionalId?: string
-  companyId?: string
-  customerId?: string
-  teamId?: string
-  appointmentId?: string
-  status?: "pending" | "checked_in" | "checked_out"
+  professionalId?: number
+  companyId?: number
+  customerId?: number
+  teamId?: number
+  appointmentId?: number
+  status?: string | number
   serviceType?: string
   startDate?: string
   endDate?: string
   search?: string
+  pageNumber?: number
+  pageSize?: number
 }
 
 // Get all check records with optional filtering
 export const getCheckRecords = async (filters?: CheckRecordFilters): Promise<CheckRecord[]> => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  try {
+    const params = new URLSearchParams()
 
-  // Apply filters if provided
-  if (filters) {
-    return mockCheckRecords.filter((record) => {
-      let match = true
+    if (filters) {
+      if (filters.professionalId) params.append("ProfessionalId", filters.professionalId.toString())
+      if (filters.companyId) params.append("CompanyId", filters.companyId.toString())
+      if (filters.customerId) params.append("CustomerId", filters.customerId.toString())
+      if (filters.teamId) params.append("TeamId", filters.teamId.toString())
+      if (filters.appointmentId) params.append("AppointmentId", filters.appointmentId.toString())
+      if (filters.status !== undefined) params.append("Status", filters.status.toString())
+      if (filters.serviceType) params.append("ServiceType", filters.serviceType)
+      if (filters.startDate) params.append("StartDate", filters.startDate)
+      if (filters.endDate) params.append("EndDate", filters.endDate)
+      if (filters.search) params.append("Search", filters.search)
+      if (filters.pageNumber) params.append("PageNumber", filters.pageNumber.toString())
+      if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
+    }
 
-      if (filters.professionalId && record.professionalId !== filters.professionalId) match = false
-      if (filters.companyId && record.companyId !== filters.companyId) match = false
-      if (filters.customerId && record.customerId !== filters.customerId) match = false
-      if (filters.teamId && record.teamId !== filters.teamId) match = false
-      if (filters.appointmentId && record.appointmentId !== filters.appointmentId) match = false
-      if (filters.status && record.status !== filters.status) match = false
-      if (filters.serviceType && record.serviceType !== filters.serviceType) match = false
+    // Set default pagination if not provided
+    if (!params.has("PageNumber")) params.append("PageNumber", "1")
+    if (!params.has("PageSize")) params.append("PageSize", "100")
 
-      // Date range filtering
-      if (filters.startDate) {
-        const startDate = new Date(filters.startDate)
-        const recordDate = new Date(record.createdAt)
-        if (recordDate < startDate) match = false
-      }
+    const queryString = params.toString()
+    const url = `/api/CheckRecord${queryString ? `?${queryString}` : ""}`
 
-      if (filters.endDate) {
-        const endDate = new Date(filters.endDate)
-        const recordDate = new Date(record.createdAt)
-        if (recordDate > endDate) match = false
-      }
+    console.log("Fetching check records from:", url)
+    const data = await apiCall(url)
+    console.log("Check records response:", data)
 
-      // Search term filtering
-      if (filters.search) {
-        const searchTerm = filters.search.toLowerCase()
-        const searchableFields = [
-          record.professionalName,
-          record.customerName,
-          record.teamName,
-          record.address,
-          record.serviceType,
-          record.notes,
-        ].filter(Boolean) as string[]
-
-        if (!searchableFields.some((field) => field.toLowerCase().includes(searchTerm))) match = false
-      }
-
-      return match
-    })
+    return data.results || []
+  } catch (error) {
+    console.error("Error fetching check records:", error)
+    throw error
   }
-
-  return mockCheckRecords
 }
 
 // Get a single check record by ID
 export const getCheckRecordById = async (id: string): Promise<CheckRecord> => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 300))
-
-  const record = mockCheckRecords.find((r) => r.id === id)
-  if (!record) {
-    throw new Error(`Check record with ID ${id} not found`)
+  try {
+    console.log("Fetching check record by ID:", id)
+    const data = await apiCall(`/api/CheckRecord/${id}`)
+    console.log("Check record response:", data)
+    return data
+  } catch (error) {
+    console.error("Error fetching check record by ID:", error)
+    throw error
   }
-  return record
 }
 
 // Create a new check record
 export const createCheckRecord = async (
-  data: Omit<CheckRecord, "id" | "createdAt" | "updatedAt">,
+  data: Omit<CheckRecord, "id" | "createdDate" | "updatedDate">,
 ): Promise<CheckRecord> => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 800))
-
-  const now = new Date().toISOString()
-  const newRecord: CheckRecord = {
-    id: `cr${mockCheckRecords.length + 1}`,
-    ...data,
-    createdAt: now,
-    updatedAt: now,
+  try {
+    console.log("Creating check record:", data)
+    const response = await apiCall("/api/CheckRecord", {
+      method: "POST",
+      body: JSON.stringify({
+        professionalId: data.professionalId,
+        professionalName: data.professionalName,
+        companyId: data.companyId,
+        customerId: data.customerId,
+        customerName: data.customerName,
+        appointmentId: data.appointmentId,
+        address: data.address,
+        teamId: data.teamId,
+        teamName: data.teamName,
+        serviceType: data.serviceType,
+        notes: data.notes,
+      }),
+    })
+    console.log("Create check record response:", response)
+    return response
+  } catch (error) {
+    console.error("Error creating check record:", error)
+    throw error
   }
-
-  mockCheckRecords.push(newRecord)
-  return newRecord
 }
 
 // Update an existing check record
 export const updateCheckRecord = async (id: string, data: Partial<CheckRecord>): Promise<CheckRecord> => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 600))
-
-  const index = mockCheckRecords.findIndex((r) => r.id === id)
-  if (index === -1) {
-    throw new Error(`Check record with ID ${id} not found`)
+  try {
+    console.log("Updating check record:", id, data)
+    const response = await apiCall(`/api/CheckRecord/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        professionalId: data.professionalId,
+        professionalName: data.professionalName,
+        companyId: data.companyId,
+        customerId: data.customerId,
+        customerName: data.customerName,
+        appointmentId: data.appointmentId,
+        address: data.address,
+        teamId: data.teamId,
+        teamName: data.teamName,
+        checkInTime: data.checkInTime,
+        checkOutTime: data.checkOutTime,
+        status: data.status,
+        serviceType: data.serviceType,
+        notes: data.notes,
+      }),
+    })
+    console.log("Update check record response:", response)
+    return response
+  } catch (error) {
+    console.error("Error updating check record:", error)
+    throw error
   }
-
-  const updatedRecord = {
-    ...mockCheckRecords[index],
-    ...data,
-    updatedAt: new Date().toISOString(),
-  }
-
-  mockCheckRecords[index] = updatedRecord
-  return updatedRecord
 }
 
 // Delete a check record
 export const deleteCheckRecord = async (id: string): Promise<void> => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  const index = mockCheckRecords.findIndex((r) => r.id === id)
-  if (index === -1) {
-    throw new Error(`Check record with ID ${id} not found`)
+  try {
+    console.log("Deleting check record:", id)
+    await apiCall(`/api/CheckRecord/${id}`, {
+      method: "DELETE",
+    })
+    console.log("Check record deleted successfully")
+  } catch (error) {
+    console.error("Error deleting check record:", error)
+    throw error
   }
-
-  mockCheckRecords.splice(index, 1)
 }
 
 // Perform check-in
 export const performCheckIn = async (
-  data: Omit<CheckRecord, "id" | "createdAt" | "updatedAt" | "checkOutTime" | "status">,
+  data: Omit<CheckRecord, "id" | "createdDate" | "updatedDate" | "checkOutTime" | "status" | "checkInTime">,
 ): Promise<CheckRecord> => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 800))
-
-  const now = new Date().toISOString()
-  const newRecord: CheckRecord = {
-    id: `cr${mockCheckRecords.length + 1}`,
-    ...data,
-    checkInTime: now,
-    checkOutTime: null,
-    status: "checked_in",
-    createdAt: now,
-    updatedAt: now,
+  try {
+    console.log("Performing check-in:", data)
+    const response = await apiCall("/api/CheckRecord/check-in", {
+      method: "POST",
+      body: JSON.stringify({
+        professionalId: data.professionalId,
+        professionalName: data.professionalName,
+        companyId: data.companyId,
+        customerId: data.customerId,
+        customerName: data.customerName,
+        appointmentId: data.appointmentId,
+        address: data.address,
+        teamId: data.teamId,
+        teamName: data.teamName,
+        serviceType: data.serviceType,
+        notes: data.notes,
+      }),
+    })
+    console.log("Check-in response:", response)
+    return response
+  } catch (error) {
+    console.error("Error performing check-in:", error)
+    throw error
   }
-
-  mockCheckRecords.push(newRecord)
-  return newRecord
 }
 
 // Perform check-out
 export const performCheckOut = async (id: string): Promise<CheckRecord> => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 600))
-
-  const index = mockCheckRecords.findIndex((r) => r.id === id)
-  if (index === -1) {
-    throw new Error(`Check record with ID ${id} not found`)
+  try {
+    console.log("Performing check-out for record:", id)
+    const response = await apiCall(`/api/CheckRecord/check-out/${id}`, {
+      method: "POST",
+      body: "",
+    })
+    console.log("Check-out response:", response)
+    return response
+  } catch (error) {
+    console.error("Error performing check-out:", error)
+    throw error
   }
+}
 
-  if (mockCheckRecords[index].status !== "checked_in") {
-    throw new Error("Cannot check out a record that is not checked in")
+// Get professionals for dropdown
+export const getProfessionals = async (companyId?: number): Promise<any[]> => {
+  try {
+    console.log("Fetching professionals...")
+
+    const endpoints = [
+      `/api/Professional?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/api/Professionals?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/api/Professional?page=1&pageSize=100",
+      "/api/Professionals?page=1&pageSize=100",
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`)
+        const data = await apiCall(endpoint)
+        console.log("Professionals response:", data)
+
+        if (data && (data.results || data.data || Array.isArray(data))) {
+          const results = data.results || data.data || data
+          console.log(`Successfully loaded ${results.length} professionals from ${endpoint}`)
+          return results
+        }
+      } catch (endpointError) {
+        console.log(`Endpoint ${endpoint} failed:`, endpointError)
+        continue
+      }
+    }
+
+    console.warn("All professional endpoints failed")
+    return []
+  } catch (error) {
+    console.error("Error fetching professionals:", error)
+    return []
   }
+}
 
-  const now = new Date().toISOString()
-  const updatedRecord = {
-    ...mockCheckRecords[index],
-    checkOutTime: now,
-    status: "checked_out" as const,
-    updatedAt: now,
+// Get companies for dropdown
+export const getCompanies = async (): Promise<any[]> => {
+  try {
+    console.log("Fetching companies...")
+
+    const endpoints = ["/api/Companies?page=1&pageSize=100", "/api/Company?page=1&pageSize=100"]
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`)
+        const data = await apiCall(endpoint)
+        console.log("Companies response:", data)
+
+        if (data && (data.results || data.data || Array.isArray(data))) {
+          const results = data.results || data.data || data
+          console.log(`Successfully loaded ${results.length} companies from ${endpoint}`)
+          return results
+        }
+      } catch (endpointError) {
+        console.log(`Endpoint ${endpoint} failed:`, endpointError)
+        continue
+      }
+    }
+
+    console.warn("All company endpoints failed")
+    return []
+  } catch (error) {
+    console.error("Error fetching companies:", error)
+    return []
   }
+}
 
-  mockCheckRecords[index] = updatedRecord
-  return updatedRecord
+// Get customers for dropdown
+export const getCustomers = async (companyId?: number): Promise<any[]> => {
+  try {
+    console.log("Fetching customers for company:", companyId)
+
+    const endpoints = [
+      `/api/Customers?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/api/Customer?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/api/Customers?page=1&pageSize=100",
+      "/api/Customer?page=1&pageSize=100",
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`)
+        const data = await apiCall(endpoint)
+        console.log("Customers response:", data)
+
+        if (data && (data.results || data.data || Array.isArray(data))) {
+          const results = data.results || data.data || data
+          console.log(`Successfully loaded ${results.length} customers from ${endpoint}`)
+          return results
+        }
+      } catch (endpointError) {
+        console.log(`Endpoint ${endpoint} failed:`, endpointError)
+        continue
+      }
+    }
+
+    console.warn("All customer endpoints failed")
+    return []
+  } catch (error) {
+    console.error("Error fetching customers:", error)
+    return []
+  }
+}
+
+// Get teams for dropdown
+export const getTeams = async (companyId?: number): Promise<any[]> => {
+  try {
+    console.log("Fetching teams for company:", companyId)
+
+    const endpoints = [
+      `/api/Teams?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/api/Team?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/api/Teams?page=1&pageSize=100",
+      "/api/Team?page=1&pageSize=100",
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`)
+        const data = await apiCall(endpoint)
+        console.log("Teams response:", data)
+
+        if (data && (data.results || data.data || Array.isArray(data))) {
+          const results = data.results || data.data || data
+          console.log(`Successfully loaded ${results.length} teams from ${endpoint}`)
+          return results
+        }
+      } catch (endpointError) {
+        console.log(`Endpoint ${endpoint} failed:`, endpointError)
+        continue
+      }
+    }
+
+    console.warn("All team endpoints failed")
+    return []
+  } catch (error) {
+    console.error("Error fetching teams:", error)
+    return []
+  }
+}
+
+// Get appointments for dropdown
+export const getAppointments = async (companyId?: number): Promise<any[]> => {
+  try {
+    console.log("Fetching appointments for company:", companyId)
+
+    const endpoints = [
+      `/api/Appointments?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/api/Appointment?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/api/Appointments?page=1&pageSize=100",
+      "/api/Appointment?page=1&pageSize=100",
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`)
+        const data = await apiCall(endpoint)
+        console.log("Appointments response:", data)
+
+        if (data && (data.results || data.data || Array.isArray(data))) {
+          const results = data.results || data.data || data
+          console.log(`Successfully loaded ${results.length} appointments from ${endpoint}`)
+          return results
+        }
+      } catch (endpointError) {
+        console.log(`Endpoint ${endpoint} failed:`, endpointError)
+        continue
+      }
+    }
+
+    console.warn("All appointment endpoints failed")
+    return []
+  } catch (error) {
+    console.error("Error fetching appointments:", error)
+    return []
+  }
 }

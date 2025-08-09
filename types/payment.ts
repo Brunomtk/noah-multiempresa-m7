@@ -1,38 +1,52 @@
-// Payment Types
 export interface Payment {
-  id: string
-  companyId: string
-  companyName?: string
+  id: number
+  companyId: number
+  companyName?: string | null
   amount: number
   dueDate: string
-  paymentDate?: string
-  status: "pending" | "paid" | "overdue" | "cancelled"
-  method?: "credit_card" | "debit_card" | "bank_transfer" | "pix"
+  paymentDate?: string | null
+  status: 0 | 1 | 2 | 3 // 0=Pending, 1=Paid, 2=Overdue, 3=Cancelled
+  method: 0 | 1 | 2 | 3 // 0=CreditCard, 1=DebitCard, 2=BankTransfer, 3=Pix
   reference: string
-  planId: string
-  planName?: string
-  createdAt: string
-  updatedAt: string
+  planId: number
+  planName?: string | null
+  createdDate: string
+  updatedDate: string
 }
 
-// Payment form data
 export interface PaymentFormData {
-  companyId: string
+  companyId: number
   amount: number
   dueDate: string
-  status: "pending" | "paid" | "overdue" | "cancelled"
-  method?: "credit_card" | "debit_card" | "bank_transfer" | "pix"
-  reference: string
-  planId: string
   paymentDate?: string
+  status: 0 | 1 | 2 | 3
+  method: 0 | 1 | 2 | 3
+  reference: string
+  planId: number
 }
 
-// Payment filters
 export interface PaymentFilters {
-  companyId?: string
-  status?: "pending" | "paid" | "overdue" | "cancelled"
+  companyId?: number
+  status?: 0 | 1 | 2 | 3
   search?: string
   startDate?: string
   endDate?: string
-  planId?: string
+  planId?: number
+  page?: number
+  pageSize?: number
+}
+
+export interface PaymentStatusUpdate {
+  status: 0 | 1 | 2 | 3
+  paymentDate?: string
+}
+
+export interface PaymentsResponse {
+  results: Payment[]
+  currentPage: number
+  pageCount: number
+  pageSize: number
+  totalItems: number
+  firstRowOnPage: number
+  lastRowOnPage: number
 }

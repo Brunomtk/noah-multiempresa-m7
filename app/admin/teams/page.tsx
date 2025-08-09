@@ -3,291 +3,387 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Plus, Search, Eye, Edit, Trash2 } from "lucide-react"
 import { TeamModal } from "@/components/admin/team-modal"
 import { TeamDetailsModal } from "@/components/admin/team-details-modal"
-import { Plus, Search, Eye, Edit, Trash2, Users, MapPin, Building } from "lucide-react"
-import type { Team, Leader } from "@/types"
-import { teamsApi } from "@/lib/api/teams"
-import { leadersApi } from "@/lib/api/leaders"
+import { useToast } from "@/hooks/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+
+interface Company {
+  id: number
+  name: string
+  cnpj: string
+  responsible: string
+  email: string
+  phone: string
+  planId: number
+  planName?: string
+  status: number
+  createdDate: string
+  updatedDate: string
+}
+
+interface Team {
+  id: number
+  name: string
+  description?: string
+  companyId: number
+  company?: Company
+  leaderId?: number
+  region?: string
+  status: number
+  rating?: number
+  completedServices?: number
+  createdDate?: string
+  updatedDate?: string
+}
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([])
-  const [leaders, setLeaders] = useState<Leader[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const { toast } = useToast()
 
-  useEffect(() => {
-    loadTeams()
-    loadLeaders()
-  }, [currentPage, statusFilter])
+  const apiCall = async (url: string, options: RequestInit = {}) => {
+    const token = localStorage.getItem("noah_token")
+
+    if (!token) {
+      throw new Error("No authentication token found")
+    }
+
+    const response = await fetch(`https://localhost:44394${url}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return response.json()
+  }
 
   const loadTeams = async () => {
     try {
-      setLoading(true)
-      const response = await teamsApi.getAll(currentPage, 10, statusFilter)
-      setTeams(response.results)
-      setTotalPages(response.pageCount)
+      setIsLoading(true)
+      const data = await apiCall("/api/Team?PageNumber=1&PageSize=100")
+      console.log("Teams loaded:", data)
+      setTeams(data.results || [])
     } catch (error) {
-      console.error("Failed to load teams:", error)
+      console.error("Error loading teams:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load teams",
+        variant: "destructive",
+      })
+      setTeams([])
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const loadLeaders = async () => {
+  const loadCompanies = async () => {
     try {
-      const leadersData = await leadersApi.getAll()
-      setLeaders(leadersData)
+      const data = await apiCall("/api/Companies/paged?PageNumber=1&PageSize=100")
+      console.log("Companies loaded:", data)
+      setCompanies(data.result || [])
     } catch (error) {
-      console.error("Failed to load leaders:", error)
+      console.error("Error loading companies:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load companies",
+        variant: "destructive",
+      })
+      setCompanies([])
     }
   }
 
-  const handleCreateTeam = async (data: any) => {
+  useEffect(() => {
+    loadTeams()
+    loadCompanies()
+  }, [])
+
+  const filteredTeams = (teams || []).filter(
+    (team) =>
+      team.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.region?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (team.company?.name || "").toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  const handleAddTeam = async (data: any) => {
     try {
-      const teamData = {
-        name: data.name,
-        leaderId: Number.parseInt(data.leaderId),
-        region: data.region,
-        description: data.description,
-        companyId: Number.parseInt(data.companyId),
+      const response = await apiCall("/api/Team", {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+
+      const newTeam = {
+        id: Date.now(), // Temporary ID
+        ...data,
+        rating: 0,
+        completedServices: 0,
+        company: companies.find((c) => c.id === data.companyId),
       }
 
-      await teamsApi.create(teamData)
-      await loadTeams()
+      setTeams([...teams, newTeam])
       setIsModalOpen(false)
+      toast({
+        title: "Team added successfully",
+        description: `Team ${data.name} has been created.`,
+      })
     } catch (error) {
-      console.error("Failed to create team:", error)
+      console.error("Error creating team:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create team",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleUpdateTeam = async (data: any) => {
+  const handleEditTeam = async (data: any) => {
     if (!selectedTeam) return
 
     try {
-      const teamData = {
-        id: selectedTeam.id,
-        createdDate: selectedTeam.createdDate,
-        updatedDate: new Date().toISOString(),
-        name: data.name,
-        region: data.region,
-        description: data.description,
-        rating: selectedTeam.rating,
-        completedServices: selectedTeam.completedServices,
-        status: data.status === "active" ? 1 : 0,
-        companyId: Number.parseInt(data.companyId),
-        leaderId: Number.parseInt(data.leaderId),
-      }
+      await apiCall(`/api/Team/${selectedTeam.id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      })
 
-      await teamsApi.update(selectedTeam.id, teamData)
-      await loadTeams()
-      setIsModalOpen(false)
+      setTeams(
+        teams.map((team) =>
+          team.id === selectedTeam.id
+            ? {
+                ...team,
+                ...data,
+                company: companies.find((c) => c.id === data.companyId),
+              }
+            : team,
+        ),
+      )
       setSelectedTeam(null)
+      setIsModalOpen(false)
+      toast({
+        title: "Team updated successfully",
+        description: `Team ${data.name} has been updated.`,
+      })
     } catch (error) {
-      console.error("Failed to update team:", error)
+      console.error("Error updating team:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update team",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleDeleteTeam = async (id: number) => {
-    if (confirm("Are you sure you want to delete this team?")) {
-      try {
-        await teamsApi.delete(id)
-        await loadTeams()
-      } catch (error) {
-        console.error("Failed to delete team:", error)
-      }
+  const handleDeleteTeam = async () => {
+    if (!teamToDelete) return
+
+    try {
+      await apiCall(`/api/Team/${teamToDelete.id}`, {
+        method: "DELETE",
+      })
+
+      setTeams(teams.filter((team) => team.id !== teamToDelete.id))
+      toast({
+        title: "Team deleted successfully",
+        description: `Team ${teamToDelete.name} has been removed.`,
+        variant: "destructive",
+      })
+      setTeamToDelete(null)
+    } catch (error) {
+      console.error("Error deleting team:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete team",
+        variant: "destructive",
+      })
     }
   }
 
-  const openEditModal = (team: Team) => {
-    setSelectedTeam(team)
-    setIsModalOpen(true)
-  }
-
-  const openDetailsModal = (team: Team) => {
+  const handleViewDetails = (team: Team) => {
     setSelectedTeam(team)
     setIsDetailsModalOpen(true)
   }
 
-  const filteredTeams = teams.filter(
-    (team) =>
-      team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.region.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (team.company?.name || "").toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const handleEdit = (team: Team) => {
+    setSelectedTeam(team)
+    setIsModalOpen(true)
+  }
 
   const getStatusBadge = (status: number) => {
-    return status === 1 ? (
-      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
-    ) : (
-      <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Inactive</Badge>
+    return status === 1
+      ? { label: "Active", className: "border-green-500 text-green-500" }
+      : { label: "Inactive", className: "border-red-500 text-red-500" }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading teams...</div>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Teams</h1>
-          <p className="text-gray-400">Manage your teams and their assignments</p>
-        </div>
-        <Button
-          onClick={() => {
-            setSelectedTeam(null)
-            setIsModalOpen(true)
-          }}
-          className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Team
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-[#1a2234] border-[#2a3349]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Total Teams</CardTitle>
-            <Users className="h-4 w-4 text-[#06b6d4]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{teams.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Active Teams</CardTitle>
-            <Users className="h-4 w-4 text-green-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{teams.filter((team) => team.status === 1).length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Regions</CardTitle>
-            <MapPin className="h-4 w-4 text-[#06b6d4]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{new Set(teams.map((team) => team.region)).size}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#1a2234] border-[#2a3349]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Companies</CardTitle>
-            <Building className="h-4 w-4 text-[#06b6d4]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{new Set(teams.map((team) => team.companyId)).size}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="bg-[#1a2234] border-[#2a3349]">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">Teams List</CardTitle>
-              <CardDescription className="text-gray-400">Manage and organize your teams</CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search teams..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 bg-[#0f172a] border-[#2a3349] text-white w-64"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32 bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="1">Active</SelectItem>
-                  <SelectItem value="0">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <TooltipProvider>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-1">Teams Management</h1>
+            <p className="text-gray-400">Manage all teams across different companies in the system.</p>
           </div>
-        </CardHeader>
-        <CardContent>
+          <Button
+            className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
+            onClick={() => {
+              setSelectedTeam(null)
+              setIsModalOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Team
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search teams..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-[300px] bg-[#1a2234] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-md border border-[#2a3349] overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow className="border-[#2a3349] hover:bg-[#2a3349]/50">
-                <TableHead className="text-gray-400">Name</TableHead>
-                <TableHead className="text-gray-400">Leader</TableHead>
-                <TableHead className="text-gray-400">Region</TableHead>
-                <TableHead className="text-gray-400">Company</TableHead>
-                <TableHead className="text-gray-400">Status</TableHead>
-                <TableHead className="text-gray-400">Services</TableHead>
-                <TableHead className="text-gray-400">Actions</TableHead>
+            <TableHeader className="bg-[#1a2234]">
+              <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
+                <TableHead className="text-white">Team</TableHead>
+                <TableHead className="text-white">Company</TableHead>
+                <TableHead className="text-white">Region</TableHead>
+                <TableHead className="text-white">Leader ID</TableHead>
+                <TableHead className="text-white">Performance</TableHead>
+                <TableHead className="text-white">Status</TableHead>
+                <TableHead className="text-white text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-400 py-8">
-                    Loading teams...
-                  </TableCell>
-                </TableRow>
-              ) : filteredTeams.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-400 py-8">
+              {filteredTeams.length === 0 ? (
+                <TableRow className="border-[#2a3349] bg-[#0f172a]">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-400">
                     No teams found
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredTeams.map((team) => (
-                  <TableRow key={team.id} className="border-[#2a3349] hover:bg-[#2a3349]/50">
-                    <TableCell className="text-white font-medium">{team.name}</TableCell>
-                    <TableCell className="text-gray-300">
-                      {leaders.find((l) => l.id === team.leaderId)?.name || "Not assigned"}
+                  <TableRow key={team.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
+                    <TableCell className="font-medium text-white">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 border border-[#2a3349]">
+                          <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
+                            {team.name
+                              ?.split(" ")
+                              .map((n: string) => n[0])
+                              .join("") || "T"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div>{team.name || "N/A"}</div>
+                          <div className="text-xs text-gray-400">{team.description || "No description"}</div>
+                        </div>
+                      </div>
                     </TableCell>
-                    <TableCell className="text-gray-300">{team.region}</TableCell>
-                    <TableCell className="text-gray-300">{team.company?.name || "N/A"}</TableCell>
-                    <TableCell>{getStatusBadge(team.status)}</TableCell>
-                    <TableCell className="text-gray-300">{team.completedServices}</TableCell>
+                    <TableCell className="text-gray-400">{team.company?.name || "N/A"}</TableCell>
+                    <TableCell className="text-gray-400">{team.region || "N/A"}</TableCell>
+                    <TableCell className="text-gray-400">Leader #{team.leaderId || "N/A"}</TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDetailsModal(team)}
-                          className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditModal(team)}
-                          className="text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteTeam(team.id)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm">
+                          <div className="text-white">{team.rating || 0}/5.0</div>
+                          <div className="text-xs text-gray-400">{team.completedServices || 0} services</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={getStatusBadge(team.status || 0).className}>
+                        {getStatusBadge(team.status || 0).label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewDetails(team)}
+                              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View Details</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(team)}
+                              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setTeamToDelete(team)}
+                              className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Delete</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -295,56 +391,88 @@ export default function TeamsPage() {
               )}
             </TableBody>
           </Table>
+        </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-400">
-                Page {currentPage} of {totalPages}
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-400">
+            Showing <span className="font-medium text-white">{filteredTeams.length}</span> of{" "}
+            <span className="font-medium text-white">{teams.length}</span> teams
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#2a3349] bg-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
+            >
+              1
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
+            >
+              2
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
 
-      <TeamModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setSelectedTeam(null)
-        }}
-        onSubmit={selectedTeam ? handleUpdateTeam : handleCreateTeam}
-        team={selectedTeam}
-        leaders={leaders}
-      />
+        <TeamModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedTeam(null)
+          }}
+          onSubmit={selectedTeam ? handleEditTeam : handleAddTeam}
+          team={selectedTeam}
+          companies={companies}
+          leaders={[]}
+        />
 
-      <TeamDetailsModal
-        isOpen={isDetailsModalOpen}
-        onClose={() => {
-          setIsDetailsModalOpen(false)
-          setSelectedTeam(null)
-        }}
-        team={selectedTeam}
-      />
-    </div>
+        <TeamDetailsModal
+          isOpen={isDetailsModalOpen}
+          onClose={() => {
+            setIsDetailsModalOpen(false)
+            setSelectedTeam(null)
+          }}
+          team={selectedTeam}
+          onEdit={handleEdit}
+          onDelete={setTeamToDelete}
+        />
+
+        <AlertDialog open={!!teamToDelete} onOpenChange={() => setTeamToDelete(null)}>
+          <AlertDialogContent className="bg-[#1a2234] border-[#2a3349] text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                This action cannot be undone. This will permanently delete the team
+                <span className="font-semibold text-white block mt-1">{teamToDelete?.name}</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-transparent border-[#2a3349] text-white hover:bg-[#2a3349]">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteTeam} className="bg-red-600 hover:bg-red-700 text-white border-0">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
   )
 }

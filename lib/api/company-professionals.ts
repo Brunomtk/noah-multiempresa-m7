@@ -1,10 +1,15 @@
 import type { ApiResponse, Professional, PaginatedResponse } from "@/types"
-import { professionalsApi, type ProfessionalWithDetails } from "@/lib/api/professionals"
-import { apiDelay } from "./utils"
+import { fetchApi } from "./utils"
 
-// API de Profissionais da Empresa
+export interface ProfessionalWithDetails extends Professional {
+  // Extend with any real additional fields if available
+}
+
+// Base endpoint
+const API_BASE = "/Professional"
+
 export const companyProfessionalsApi = {
-  // Listar profissionais da empresa (com paginação e filtros)
+  // List professionals with pagination and optional filtering
   async getCompanyProfessionals(
     companyId: string,
     page = 1,
@@ -13,169 +18,159 @@ export const companyProfessionalsApi = {
     teamId?: string,
     search?: string,
   ): Promise<ApiResponse<PaginatedResponse<Professional>>> {
-    // Reutiliza a API de profissionais, mas sempre filtra pelo companyId
-    return professionalsApi.getProfessionals(page, limit, status, teamId, search, companyId)
-  },
-
-  // Obter profissional da empresa por ID
-  async getCompanyProfessionalById(companyId: string, id: string): Promise<ApiResponse<ProfessionalWithDetails>> {
     try {
-      await apiDelay(500)
+      const params = new URLSearchParams({
+        CompanyId: companyId,
+        Page: String(page),
+        PageSize: String(limit),
+      })
+      if (teamId && teamId !== "all") params.append("TeamId", teamId)
 
-      const response = await professionalsApi.getProfessionalById(id)
+      const res = await fetchApi<PaginatedResponse<Professional>>(
+        `${API_BASE}/paged?${params}`,
+      )
+      let results = res.results || []
 
-      if (response.error) {
-        return response
+      if (status && status !== "all") {
+        results = results.filter(
+          (p) => p.status.toLowerCase() === status.toLowerCase(),
+        )
+      }
+      if (search) {
+        const q = search.toLowerCase()
+        results = results.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.cpf.includes(search) ||
+            p.email.toLowerCase().includes(q) ||
+            p.phone.includes(search),
+        )
       }
 
-      // Verificar se o profissional pertence à empresa
-      if (response.data && response.data.companyId !== companyId) {
-        return {
-          error: "Professional not found in this company",
-          status: 404,
-        }
-      }
-
-      return response
-    } catch (error) {
-      console.error("Failed to fetch company professional:", error)
       return {
-        error: "Failed to fetch company professional",
-        status: 500,
+        data: {
+          data: results,
+          meta: {
+            currentPage: res.currentPage,
+            totalPages: res.pageCount,
+            totalItems: res.totalItems,
+            itemsPerPage: res.pageSize,
+          },
+        },
       }
+    } catch (err) {
+      console.error("getCompanyProfessionals error:", err)
+      return { error: "Failed to fetch professionals", status: 500 }
     }
   },
 
-  // Criar novo profissional na empresa
+  // Get one professional by ID
+  async getCompanyProfessionalById(
+    companyId: string,
+    id: string,
+  ): Promise<ApiResponse<ProfessionalWithDetails>> {
+    try {
+      const p = await fetchApi<ProfessionalWithDetails>(`${API_BASE}/${id}`)
+      if (String(p.companyId) !== companyId) {
+        return { error: "Professional not found in this company", status: 404 }
+      }
+      return { data: p }
+    } catch (err) {
+      console.error("getCompanyProfessionalById error:", err)
+      return { error: "Failed to fetch professional", status: 500 }
+    }
+  },
+
+  // Create professional
   async createCompanyProfessional(
     companyId: string,
-    professionalData: Omit<ProfessionalWithDetails, "id" | "createdAt" | "updatedAt" | "rating" | "completedServices">,
+    pd: Omit<Professional, "id" | "createdAt" | "updatedAt" | "rating" | "completedServices">,
   ): Promise<ApiResponse<Professional>> {
-    // Garantir que o companyId seja o correto
-    const dataWithCompanyId = {
-      ...professionalData,
-      companyId,
+    try {
+      const req = {
+        ...pd,
+        companyId: Number(companyId),
+      }
+      const p = await fetchApi<Professional>(API_BASE, {
+        method: "POST",
+        body: JSON.stringify(req),
+      })
+      return { data: p }
+    } catch (err) {
+      console.error("createCompanyProfessional error:", err)
+      return { error: "Failed to create professional", status: 500 }
     }
-
-    return professionalsApi.createProfessional(dataWithCompanyId)
   },
 
-  // Atualizar profissional da empresa
+  // Update professional
   async updateCompanyProfessional(
     companyId: string,
     id: string,
-    professionalData: Partial<ProfessionalWithDetails>,
+    pd: Partial<Professional>,
   ): Promise<ApiResponse<Professional>> {
+    // ensure belongs
+    const check = await this.getCompanyProfessionalById(companyId, id)
+    if (check.error) return check as any
+
     try {
-      await apiDelay(500)
-
-      // Verificar se o profissional pertence à empresa
-      const checkResponse = await professionalsApi.getProfessionalById(id)
-
-      if (checkResponse.error) {
-        return checkResponse
-      }
-
-      if (checkResponse.data && checkResponse.data.companyId !== companyId) {
-        return {
-          error: "Professional not found in this company",
-          status: 404,
-        }
-      }
-
-      // Não permitir alterar o companyId
-      const dataWithoutCompanyId = { ...professionalData }
-      if (dataWithoutCompanyId.companyId) {
-        delete dataWithoutCompanyId.companyId
-      }
-
-      return professionalsApi.updateProfessional(id, dataWithoutCompanyId)
-    } catch (error) {
-      console.error("Failed to update company professional:", error)
-      return {
-        error: "Failed to update company professional",
-        status: 500,
-      }
+      const req: Partial<Professional> = { ...pd }
+      const p = await fetchApi<Professional>(`${API_BASE}/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(req),
+      })
+      return { data: p }
+    } catch (err) {
+      console.error("updateCompanyProfessional error:", err)
+      return { error: "Failed to update professional", status: 500 }
     }
   },
 
-  // Excluir profissional da empresa
+  // Delete professional
   async deleteCompanyProfessional(companyId: string, id: string): Promise<ApiResponse<null>> {
+    const check = await this.getCompanyProfessionalById(companyId, id)
+    if (check.error) return check as any
+
     try {
-      await apiDelay(500)
-
-      // Verificar se o profissional pertence à empresa
-      const checkResponse = await professionalsApi.getProfessionalById(id)
-
-      if (checkResponse.error) {
-        return checkResponse
-      }
-
-      if (checkResponse.data && checkResponse.data.companyId !== companyId) {
-        return {
-          error: "Professional not found in this company",
-          status: 404,
-        }
-      }
-
-      return professionalsApi.deleteProfessional(id)
-    } catch (error) {
-      console.error("Failed to delete company professional:", error)
-      return {
-        error: "Failed to delete company professional",
-        status: 500,
-      }
+      await fetchApi<void>(`${API_BASE}/${id}`, { method: "DELETE" })
+      return { data: null }
+    } catch (err) {
+      console.error("deleteCompanyProfessional error:", err)
+      return { error: "Failed to delete professional", status: 500 }
     }
   },
 
-  // Obter agenda do profissional da empresa
+  // Professional's schedule (calls real endpoint)
   async getCompanyProfessionalSchedule(
     companyId: string,
     id: string,
     startDate: string,
     endDate: string,
   ): Promise<ApiResponse<{ date: string; appointments: any[] }[]>> {
+    const check = await this.getCompanyProfessionalById(companyId, id)
+    if (check.error) return check as any
+
     try {
-      await apiDelay(500)
-
-      // Verificar se o profissional pertence à empresa
-      const checkResponse = await professionalsApi.getProfessionalById(id)
-
-      if (checkResponse.error) {
-        return checkResponse
-      }
-
-      if (checkResponse.data && checkResponse.data.companyId !== companyId) {
-        return {
-          error: "Professional not found in this company",
-          status: 404,
-        }
-      }
-
-      return professionalsApi.getProfessionalSchedule(id, startDate, endDate)
-    } catch (error) {
-      console.error("Failed to fetch company professional schedule:", error)
-      return {
-        error: "Failed to fetch company professional schedule",
-        status: 500,
-      }
+      const params = new URLSearchParams({ startDate, endDate })
+      const schedule = await fetchApi<{ date: string; appointments: any[] }[]>(
+        `${API_BASE}/${id}/schedule?${params}`,
+      )
+      return { data: schedule }
+    } catch (err) {
+      console.error("getCompanyProfessionalSchedule error:", err)
+      return { error: "Failed to fetch professional schedule", status: 500 }
     }
   },
 
-  // Obter equipes da empresa (para filtro)
+  // Fetch teams for the company
   async getCompanyTeams(companyId: string): Promise<ApiResponse<{ id: string; name: string }[]>> {
     try {
-      await apiDelay(300)
-
-      // Em uma implementação real, filtraria as equipes pelo companyId
-      // Por enquanto, retorna todas as equipes
-      return professionalsApi.getTeams()
-    } catch (error) {
-      console.error("Failed to fetch company teams:", error)
-      return {
-        error: "Failed to fetch company teams",
-        status: 500,
-      }
+      const teams = await fetchApi<{ id: string; name: string }[]>(
+        `/Team?CompanyId=${companyId}`,
+      )
+      return { data: teams }
+    } catch (err) {
+      console.error("getCompanyTeams error:", err)
+      return { error: "Failed to fetch teams", status: 500 }
     }
   },
 }

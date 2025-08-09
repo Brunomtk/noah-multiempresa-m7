@@ -17,113 +17,97 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarIcon } from "lucide-react"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
+import type { Notification, NotificationFormData, NotificationUpdateData } from "@/types/notification"
 
-// Mock data for companies and plans
-const mockCompanies = [
-  { id: "COMP-001", name: "CleanTech Solutions" },
-  { id: "COMP-002", name: "Sparkle Cleaning Co." },
-  { id: "COMP-003", name: "Fresh & Clean Services" },
-  { id: "COMP-004", name: "Pristine Cleaning" },
-  { id: "COMP-005", name: "EcoClean Solutions" },
-]
-
-const mockPlans = [
-  { id: "PLAN-001", name: "Basic" },
-  { id: "PLAN-002", name: "Standard" },
-  { id: "PLAN-003", name: "Premium" },
-  { id: "PLAN-004", name: "Enterprise" },
+// Mock data for recipients
+const mockRecipients = [
+  { id: 1, name: "Admin User 1", role: 1 },
+  { id: 2, name: "Company User 1", role: 2 },
+  { id: 3, name: "Professional User 1", role: 3 },
+  { id: 4, name: "Company User 2", role: 2 },
+  { id: 5, name: "Professional User 2", role: 3 },
 ]
 
 interface NotificationModalProps {
   isOpen: boolean
   onClose: () => void
-  notificationToEdit?: any
+  notificationToEdit?: Notification | null
+  onSubmit: (data: NotificationFormData | NotificationUpdateData, id?: number) => Promise<void>
 }
 
-export function NotificationModal({ isOpen, onClose, notificationToEdit }: NotificationModalProps) {
+export function NotificationModal({ isOpen, onClose, notificationToEdit, onSubmit }: NotificationModalProps) {
   const [title, setTitle] = useState("")
-  const [content, setContent] = useState("")
-  const [type, setType] = useState("system")
-  const [targetType, setTargetType] = useState("all")
-  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
-  const [selectedPlans, setSelectedPlans] = useState<string[]>([])
-  const [isScheduled, setIsScheduled] = useState(false)
-  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined)
-  const [status, setStatus] = useState("draft")
+  const [message, setMessage] = useState("")
+  const [type, setType] = useState("1")
+  const [recipientRole, setRecipientRole] = useState("2")
+  const [selectedRecipients, setSelectedRecipients] = useState<number[]>([])
+  const [isBroadcast, setIsBroadcast] = useState(false)
+  const [companyId, setCompanyId] = useState<number | undefined>(undefined)
+  const [status, setStatus] = useState("0")
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (notificationToEdit) {
       setTitle(notificationToEdit.title || "")
-      setContent(notificationToEdit.content || "")
-      setType(notificationToEdit.type || "system")
-      setTargetType(notificationToEdit.targetType || "all")
-      setSelectedCompanies(notificationToEdit.targetType === "company" ? notificationToEdit.targetIds : [])
-      setSelectedPlans(notificationToEdit.targetType === "plan" ? notificationToEdit.targetIds : [])
-      setIsScheduled(notificationToEdit.status === "scheduled")
-      setScheduledDate(notificationToEdit.scheduledFor ? new Date(notificationToEdit.scheduledFor) : undefined)
-      setStatus(notificationToEdit.status || "draft")
+      setMessage(notificationToEdit.message || "")
+      setType(notificationToEdit.type?.toString() || "1")
+      setRecipientRole(notificationToEdit.recipientRole?.toString() || "2")
+      setSelectedRecipients([notificationToEdit.recipientId])
+      setIsBroadcast(false)
+      setCompanyId(notificationToEdit.companyId)
+      setStatus(notificationToEdit.status?.toString() || "0")
     } else {
       // Reset form for new notification
       setTitle("")
-      setContent("")
-      setType("system")
-      setTargetType("all")
-      setSelectedCompanies([])
-      setSelectedPlans([])
-      setIsScheduled(false)
-      setScheduledDate(undefined)
-      setStatus("draft")
+      setMessage("")
+      setType("1")
+      setRecipientRole("2")
+      setSelectedRecipients([])
+      setIsBroadcast(false)
+      setCompanyId(undefined)
+      setStatus("0")
     }
   }, [notificationToEdit])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
 
-    // In a real application, this would save the notification to the database
-    const notificationData = {
-      title,
-      content,
-      type,
-      targetType,
-      targetIds: targetType === "company" ? selectedCompanies : targetType === "plan" ? selectedPlans : [],
-      status: isScheduled ? "scheduled" : status,
-      scheduledFor: isScheduled ? scheduledDate?.toISOString() : null,
+    try {
+      if (notificationToEdit) {
+        // Update existing notification
+        const updateData: NotificationUpdateData = {
+          title,
+          message,
+          type,
+          status,
+          readAt: status === "1" ? new Date().toISOString() : undefined,
+        }
+        await onSubmit(updateData, notificationToEdit.id)
+      } else {
+        // Create new notification
+        const notificationData: NotificationFormData = {
+          title,
+          message,
+          type,
+          recipientRole,
+          recipientIds: isBroadcast ? undefined : selectedRecipients,
+          isBroadcast,
+          companyId,
+        }
+        await onSubmit(notificationData)
+      }
+
+      onClose()
+    } catch (error) {
+      console.error("Failed to submit notification:", error)
+    } finally {
+      setLoading(false)
     }
-
-    console.log("Notification data:", notificationData)
-
-    // Close the modal
-    onClose()
-
-    // Show success message
-    alert(notificationToEdit ? "Notification updated successfully!" : "Notification created successfully!")
   }
 
-  const handleSendNow = () => {
-    // In a real application, this would send the notification immediately
-    const notificationData = {
-      title,
-      content,
-      type,
-      targetType,
-      targetIds: targetType === "company" ? selectedCompanies : targetType === "plan" ? selectedPlans : [],
-      status: "sent",
-    }
-
-    console.log("Sending notification now:", notificationData)
-
-    // Close the modal
-    onClose()
-
-    // Show success message
-    alert("Notification sent successfully!")
-  }
+  const filteredRecipients = mockRecipients.filter((recipient) => recipient.role.toString() === recipientRole)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -151,13 +135,13 @@ export function NotificationModal({ isOpen, onClose, notificationToEdit }: Notif
               />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="content" className="text-right pt-2">
-                Content
+              <Label htmlFor="message" className="text-right pt-2">
+                Message
               </Label>
               <Textarea
-                id="content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
+                id="message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
                 className="col-span-3"
                 rows={5}
                 required
@@ -173,167 +157,116 @@ export function NotificationModal({ isOpen, onClose, notificationToEdit }: Notif
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="system">System</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="feature">New Features</SelectItem>
-                    <SelectItem value="feedback">Feedback</SelectItem>
-                    <SelectItem value="legal">Legal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="target-type" className="text-right">
-                Recipients
-              </Label>
-              <div className="col-span-3">
-                <Select value={targetType} onValueChange={setTargetType} required>
-                  <SelectTrigger id="target-type">
-                    <SelectValue placeholder="Select recipients" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Companies</SelectItem>
-                    <SelectItem value="company">Specific Companies</SelectItem>
-                    <SelectItem value="plan">By Plan</SelectItem>
+                    <SelectItem value="1">System</SelectItem>
+                    <SelectItem value="2">Appointment</SelectItem>
+                    <SelectItem value="3">Message</SelectItem>
+                    <SelectItem value="4">Alert</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {targetType === "company" && (
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label className="text-right pt-2">Companies</Label>
-                <div className="col-span-3 space-y-2 border rounded-md p-4">
-                  {mockCompanies.map((company) => (
-                    <div key={company.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`company-${company.id}`}
-                        checked={selectedCompanies.includes(company.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedCompanies([...selectedCompanies, company.id])
-                          } else {
-                            setSelectedCompanies(selectedCompanies.filter((id) => id !== company.id))
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`company-${company.id}`}>{company.name}</Label>
-                    </div>
-                  ))}
-                  {selectedCompanies.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Select at least one company</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {targetType === "plan" && (
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label className="text-right pt-2">Plans</Label>
-                <div className="col-span-3 space-y-2 border rounded-md p-4">
-                  {mockPlans.map((plan) => (
-                    <div key={plan.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`plan-${plan.id}`}
-                        checked={selectedPlans.includes(plan.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedPlans([...selectedPlans, plan.id])
-                          } else {
-                            setSelectedPlans(selectedPlans.filter((id) => id !== plan.id))
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`plan-${plan.id}`}>{plan.name}</Label>
-                    </div>
-                  ))}
-                  {selectedPlans.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Select at least one plan</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="is-scheduled" className="text-right">
-                Schedule Send
-              </Label>
-              <div className="flex items-center space-x-2 col-span-3">
-                <Switch id="is-scheduled" checked={isScheduled} onCheckedChange={setIsScheduled} />
-                <Label htmlFor="is-scheduled">
-                  {isScheduled ? "Scheduled send" : "Send immediately or save as draft"}
-                </Label>
-              </div>
-            </div>
-
-            {isScheduled && (
+            {notificationToEdit && (
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="scheduled-date" className="text-right">
-                  Date and Time
+                <Label htmlFor="status" className="text-right">
+                  Status
                 </Label>
                 <div className="col-span-3">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="scheduled-date"
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !scheduledDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {scheduledDate ? format(scheduledDate, "PPP 'at' HH:mm") : <span>Select date and time</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar mode="single" selected={scheduledDate} onSelect={setScheduledDate} initialFocus />
-                      <div className="p-3 border-t border-border">
-                        <Label htmlFor="scheduled-time">Time</Label>
-                        <Input
-                          id="scheduled-time"
-                          type="time"
-                          className="mt-1"
-                          value={scheduledDate ? format(scheduledDate, "HH:mm") : ""}
-                          onChange={(e) => {
-                            if (scheduledDate) {
-                              const [hours, minutes] = e.target.value.split(":").map(Number)
-                              const newDate = new Date(scheduledDate)
-                              newDate.setHours(hours, minutes)
-                              setScheduledDate(newDate)
-                            } else {
-                              const now = new Date()
-                              const [hours, minutes] = e.target.value.split(":").map(Number)
-                              now.setHours(hours, minutes)
-                              setScheduledDate(now)
-                            }
-                          }}
-                        />
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <Select value={status} onValueChange={setStatus} required>
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Unread</SelectItem>
+                      <SelectItem value="1">Read</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+            )}
+
+            {!notificationToEdit && (
+              <>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="recipient-role" className="text-right">
+                    Recipient Role
+                  </Label>
+                  <div className="col-span-3">
+                    <Select value={recipientRole} onValueChange={setRecipientRole} required>
+                      <SelectTrigger id="recipient-role">
+                        <SelectValue placeholder="Select recipient role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Admin</SelectItem>
+                        <SelectItem value="2">Company</SelectItem>
+                        <SelectItem value="3">Professional</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="is-broadcast" className="text-right">
+                    Broadcast
+                  </Label>
+                  <div className="flex items-center space-x-2 col-span-3">
+                    <Switch id="is-broadcast" checked={isBroadcast} onCheckedChange={setIsBroadcast} />
+                    <Label htmlFor="is-broadcast">
+                      {isBroadcast ? "Send to all users of selected role" : "Send to specific recipients"}
+                    </Label>
+                  </div>
+                </div>
+
+                {!isBroadcast && (
+                  <div className="grid grid-cols-4 items-start gap-4">
+                    <Label className="text-right pt-2">Recipients</Label>
+                    <div className="col-span-3 space-y-2 border rounded-md p-4 max-h-40 overflow-y-auto">
+                      {filteredRecipients.map((recipient) => (
+                        <div key={recipient.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`recipient-${recipient.id}`}
+                            checked={selectedRecipients.includes(recipient.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedRecipients([...selectedRecipients, recipient.id])
+                              } else {
+                                setSelectedRecipients(selectedRecipients.filter((id) => id !== recipient.id))
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`recipient-${recipient.id}`}>{recipient.name}</Label>
+                        </div>
+                      ))}
+                      {filteredRecipients.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No recipients available for selected role</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="company-id" className="text-right">
+                    Company ID
+                  </Label>
+                  <Input
+                    id="company-id"
+                    type="number"
+                    value={companyId || ""}
+                    onChange={(e) => setCompanyId(e.target.value ? Number.parseInt(e.target.value) : undefined)}
+                    className="col-span-3"
+                    placeholder="Optional"
+                  />
+                </div>
+              </>
             )}
           </div>
           <DialogFooter className="flex justify-between sm:justify-between">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <div className="flex gap-2">
-              {!isScheduled && (
-                <Button type="button" variant="outline" onClick={() => setStatus("draft")}>
-                  Save Draft
-                </Button>
-              )}
-              {!isScheduled && (
-                <Button type="button" onClick={handleSendNow}>
-                  Send Now
-                </Button>
-              )}
-              {isScheduled && <Button type="submit">Schedule</Button>}
-            </div>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : notificationToEdit ? "Update" : "Create"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
