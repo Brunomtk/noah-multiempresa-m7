@@ -1,14 +1,25 @@
-// Função para fazer delay nas requisições (simulação)
+// Get API URL from environment variables with fallback
+const getApiBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    // Client-side
+    return process.env.NEXT_PUBLIC_API_URL || "https://localhost:44394/api"
+  } else {
+    // Server-side
+    return process.env.NEXT_PUBLIC_API_URL || "https://localhost:44394/api"
+  }
+}
+
+// Export API URL constant
+export const API_URL = getApiBaseUrl()
+
+// Export delay function
+export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Export the apiDelay function
 export const apiDelay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // URL base da API
-const API_BASE_URL = "https://localhost:44394/api"
-
-// Export API_URL for compatibility
-export const API_URL = API_BASE_URL
-
-// Export delay function for compatibility
-export const delay = apiDelay
+const API_BASE_URL = getApiBaseUrl()
 
 // Função para obter o token de autenticação
 function getAuthToken(): string | null {
@@ -129,7 +140,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 
 // Utility function to get API base URL
 export function getApiUrl(): string {
-  return "https://localhost:44394/api"
+  return getApiBaseUrl()
 }
 
 // Utility function to get user data from localStorage

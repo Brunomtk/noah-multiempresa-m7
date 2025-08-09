@@ -100,61 +100,6 @@ export const internalFeedbackApi = {
   },
 }
 
-// Get internal feedback (alias for getRecords)
-export async function getInternalFeedback(
-  filters: InternalFeedbackFilters = {},
-): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
-  return internalFeedbackApi.getRecords(filters)
-}
-
-// Add comment to internal feedback (alias for addComment)
-export async function addCommentToInternalFeedback(
-  id: number,
-  comment: string,
-): Promise<{ data?: InternalFeedback; error?: string }> {
-  return internalFeedbackApi.addComment(id, comment)
-}
-
-// Get internal feedback by professional
-export async function getInternalFeedbackByProfessional(
-  professionalId: number,
-  filters: Omit<InternalFeedbackFilters, "professionalId"> = {},
-): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
-  return internalFeedbackApi.getRecords({ ...filters, professionalId })
-}
-
-// Get internal feedback by team
-export async function getInternalFeedbackByTeam(
-  teamId: number,
-  filters: Omit<InternalFeedbackFilters, "teamId"> = {},
-): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
-  return internalFeedbackApi.getRecords({ ...filters, teamId })
-}
-
-// Get internal feedback by category
-export async function getInternalFeedbackByCategory(
-  category: string,
-  filters: Omit<InternalFeedbackFilters, "category"> = {},
-): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
-  return internalFeedbackApi.getRecords({ ...filters, category })
-}
-
-// Get internal feedback by status
-export async function getInternalFeedbackByStatus(
-  status: string,
-  filters: Omit<InternalFeedbackFilters, "status"> = {},
-): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
-  return internalFeedbackApi.getRecords({ ...filters, status })
-}
-
-// Get internal feedback by priority
-export async function getInternalFeedbackByPriority(
-  priority: string,
-  filters: Omit<InternalFeedbackFilters, "priority"> = {},
-): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
-  return internalFeedbackApi.getRecords({ ...filters, priority })
-}
-
 // Legacy exports for backward compatibility
 export const getInternalFeedbackRecords = internalFeedbackApi.getRecords
 export const getInternalFeedbackById = internalFeedbackApi.getById
@@ -162,3 +107,62 @@ export const createInternalFeedback = internalFeedbackApi.create
 export const updateInternalFeedback = internalFeedbackApi.update
 export const deleteInternalFeedback = internalFeedbackApi.delete
 export const addInternalFeedbackComment = internalFeedbackApi.addComment
+
+// Legacy export aliases for backward compatibility
+export const getInternalFeedback = internalFeedbackApi.getRecords
+export const addCommentToInternalFeedback = internalFeedbackApi.addComment
+
+// Get internal feedback by professional
+export async function getInternalFeedbackByProfessional(
+  professionalId: number,
+  filters: Omit<InternalFeedbackFilters, "professionalId"> = {},
+): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
+  return internalFeedbackApi.getRecords({
+    ...filters,
+    professionalId,
+  })
+}
+
+// Get internal feedback by team
+export async function getInternalFeedbackByTeam(
+  teamId: number,
+  filters: Omit<InternalFeedbackFilters, "teamId"> = {},
+): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
+  return internalFeedbackApi.getRecords({
+    ...filters,
+    teamId,
+  })
+}
+
+// Get internal feedback by category
+export async function getInternalFeedbackByCategory(
+  category: string,
+  filters: Omit<InternalFeedbackFilters, "category"> = {},
+): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
+  return internalFeedbackApi.getRecords({
+    ...filters,
+    category,
+  })
+}
+
+// Get internal feedback by status
+export async function getInternalFeedbackByStatus(
+  status: string,
+  filters: Omit<InternalFeedbackFilters, "status"> = {},
+): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
+  return internalFeedbackApi.getRecords({
+    ...filters,
+    status,
+  })
+}
+
+// Get internal feedback by priority
+export async function getInternalFeedbackByPriority(
+  priority: string,
+  filters: Omit<InternalFeedbackFilters, "priority"> = {},
+): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
+  return internalFeedbackApi.getRecords({
+    ...filters,
+    priority,
+  })
+}

@@ -129,22 +129,29 @@ export async function getCompanyUnreadNotificationsCount(): Promise<number> {
   return typeof data === "number" ? data : 0
 }
 
-// Send notification to professionals
-export async function sendCompanyNotificationToProfessionals(data: {
+// Send notification to specific professionals
+export async function sendCompanyNotificationToProfessionals(notificationData: {
   title: string
   message: string
+  type: string
   professionalIds: number[]
   companyId: number
 }): Promise<Notification[]> {
   try {
-    const response = await fetchApi<Notification[]>(`/Notifications/send-to-professionals`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-    return response
-  } catch (error) {
-    console.error("Error sending notification to professionals:", error)
-    throw error
+    const results = []
+    for (const professionalId of notificationData.professionalIds) {
+      const result = await createCompanyNotification({
+        ...notificationData,
+        recipientRole: "professional",
+        recipientIds: [professionalId],
+        isBroadcast: false,
+      })
+      results.push(result)
+    }
+    return results
+  } catch (err) {
+    console.error("Error sending notifications to professionals:", err)
+    throw err
   }
 }
 
@@ -152,68 +159,56 @@ export async function sendCompanyNotificationToProfessionals(data: {
 export async function broadcastCompanyNotification(data: {
   title: string
   message: string
+  type: string
   companyId: number
-  type?: number
 }): Promise<Notification> {
-  try {
-    const response = await fetchApi<Notification>(`/Notifications/broadcast`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-    return response
-  } catch (error) {
-    console.error("Error broadcasting notification:", error)
-    throw error
-  }
+  return await createCompanyNotification({
+    ...data,
+    recipientRole: "all",
+    recipientIds: [],
+    isBroadcast: true,
+  })
 }
 
-// Get company notification statistics
+// Get notification statistics for company
 export async function getCompanyNotificationStats(): Promise<{
   total: number
   unread: number
   read: number
-  thisWeek: number
-  thisMonth: number
   byType: Record<string, number>
+  recent: number
 }> {
   try {
-    const companyId = getCompanyIdFromToken()
     const notifications = await getCompanyNotifications()
-
-    const now = new Date()
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-
-    const unreadCount = notifications.filter((n) => n.status === 0).length
-    const thisWeek = notifications.filter((n) => new Date(n.createdDate) >= oneWeekAgo).length
-    const thisMonth = notifications.filter((n) => new Date(n.createdDate) >= oneMonthAgo).length
+    const unreadCount = await getCompanyUnreadNotificationsCount()
 
     const byType = notifications.reduce(
       (acc, notification) => {
-        const typeKey = `type_${notification.type}`
-        acc[typeKey] = (acc[typeKey] || 0) + 1
+        const type = notification.type.toString()
+        acc[type] = (acc[type] || 0) + 1
         return acc
       },
       {} as Record<string, number>,
     )
 
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const recent = notifications.filter((n) => new Date(n.createdDate) >= oneWeekAgo).length
+
     return {
       total: notifications.length,
       unread: unreadCount,
       read: notifications.length - unreadCount,
-      thisWeek,
-      thisMonth,
       byType,
+      recent,
     }
-  } catch (error) {
-    console.error("Error getting notification stats:", error)
+  } catch (err) {
+    console.error("Error getting notification stats:", err)
     return {
       total: 0,
       unread: 0,
       read: 0,
-      thisWeek: 0,
-      thisMonth: 0,
       byType: {},
+      recent: 0,
     }
   }
 }

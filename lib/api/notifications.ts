@@ -65,42 +65,30 @@ export async function getUserNotifications(userId: number): Promise<Notification
   return fetchApi<Notification[]>(`${API_BASE}/user/${userId}`)
 }
 
-// Send notification to specific users
+// Send notification to specific recipients
 export async function sendNotification(data: {
   title: string
   message: string
-  type: number
+  type: string
   recipientIds: number[]
-  companyId?: number
-}): Promise<Notification[]> {
-  try {
-    const response = await fetchApi<Notification[]>(`${API_BASE}/send`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-    return response
-  } catch (error) {
-    console.error("Error sending notification:", error)
-    throw error
-  }
+  recipientRole: string
+}): Promise<Notification> {
+  return createNotification({
+    ...data,
+    isBroadcast: false,
+  })
 }
 
-// Broadcast notification to all users in a company or role
+// Broadcast notification to all users of a specific role
 export async function broadcastNotification(data: {
   title: string
   message: string
-  type: number
-  companyId?: number
-  role?: string
+  type: string
+  recipientRole: string
 }): Promise<Notification> {
-  try {
-    const response = await fetchApi<Notification>(`${API_BASE}/broadcast`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-    return response
-  } catch (error) {
-    console.error("Error broadcasting notification:", error)
-    throw error
-  }
+  return createNotification({
+    ...data,
+    recipientIds: [],
+    isBroadcast: true,
+  })
 }
