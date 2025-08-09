@@ -1,164 +1,153 @@
-import { fetchApi } from "./utils"
-import type {
-  InternalFeedback,
-  InternalFeedbackCreateRequest,
-  InternalFeedbackUpdateRequest,
-  InternalFeedbackFilters,
-  InternalFeedbackPagedResponse,
-} from "@/types/internal-feedback"
+import type { InternalFeedback, InternalFeedbackFilters, CreateInternalFeedbackData } from "@/types/internal-feedback"
 
-export const internalFeedbackApi = {
-  // Get paginated internal feedback
-  async getRecords(
-    filters: InternalFeedbackFilters = {},
-  ): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
-    try {
-      const params = new URLSearchParams()
-      if (filters.status && filters.status !== "all") params.append("Status", filters.status.toString())
-      if (filters.priority && filters.priority !== "all") params.append("Priority", filters.priority.toString())
-      if (filters.category && filters.category !== "all") params.append("Category", filters.category)
-      if (filters.professionalId) params.append("ProfessionalId", filters.professionalId.toString())
-      if (filters.teamId) params.append("TeamId", filters.teamId.toString())
-      if (filters.searchQuery) params.append("Search", filters.searchQuery)
-      if (filters.pageNumber) params.append("PageNumber", filters.pageNumber.toString())
-      if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
-      const query = params.toString()
-      const url = query ? `/InternalFeedback/paged?${query}` : "/InternalFeedback/paged"
-      const response = await fetchApi(url)
-      return { data: response }
-    } catch (error) {
-      console.error("Error fetching internal feedback:", error)
-      return { error: error instanceof Error ? error.message : "Failed to fetch internal feedback" }
-    }
-  },
-
-  // Get a feedback by ID
-  async getById(id: number): Promise<{ data?: InternalFeedback; error?: string }> {
-    try {
-      const response = await fetchApi(`/InternalFeedback/${id}`)
-      return { data: response }
-    } catch (error) {
-      console.error("Error fetching internal feedback:", error)
-      return { error: error instanceof Error ? error.message : "Failed to fetch internal feedback" }
-    }
-  },
-
-  // Create a new feedback
-  async create(data: InternalFeedbackCreateRequest): Promise<{ data?: InternalFeedback; error?: string }> {
-    try {
-      const response = await fetchApi("/InternalFeedback/create", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
-      return { data: response }
-    } catch (error) {
-      console.error("Error creating internal feedback:", error)
-      return { error: error instanceof Error ? error.message : "Failed to create internal feedback" }
-    }
-  },
-
-  // Update a feedback
-  async update(id: number, data: InternalFeedbackUpdateRequest): Promise<{ data?: InternalFeedback; error?: string }> {
-    try {
-      const response = await fetchApi(`/InternalFeedback/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      })
-      return { data: response }
-    } catch (error) {
-      console.error("Error updating internal feedback:", error)
-      return { error: error instanceof Error ? error.message : "Failed to update internal feedback" }
-    }
-  },
-
-  // Delete a feedback
-  async delete(id: number): Promise<{ success?: boolean; error?: string }> {
-    try {
-      await fetchApi(`/InternalFeedback/${id}`, {
-        method: "DELETE",
-      })
-      return { success: true }
-    } catch (error) {
-      console.error("Error deleting internal feedback:", error)
-      return { error: error instanceof Error ? error.message : "Failed to delete internal feedback" }
-    }
-  },
-
-  // Add comment to feedback
-  async addComment(id: number, comment: string): Promise<{ data?: InternalFeedback; error?: string }> {
-    try {
-      const response = await fetchApi(`/InternalFeedback/${id}/comment`, {
-        method: "POST",
-        body: JSON.stringify(comment),
-      })
-      return { data: response }
-    } catch (error) {
-      console.error("Error adding comment:", error)
-      return { error: error instanceof Error ? error.message : "Failed to add comment" }
-    }
-  },
-}
-
-// Legacy exports for backward compatibility
-export const getInternalFeedbackRecords = internalFeedbackApi.getRecords
-export const getInternalFeedbackById = internalFeedbackApi.getById
-export const createInternalFeedback = internalFeedbackApi.create
-export const updateInternalFeedback = internalFeedbackApi.update
-export const deleteInternalFeedback = internalFeedbackApi.delete
-export const addInternalFeedbackComment = internalFeedbackApi.addComment
-
-// Add these missing exports at the end of the file
-export const getInternalFeedback = internalFeedbackApi.getRecords
-export const addCommentToInternalFeedback = internalFeedbackApi.addComment
-
-// Add these new functions
-export async function getInternalFeedbackByProfessional(professionalId: string) {
+export async function getInternalFeedbacks(filters?: InternalFeedbackFilters) {
   try {
-    const response = await fetchApi(`/InternalFeedback/professional/${professionalId}`)
-    return response
+    const queryParams = new URLSearchParams()
+
+    if (filters?.search) queryParams.append("search", filters.search)
+    if (filters?.status) queryParams.append("status", filters.status)
+    if (filters?.priority) queryParams.append("priority", filters.priority)
+    if (filters?.category) queryParams.append("category", filters.category)
+    if (filters?.professionalId) queryParams.append("professionalId", filters.professionalId)
+    if (filters?.teamId) queryParams.append("teamId", filters.teamId)
+    if (filters?.page) queryParams.append("page", filters.page.toString())
+    if (filters?.limit) queryParams.append("limit", filters.limit.toString())
+
+    const response = await fetch(`${API_BASE_URL}/internal-feedback?${queryParams}`)
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch internal feedback")
+    }
+
+    return await response.json()
   } catch (error) {
-    console.error("Error fetching feedback by professional:", error)
-    return []
+    console.error("Error fetching internal feedback:", error)
+    // Return mock data for development
+    return {
+      feedbacks: [],
+      totalCount: 0,
+      totalPages: 0,
+      stats: {
+        totalFeedbacks: 0,
+        pendingFeedbacks: 0,
+        resolvedFeedbacks: 0,
+        highPriorityFeedbacks: 0,
+      },
+    }
   }
 }
 
-export async function getInternalFeedbackByTeam(teamId: string) {
+export async function getInternalFeedback(id: string): Promise<InternalFeedback | null> {
   try {
-    const response = await fetchApi(`/InternalFeedback/team/${teamId}`)
-    return response
+    const response = await fetch(`${API_BASE_URL}/internal-feedback/${id}`)
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch internal feedback")
+    }
+
+    return await response.json()
   } catch (error) {
-    console.error("Error fetching feedback by team:", error)
-    return []
+    console.error("Error fetching internal feedback:", error)
+    return null
   }
 }
 
-export async function getInternalFeedbackByCategory(category: string) {
+export async function createInternalFeedback(data: CreateInternalFeedbackData): Promise<InternalFeedback> {
   try {
-    const response = await fetchApi(`/InternalFeedback/category/${category}`)
-    return response
+    const response = await fetch(`${API_BASE_URL}/internal-feedback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to create internal feedback")
+    }
+
+    return await response.json()
   } catch (error) {
-    console.error("Error fetching feedback by category:", error)
-    return []
+    console.error("Error creating internal feedback:", error)
+    throw error
   }
 }
 
-export async function getInternalFeedbackByStatus(status: string) {
+export async function updateInternalFeedback(id: string, data: Partial<InternalFeedback>): Promise<InternalFeedback> {
   try {
-    const response = await fetchApi(`/InternalFeedback/status/${status}`)
-    return response
+    const response = await fetch(`${API_BASE_URL}/internal-feedback/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to update internal feedback")
+    }
+
+    return await response.json()
   } catch (error) {
-    console.error("Error fetching feedback by status:", error)
-    return []
+    console.error("Error updating internal feedback:", error)
+    throw error
   }
 }
 
-export async function getInternalFeedbackByPriority(priority: string) {
+export async function deleteInternalFeedback(id: string): Promise<void> {
   try {
-    const response = await fetchApi(`/InternalFeedback/priority/${priority}`)
-    return response
+    const response = await fetch(`${API_BASE_URL}/internal-feedback/${id}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to delete internal feedback")
+    }
   } catch (error) {
-    console.error("Error fetching feedback by priority:", error)
-    return []
+    console.error("Error deleting internal feedback:", error)
+    throw error
   }
+}
+
+export async function addCommentToInternalFeedback(id: string, comment: string): Promise<InternalFeedback> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/internal-feedback/${id}/comments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ comment }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to add comment")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error adding comment:", error)
+    throw error
+  }
+}
+
+export async function getInternalFeedbackByProfessional(professionalId: string, filters?: InternalFeedbackFilters) {
+  return getInternalFeedbacks({ ...filters, professionalId })
+}
+
+export async function getInternalFeedbackByTeam(teamId: string, filters?: InternalFeedbackFilters) {
+  return getInternalFeedbacks({ ...filters, teamId })
+}
+
+export async function getInternalFeedbackByCategory(category: string, filters?: InternalFeedbackFilters) {
+  return getInternalFeedbacks({ ...filters, category })
+}
+
+export async function getInternalFeedbackByStatus(status: string, filters?: InternalFeedbackFilters) {
+  return getInternalFeedbacks({ ...filters, status })
+}
+
+export async function getInternalFeedbackByPriority(priority: string, filters?: InternalFeedbackFilters) {
+  return getInternalFeedbacks({ ...filters, priority })
 }

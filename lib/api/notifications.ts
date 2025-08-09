@@ -1,113 +1,172 @@
-import { fetchApi } from "./utils"
-import type {
-  Notification,
-  NotificationFormData,
-  NotificationUpdateData,
-  NotificationFilters,
-} from "@/types/notification"
+import type { Notification, NotificationFilters, CreateNotificationData } from "@/types/notification"
 
-const API_BASE = "/Notifications"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
-// Get all notifications with optional filters
-export async function getNotifications(filters?: NotificationFilters): Promise<Notification[]> {
-  const params = new URLSearchParams()
+export async function getNotifications(filters?: NotificationFilters) {
+  try {
+    const queryParams = new URLSearchParams()
 
-  if (filters?.type) params.append("Type", filters.type)
-  if (filters?.recipientRole) params.append("RecipientRole", filters.recipientRole)
-  if (filters?.search) params.append("Search", filters.search)
+    if (filters?.search) queryParams.append("search", filters.search)
+    if (filters?.type) queryParams.append("type", filters.type)
+    if (filters?.isRead !== undefined) queryParams.append("isRead", filters.isRead.toString())
+    if (filters?.userId) queryParams.append("userId", filters.userId)
+    if (filters?.page) queryParams.append("page", filters.page.toString())
+    if (filters?.limit) queryParams.append("limit", filters.limit.toString())
 
-  const url = params.toString() ? `${API_BASE}?${params.toString()}` : API_BASE
-  return fetchApi<Notification[]>(url)
-}
+    const response = await fetch(`${API_BASE_URL}/notifications?${queryParams}`)
 
-// Get a specific notification by ID
-export async function getNotificationById(id: number): Promise<Notification> {
-  return fetchApi<Notification>(`${API_BASE}/${id}`)
-}
+    if (!response.ok) {
+      throw new Error("Failed to fetch notifications")
+    }
 
-// Create a new notification
-export async function createNotification(data: NotificationFormData): Promise<Notification> {
-  return fetchApi<Notification>(API_BASE, {
-    method: "POST",
-    body: JSON.stringify(data),
-  })
-}
-
-// Update an existing notification
-export async function updateNotification(id: number, data: NotificationUpdateData): Promise<Notification> {
-  return fetchApi<Notification>(`${API_BASE}/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  })
-}
-
-// Delete a notification
-export async function deleteNotification(id: number): Promise<void> {
-  return fetchApi<void>(`${API_BASE}/${id}`, {
-    method: "DELETE",
-  })
-}
-
-// Mark a notification as read
-export async function markNotificationAsRead(id: number): Promise<void> {
-  return fetchApi<void>(`${API_BASE}/${id}/read`, {
-    method: "POST",
-  })
-}
-
-// Get unread notifications count for a user
-export async function getUnreadNotificationsCount(userId: number): Promise<number> {
-  return fetchApi<number>(`${API_BASE}/user/${userId}/unread-count`)
-}
-
-// Get notifications for a specific user
-export async function getUserNotifications(userId: number): Promise<Notification[]> {
-  return fetchApi<Notification[]>(`${API_BASE}/user/${userId}`)
-}
-
-// Send a notification to specific users
-export async function sendNotification(
-  title: string,
-  message: string,
-  type: string,
-  recipientIds: number[],
-  recipientRole?: string,
-  companyId?: number,
-): Promise<void> {
-  const data = {
-    title,
-    message,
-    type,
-    recipientIds,
-    recipientRole,
-    companyId,
+    return await response.json()
+  } catch (error) {
+    console.error("Error fetching notifications:", error)
+    // Return mock data for development
+    return {
+      notifications: [],
+      totalCount: 0,
+      totalPages: 0,
+      stats: {
+        totalNotifications: 0,
+        unreadNotifications: 0,
+        readNotifications: 0,
+      },
+    }
   }
-
-  return fetchApi<void>(`${API_BASE}/send`, {
-    method: "POST",
-    body: JSON.stringify(data),
-  })
 }
 
-// Broadcast a notification to all users with a specific role
+export async function getNotification(id: string): Promise<Notification | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/notifications/${id}`)
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch notification")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error fetching notification:", error)
+    return null
+  }
+}
+
+export async function createNotification(data: CreateNotificationData): Promise<Notification> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/notifications`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to create notification")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error creating notification:", error)
+    throw error
+  }
+}
+
+export async function updateNotification(id: string, data: Partial<Notification>): Promise<Notification> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/notifications/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to update notification")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error updating notification:", error)
+    throw error
+  }
+}
+
+export async function deleteNotification(id: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/notifications/${id}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to delete notification")
+    }
+  } catch (error) {
+    console.error("Error deleting notification:", error)
+    throw error
+  }
+}
+
+export async function markNotificationAsRead(id: string): Promise<Notification> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
+      method: "PUT",
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to mark notification as read")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error marking notification as read:", error)
+    throw error
+  }
+}
+
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/notifications/mark-all-read`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userId }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to mark all notifications as read")
+    }
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error)
+    throw error
+  }
+}
+
+export async function sendNotification(data: CreateNotificationData): Promise<Notification> {
+  return createNotification(data)
+}
+
 export async function broadcastNotification(
-  title: string,
-  message: string,
-  type: string,
-  recipientRole: string,
-  companyId?: number,
-): Promise<void> {
-  const data = {
-    title,
-    message,
-    type,
-    recipientRole,
-    companyId,
-    isBroadcast: true,
-  }
+  data: Omit<CreateNotificationData, "userId"> & { userIds: string[] },
+): Promise<Notification[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/notifications/broadcast`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
 
-  return fetchApi<void>(`${API_BASE}/broadcast`, {
-    method: "POST",
-    body: JSON.stringify(data),
-  })
+    if (!response.ok) {
+      throw new Error("Failed to broadcast notification")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("Error broadcasting notification:", error)
+    throw error
+  }
 }

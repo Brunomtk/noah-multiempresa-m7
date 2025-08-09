@@ -1,286 +1,194 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
-import { useCompanyMaterialsContext } from "@/contexts/company-materials-context"
+import { useState, useEffect, useCallback } from "react"
+import type { Material } from "@/types/material"
+import {
+  getMaterials,
+  createMaterial,
+  updateMaterial,
+  deleteMaterial,
+  addStock,
+  useMaterial,
+} from "@/lib/api/company-materials"
+
+export interface MaterialFilters {
+  search?: string
+  category?: string
+  isActive?: boolean
+  lowStock?: boolean
+  sortBy?: "name" | "category" | "currentStock" | "costPerUnit" | "createdAt"
+  sortOrder?: "asc" | "desc"
+  page?: number
+  limit?: number
+}
+
+export interface MaterialStats {
+  totalMaterials: number
+  activeMaterials: number
+  lowStockMaterials: number
+  totalValue: number
+  categories: string[]
+}
 
 export function useCompanyMaterials() {
-  const context = useCompanyMaterialsContext()
+  const [materials, setMaterials] = useState<Material[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<MaterialFilters>({
+    page: 1,
+    limit: 10,
+    sortBy: "name",
+    sortOrder: "asc",
+  })
+  const [stats, setStats] = useState<MaterialStats>({
+    totalMaterials: 0,
+    activeMaterials: 0,
+    lowStockMaterials: 0,
+    totalValue: 0,
+    categories: [],
+  })
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
 
-  // Format currency for display
-  const formatCurrency = useCallback((amount: number): string => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(amount)
-  }, [])
-
-  // Format date for display
-  const formatDate = useCallback((dateString: string): string => {
-    if (!dateString) return "N/A"
-
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(date)
-  }, [])
-
-  // Get stock status color
-  const getStockStatusColor = useCallback((currentStock: number, minStock: number): string => {
-    if (currentStock === 0) return "text-red-500"
-    if (currentStock <= minStock) return "text-yellow-500"
-    return "text-green-500"
-  }, [])
-
-  // Get stock status label
-  const getStockStatusLabel = useCallback((currentStock: number, minStock: number): string => {
-    if (currentStock === 0) return "Sem estoque"
-    if (currentStock <= minStock) return "Estoque baixo"
-    return "Em estoque"
-  }, [])
-
-  // Calculate stock percentage
-  const getStockPercentage = useCallback((currentStock: number, maxStock: number): number => {
-    if (maxStock === 0) return 0
-    return Math.min((currentStock / maxStock) * 100, 100)
-  }, [])
-
-  // Get category color
-  const getCategoryColor = useCallback((category: string): string => {
-    const colors: Record<string, string> = {
-      "Produtos de Limpeza": "bg-blue-100 text-blue-800",
-      Equipamentos: "bg-green-100 text-green-800",
-      Descartáveis: "bg-yellow-100 text-yellow-800",
-      Uniformes: "bg-purple-100 text-purple-800",
-      Outros: "bg-gray-100 text-gray-800",
+  const loadMaterials = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await getMaterials(filters)
+      setMaterials(response.materials)
+      setTotalCount(response.totalCount)
+      setTotalPages(response.totalPages)
+      setStats(response.stats)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load materials")
+    } finally {
+      setLoading(false)
     }
-    return colors[category] || colors["Outros"]
+  }, [filters])
+
+  useEffect(() => {
+    loadMaterials()
+  }, [loadMaterials])
+
+  const updateFilters = useCallback((newFilters: Partial<MaterialFilters>) => {
+    setFilters((prev) => ({ ...prev, ...newFilters, page: 1 }))
   }, [])
 
-  // Filter materials by search term
-  const filteredMaterials = useMemo(() => {
-    if (!context.searchTerm) return context.materials
+  const setPage = useCallback((page: number) => {
+    setFilters((prev) => ({ ...prev, page }))
+  }, [])
 
-    const searchLower = context.searchTerm.toLowerCase()
-    return context.materials.filter(
-      (material) =>
-        material.name.toLowerCase().includes(searchLower) ||
-        material.category.toLowerCase().includes(searchLower) ||
-        material.supplier.toLowerCase().includes(searchLower),
-    )
-  }, [context.materials, context.searchTerm])
+  const reloadData = useCallback(() => {
+    loadMaterials()
+  }, [loadMaterials])
 
-  // Get low stock materials
-  const lowStockMaterials = useMemo(() => {
-    return context.materials.filter((material) => material.currentStock <= material.minStock)
-  }, [context.materials])
+  const createNewMaterial = useCallback(
+    async (materialData: Omit<Material, "id" | "createdAt" | "updatedAt">) => {
+      try {
+        await createMaterial(materialData)
+        await loadMaterials()
+      } catch (err) {
+        throw err
+      }
+    },
+    [loadMaterials],
+  )
 
-  // Get out of stock materials
-  const outOfStockMaterials = useMemo(() => {
-    return context.materials.filter((material) => material.currentStock === 0)
-  }, [context.materials])
+  const updateExistingMaterial = useCallback(
+    async (id: string, materialData: Partial<Material>) => {
+      try {
+        await updateMaterial(id, materialData)
+        await loadMaterials()
+      } catch (err) {
+        throw err
+      }
+    },
+    [loadMaterials],
+  )
 
-  // Calculate total value
-  const totalValue = useMemo(() => {
-    return context.materials.reduce((total, material) => total + material.currentStock * material.unitPrice, 0)
-  }, [context.materials])
+  const deleteMaterialById = useCallback(
+    async (id: string) => {
+      try {
+        await deleteMaterial(id)
+        await loadMaterials()
+      } catch (err) {
+        throw err
+      }
+    },
+    [loadMaterials],
+  )
 
-  // Actions with proper error handling
-  const actions = {
-    reloadData: useCallback(() => {
-      context.reloadData()
-    }, [context]),
+  const addStockToMaterial = useCallback(
+    async (id: string, quantity: number, notes?: string) => {
+      try {
+        await addStock(id, quantity, notes)
+        await loadMaterials()
+      } catch (err) {
+        throw err
+      }
+    },
+    [loadMaterials],
+  )
 
-    setPage: useCallback(
-      (page: number) => {
-        context.setPage(page)
-      },
-      [context],
-    ),
-
-    updateFilters: useCallback(
-      (filters: any) => {
-        context.updateFilters(filters)
-      },
-      [context],
-    ),
-
-    // Mock implementations for functions that don't have endpoints yet
-    createMaterial: useCallback(async (materialData: any) => {
-      // TODO: Implement when endpoint is available
-      console.log("Creating material:", materialData)
-      throw new Error("Create material endpoint not implemented yet")
-    }, []),
-
-    updateMaterial: useCallback(async (materialId: number, materialData: any) => {
-      // TODO: Implement when endpoint is available
-      console.log("Updating material:", materialId, materialData)
-      throw new Error("Update material endpoint not implemented yet")
-    }, []),
-
-    deleteMaterial: useCallback(async (materialId: number) => {
-      // TODO: Implement when endpoint is available
-      console.log("Deleting material:", materialId)
-      throw new Error("Delete material endpoint not implemented yet")
-    }, []),
-
-    useMaterial: useCallback(async (materialId: number, quantity: number, reason: string) => {
-      // TODO: Implement when endpoint is available
-      console.log("Using material:", materialId, quantity, reason)
-      throw new Error("Use material endpoint not implemented yet")
-    }, []),
-
-    addStock: useCallback(async (materialId: number, quantity: number, reason: string) => {
-      // TODO: Implement when endpoint is available
-      console.log("Adding stock:", materialId, quantity, reason)
-      throw new Error("Add stock endpoint not implemented yet")
-    }, []),
-
-    getTransactions: useCallback(async (materialId: number) => {
-      // TODO: Implement when endpoint is available
-      console.log("Getting transactions for material:", materialId)
-      return []
-    }, []),
-
-    fetchCategories: useCallback(async () => {
-      // TODO: Implement when endpoint is available
-      return ["Produtos de Limpeza", "Equipamentos", "Descartáveis", "Uniformes", "Outros"]
-    }, []),
-
-    fetchSuppliers: useCallback(async () => {
-      // TODO: Implement when endpoint is available
-      return ["Fornecedor A", "Fornecedor B", "Fornecedor C"]
-    }, []),
-  }
+  const useMaterialFromStock = useCallback(
+    async (id: string, quantity: number, notes?: string) => {
+      try {
+        await useMaterial(id, quantity, notes)
+      } catch (err) {
+        throw err
+      }
+    },
+    [loadMaterials],
+  )
 
   return {
-    ...context,
-    formatCurrency,
-    formatDate,
-    getStockStatusColor,
-    getStockStatusLabel,
-    getStockPercentage,
-    getCategoryColor,
-    filteredMaterials,
-    lowStockMaterials,
-    outOfStockMaterials,
-    totalValue,
-    ...actions,
+    materials,
+    loading,
+    error,
+    filters,
+    stats,
+    totalCount,
+    totalPages,
+    updateFilters,
+    setPage,
+    reloadData,
+    createMaterial: createNewMaterial,
+    updateMaterial: updateExistingMaterial,
+    deleteMaterial: deleteMaterialById,
+    addStock: addStockToMaterial,
+    useMaterial: useMaterialFromStock,
   }
 }
 
-// Add this export at the end of the file
-export function useCompanyMaterialsUtils(companyId: number) {
-  const materials = useCompanyMaterials()
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("pt-BR", {
+// Export utility functions
+export const useCompanyMaterialsUtils = {
+  formatCurrency: (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "BRL",
+      currency: "USD",
     }).format(amount)
-  }
+  },
 
-  const formatDate = (dateString: string): string => {
-    if (!dateString) return "N/A"
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(date)
-  }
+  getStockStatus: (material: Material) => {
+    if (!material || material.currentStock === null || material.currentStock === undefined) {
+      return { label: "Unknown", color: "bg-gray-100 text-gray-800 border-gray-200" }
+    }
 
-  const formatQuantity = (material: any): string => {
-    if (!material) return "0"
-    return `${material.currentStock || 0} ${material.unit || ""}`
-  }
+    if (material.currentStock <= 0) {
+      return { label: "Out of Stock", color: "bg-red-100 text-red-800 border-red-200" }
+    }
+    if (material.currentStock <= material.minimumStock) {
+      return { label: "Low Stock", color: "bg-yellow-100 text-yellow-800 border-yellow-200" }
+    }
+    return { label: "In Stock", color: "bg-green-100 text-green-800 border-green-200" }
+  },
 
-  const calculateTotalValue = (material: any): number => {
-    if (!material) return 0
-    return (material.currentStock || 0) * (material.unitPrice || 0)
-  }
-
-  const getMaterialStatusText = (material: any): string => {
-    if (!material) return "Unknown"
-    if (material.currentStock === 0) return "Out of Stock"
-    if (material.currentStock <= material.minStock) return "Low Stock"
-    return "In Stock"
-  }
-
-  const isNearExpiry = (expirationDate: string): boolean => {
-    if (!expirationDate) return false
-    const expiry = new Date(expirationDate)
-    const now = new Date()
-    const diffTime = expiry.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays <= 30 && diffDays > 0
-  }
-
-  const isExpired = (expirationDate: string): boolean => {
-    if (!expirationDate) return false
-    const expiry = new Date(expirationDate)
-    const now = new Date()
-    return expiry < now
-  }
-
-  const getDaysUntilExpiry = (expirationDate: string): number | null => {
-    if (!expirationDate) return null
-    const expiry = new Date(expirationDate)
-    const now = new Date()
-    const diffTime = expiry.getTime() - now.getTime()
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  }
-
-  const createMaterial = async (data: any) => {
-    // Mock implementation
-    console.log("Creating material:", data)
-    return Promise.resolve({ id: Date.now(), ...data })
-  }
-
-  const updateMaterial = async (id: number, data: any) => {
-    // Mock implementation
-    console.log("Updating material:", id, data)
-    return Promise.resolve({ id, ...data })
-  }
-
-  const useMaterial = async (data: any) => {
-    // Mock implementation
-    console.log("Using material:", data)
-    return Promise.resolve()
-  }
-
-  const addStock = async (data: any) => {
-    // Mock implementation
-    console.log("Adding stock:", data)
-    return Promise.resolve()
-  }
-
-  const getTransactions = async (materialId: number) => {
-    // Mock implementation
-    console.log("Getting transactions for:", materialId)
-    return Promise.resolve([])
-  }
-
-  const categories = ["Produtos de Limpeza", "Equipamentos", "Descartáveis", "Uniformes", "Outros"]
-  const suppliers = ["Fornecedor A", "Fornecedor B", "Fornecedor C"]
-
-  return {
-    ...materials,
-    formatCurrency,
-    formatDate,
-    formatQuantity,
-    calculateTotalValue,
-    getMaterialStatusText,
-    isNearExpiry,
-    isExpired,
-    getDaysUntilExpiry,
-    createMaterial,
-    updateMaterial,
-    useMaterial,
-    addStock,
-    getTransactions,
-    categories,
-    suppliers,
-  }
+  calculateTotalValue: (materials: Material[]) => {
+    return materials.reduce((total, material) => {
+      if (material && material.currentStock && material.costPerUnit) {
+        return total + material.currentStock * material.costPerUnit
+      }
+      return total
+    }, 0)
+  },
 }
