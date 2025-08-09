@@ -1,30 +1,7 @@
 import type { CheckRecord } from "@/types/check-record"
+import { apiCall } from "./utils"
 
 const API_BASE_URL = "https://localhost:44394"
-
-// Helper function to make API calls with authentication
-const apiCall = async (url: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem("noah_token")
-
-  if (!token) {
-    throw new Error("No authentication token found")
-  }
-
-  const response = await fetch(`${API_BASE_URL}${url}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
-  }
-
-  return response.json()
-}
 
 // Type for filtering check records
 export interface CheckRecordFilters {
