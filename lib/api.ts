@@ -1,15 +1,8 @@
-import type {
-  ApiResponse,
-  LoginCredentials,
-  AuthUser,
-  User,
-  RegisterUserData,
-  PaginatedResponse,
-} from "@/types"
+import type { ApiResponse, LoginCredentials, AuthUser, User, RegisterUserData, PaginatedResponse } from "@/types"
 import type { AuthResponse } from "@/types/auth"
 
 // Base URL da API
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://localhost:44394/api"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://206.189.191.51:5000/api"
 
 // Função para obter o header de autenticação
 export const getAuthHeader = (): Record<string, string> => {
@@ -21,10 +14,7 @@ export const getAuthHeader = (): Record<string, string> => {
 }
 
 // Função genérica para fazer requisições à API
-export async function fetchApi<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<ApiResponse<T>> {
+export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   try {
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
@@ -57,17 +47,12 @@ export async function fetchApi<T>(
 // API de Autenticação
 export const authApi = {
   // Login
-  async login(
-    credentials: LoginCredentials
-  ): Promise<ApiResponse<AuthUser>> {
+  async login(credentials: LoginCredentials): Promise<ApiResponse<AuthUser>> {
     try {
-      const response = await fetchApi<AuthResponse>(
-        "/Users/authenticate",
-        {
-          method: "POST",
-          body: JSON.stringify(credentials),
-        }
-      )
+      const response = await fetchApi<AuthResponse>("/Users/authenticate", {
+        method: "POST",
+        body: JSON.stringify(credentials),
+      })
       if (response.error || !response.data) {
         return {
           error: response.error || "Invalid credentials",
@@ -158,17 +143,12 @@ export const authApi = {
   },
 
   // Registrar novo usuário
-  async register(
-    userData: RegisterUserData
-  ): Promise<ApiResponse<boolean>> {
+  async register(userData: RegisterUserData): Promise<ApiResponse<boolean>> {
     try {
-      const response = await fetchApi<boolean>(
-        "/Users/create",
-        {
-          method: "POST",
-          body: JSON.stringify(userData),
-        }
-      )
+      const response = await fetchApi<boolean>("/Users/create", {
+        method: "POST",
+        body: JSON.stringify(userData),
+      })
       if (response.error) {
         return { error: response.error, status: response.status }
       }
@@ -183,19 +163,13 @@ export const authApi = {
 // API de Usuários
 export const usersApi = {
   // Listar usuários (com paginação)
-  getUsers(
-    page = 1,
-    limit = 10,
-    name?: string
-  ): Promise<ApiResponse<PaginatedResponse<User>>> {
+  getUsers(page = 1, limit = 10, name?: string): Promise<ApiResponse<PaginatedResponse<User>>> {
     const params = new URLSearchParams({
       pageNumber: page.toString(),
       pageSize: limit.toString(),
     })
     if (name) params.append("Name", name)
-    return fetchApi<PaginatedResponse<User>>(
-      `/Users/paged?${params.toString()}`
-    )
+    return fetchApi<PaginatedResponse<User>>(`/Users/paged?${params.toString()}`)
   },
 
   // Obter usuário por ID
@@ -204,25 +178,16 @@ export const usersApi = {
   },
 
   // Atualizar usuário
-  updateUser(
-    id: string,
-    userData: Partial<User>
-  ): Promise<ApiResponse<boolean>> {
-    return fetchApi<boolean>(
-      `/Users/${id}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(userData),
-      }
-    )
+  updateUser(id: string, userData: Partial<User>): Promise<ApiResponse<boolean>> {
+    return fetchApi<boolean>(`/Users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(userData),
+    })
   },
 
   // Excluir usuário
   deleteUser(id: string): Promise<ApiResponse<boolean>> {
-    return fetchApi<boolean>(
-      `/Users/${id}`,
-      { method: "DELETE" }
-    )
+    return fetchApi<boolean>(`/Users/${id}`, { method: "DELETE" })
   },
 
   // Listar todos os usuários

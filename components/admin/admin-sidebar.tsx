@@ -1,198 +1,190 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { createContext, useContext, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  LayoutDashboard,
-  Users,
-  Building2,
-  UserCheck,
-  Calendar,
-  MessageSquare,
-  BarChart3,
-  Settings,
-  CreditCard,
-  MapPin,
-  Star,
-  AlertCircle,
   Bell,
+  Building2,
+  Calendar,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
-  LogOut,
-  Shield,
-  Clock,
-  FileText,
-  UserPlus,
-  Briefcase,
+  ClipboardList,
+  CreditCard,
+  Home,
+  MapPin,
+  MessageSquare,
+  Package,
+  Settings,
+  Star,
+  Users,
+  UserCog,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { ScrollArea as UIScrollArea } from "@/components/ui/scroll-area"
+import { NoahLogo } from "@/components/noah-logo"
+import { useAuth } from "@/contexts/auth-context"
 
-const navigation = [
-  {
-    name: "Dashboard",
-    href: "/admin/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    name: "Empresas",
-    href: "/admin/companies",
-    icon: Building2,
-  },
-  {
-    name: "Usuários",
-    href: "/admin/users",
-    icon: Users,
-  },
-  {
-    name: "Profissionais",
-    href: "/admin/professionals",
-    icon: UserCheck,
-  },
-  {
-    name: "Clientes",
-    href: "/admin/customers",
-    icon: UserPlus,
-  },
-  {
-    name: "Equipes",
-    href: "/admin/teams",
-    icon: Briefcase,
-  },
-  {
-    name: "Agendamentos",
-    href: "/admin/appointments",
-    icon: Calendar,
-  },
-  {
-    name: "Check-in",
-    href: "/admin/check-in",
-    icon: Clock,
-  },
-  {
-    name: "Recorrências",
-    href: "/admin/recurrences",
-    icon: FileText,
-  },
-  {
-    name: "GPS Tracking",
-    href: "/admin/gps-tracking",
-    icon: MapPin,
-  },
-  {
-    name: "Avaliações",
-    href: "/admin/reviews",
-    icon: Star,
-  },
-  {
-    name: "Feedback",
-    href: "/admin/feedback",
-    icon: MessageSquare,
-  },
-  {
-    name: "Cancelamentos",
-    href: "/admin/cancellations",
-    icon: AlertCircle,
-  },
-  {
-    name: "Notificações",
-    href: "/admin/notifications",
-    icon: Bell,
-  },
-  {
-    name: "Relatórios",
-    href: "/admin/reports",
-    icon: BarChart3,
-  },
-  {
-    name: "Planos",
-    href: "/admin/plans",
-    icon: Shield,
-  },
-  {
-    name: "Pagamentos",
-    href: "/admin/payments",
-    icon: CreditCard,
-  },
-  {
-    name: "Configurações",
-    href: "/admin/settings",
-    icon: Settings,
-  },
-]
-
-interface AdminSidebarProps {
-  className?: string
+type SidebarContextType = {
+  isOpen: boolean
+  toggleSidebar: () => void
 }
 
-export function AdminSidebar({ className }: AdminSidebarProps) {
-  const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
+const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 
-  const handleLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("user")
-    window.location.href = "/login"
+export function useSidebar() {
+  const context = useContext(SidebarContext)
+  if (!context) {
+    throw new Error("useSidebar must be used within a SidebarProvider")
+  }
+  return context
+}
+
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = useState(true)
+
+  const toggleSidebar = () => {
+    setIsOpen(!isOpen)
+  }
+
+  return <SidebarContext.Provider value={{ isOpen, toggleSidebar }}>{children}</SidebarContext.Provider>
+}
+
+export function AdminSidebar() {
+  const { isOpen, toggleSidebar } = useSidebar()
+  const { user } = useAuth()
+  const pathname = usePathname()
+
+  const navItems = [
+    { href: "/admin/dashboard", label: "Dashboard", icon: Home },
+    { href: "/admin/users", label: "Users", icon: UserCog },
+    { href: "/admin/companies", label: "Companies", icon: Building2 },
+    { href: "/admin/customers", label: "Customers", icon: Users },
+    { href: "/admin/professionals", label: "Professionals", icon: Users },
+    { href: "/admin/teams", label: "Teams", icon: Users },
+    { href: "/admin/appointments", label: "Appointments", icon: Calendar },
+    { href: "/admin/recurrences", label: "Recurrences", icon: ClipboardList },
+    { href: "/admin/check-in", label: "Check-in/Check-out", icon: CheckSquare },
+    { href: "/admin/gps-tracking", label: "GPS Tracking", icon: MapPin },
+    { href: "/admin/reviews", label: "Reviews", icon: Star },
+    { href: "/admin/feedback", label: "Internal Feedback", icon: MessageSquare },
+    { href: "/admin/cancellations", label: "Cancellations", icon: ClipboardList },
+    { href: "/admin/payments", label: "Payments", icon: CreditCard },
+    { href: "/admin/plans", label: "Plans", icon: Package },
+    { href: "/admin/notifications", label: "Notifications", icon: Bell },
+    { href: "/admin/settings", label: "Profile", icon: Settings },
+  ]
+
+  const getUserInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((word) => word.charAt(0))
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role?.toLowerCase()) {
+      case "admin":
+        return "Administrator"
+      case "company":
+        return "Company"
+      case "professional":
+        return "Professional"
+      case "operador":
+        return "Operator"
+      default:
+        return role || "User"
+    }
   }
 
   return (
-    <div className={cn("flex h-full flex-col bg-white border-r", className)}>
-      {/* Header */}
-      <div className="flex h-16 items-center justify-between px-4 border-b">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
-          {!collapsed && (
-            <div>
-              <h1 className="text-lg font-semibold">Maids Flow Admin</h1>
-            </div>
-          )}
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => setCollapsed(!collapsed)} className="h-8 w-8 p-0">
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+    <div
+      className={cn(
+        "relative flex h-screen flex-col border-r border-[#2a3349] bg-[#0f172a] transition-all duration-300",
+        isOpen ? "w-64" : "w-[70px]",
+      )}
+    >
+      <div className="flex h-16 items-center justify-between px-4">
+        {!isOpen ? (
+          <Link href="/admin/dashboard" className="flex items-center justify-center w-full">
+            <NoahLogo className="h-8 w-8" />
+          </Link>
+        ) : (
+          <Link href="/admin/dashboard" className="flex items-center space-x-2">
+            <NoahLogo className="h-8 w-8" />
+            <span className="text-xl font-bold text-white">Noah Admin</span>
+          </Link>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className="absolute right-[-12px] top-8 h-6 w-6 rounded-full bg-[#0f172a] border border-[#2a3349] text-gray-400 hover:text-white hover:bg-[#1a2234] z-10"
+        >
+          {isOpen ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </Button>
       </div>
 
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="space-y-1">
-          {navigation.map((item) => {
+      <UIScrollArea className="flex-1 px-3">
+        <div className="space-y-1 py-4">
+          {navItems.map((item) => {
+            const Icon = item.icon
             const isActive = pathname === item.href
+
             return (
-              <Link key={item.name} href={item.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start",
-                    collapsed ? "px-2" : "px-3",
-                    isActive && "bg-blue-50 text-blue-700 hover:bg-blue-100",
-                  )}
-                >
-                  <item.icon className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-3")} />
-                  {!collapsed && <span>{item.name}</span>}
-                </Button>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isActive ? "bg-[#06b6d4] text-white" : "text-gray-400 hover:bg-[#1a2234] hover:text-white",
+                  !isOpen && "justify-center",
+                )}
+                title={!isOpen ? item.label : undefined}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                {isOpen && <span>{item.label}</span>}
               </Link>
             )
           })}
-        </nav>
-      </ScrollArea>
+        </div>
+      </UIScrollArea>
 
-      {/* Footer */}
-      <div className="p-3 border-t">
-        <Button
-          variant="ghost"
-          onClick={handleLogout}
+      <div className="border-t border-[#2a3349] p-4">
+        <Link
+          href="/admin/settings"
           className={cn(
-            "w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50",
-            collapsed ? "px-2" : "px-3",
+            "flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-[#1a2234]",
+            !isOpen && "justify-center",
           )}
+          title={!isOpen ? user?.name || "Profile" : undefined}
         >
-          <LogOut className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-3")} />
-          {!collapsed && <span>Sair</span>}
-        </Button>
+          <div className="h-8 w-8 rounded-full bg-[#06b6d4] flex items-center justify-center text-white font-semibold text-sm">
+            {user?.avatar ? (
+              <img
+                src={user.avatar || "/placeholder.svg"}
+                alt={user.name}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              getUserInitials(user?.name || "User")
+            )}
+          </div>
+          {isOpen && user && (
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sm font-medium text-white truncate">{user.name}</p>
+              <p className="text-xs text-gray-400 truncate">
+                {getRoleDisplayName(user.role)} • {user.email}
+              </p>
+            </div>
+          )}
+        </Link>
       </div>
     </div>
   )

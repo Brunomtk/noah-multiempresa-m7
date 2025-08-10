@@ -1,199 +1,224 @@
-# Maids Flow - Multi Empresas
+# Noah - Multi Empresas
 
-Uma plataforma completa de gestão para empresas de limpeza, permitindo o gerenciamento de múltiplas empresas, profissionais, agendamentos e muito mais.
+A comprehensive multi-company cleaning service management platform built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## 🚀 Funcionalidades
+## 🌟 Overview
 
-### Para Administradores
-- **Dashboard Completo**: Visão geral de todas as empresas e atividades
-- **Gestão de Empresas**: Cadastro e gerenciamento de empresas parceiras
-- **Gestão de Usuários**: Controle de acesso e permissões
-- **Gestão de Profissionais**: Cadastro e acompanhamento de profissionais
-- **Relatórios Avançados**: Análises detalhadas de performance
-- **Sistema de Pagamentos**: Controle financeiro integrado
-- **GPS Tracking**: Monitoramento em tempo real
-- **Gestão de Planos**: Diferentes níveis de serviço
+Noah is a modern, scalable platform designed to manage multiple cleaning service companies from a single interface. It provides role-based access control for administrators, companies, and professionals, offering complete management of appointments, teams, materials, payments, and more.
 
-### Para Empresas
-- **Dashboard Personalizado**: Métricas específicas da empresa
-- **Gestão de Equipes**: Organização de profissionais em equipes
-- **Agendamentos**: Sistema completo de agendamento de serviços
-- **Chat Integrado**: Comunicação com profissionais
-- **Relatórios**: Análises de performance e produtividade
-- **Gestão de Clientes**: Cadastro e histórico de clientes
-- **Sistema de Avaliações**: Feedback de clientes
-- **Controle de Materiais**: Gestão de estoque e consumo
+## ✨ Features
 
-### Para Profissionais
-- **App Mobile-First**: Interface otimizada para dispositivos móveis
-- **Check-in/Check-out**: Sistema de ponto com GPS
-- **Agenda Pessoal**: Visualização de agendamentos
-- **Chat**: Comunicação com supervisores
-- **Histórico**: Registro de atividades realizadas
-- **Performance**: Acompanhamento de métricas pessoais
+### 🔐 Authentication & Authorization
+- **Multi-role system**: Admin, Company, and Professional roles
+- **JWT-based authentication** with secure token management
+- **Role-based access control** for different dashboard views
 
-## 🛠️ Tecnologias Utilizadas
+### 👥 User Management
+- **Admin Dashboard**: Complete system oversight and management
+- **Company Dashboard**: Company-specific operations and team management
+- **Professional Dashboard**: Individual professional tools and schedules
 
-- **Frontend**: Next.js 14, React 18, TypeScript
-- **Styling**: Tailwind CSS, shadcn/ui
-- **State Management**: React Context API
-- **Forms**: React Hook Form
-- **Charts**: Recharts
-- **Icons**: Lucide React
-- **Date Handling**: date-fns
-- **HTTP Client**: Fetch API nativo
+### 📅 Appointment Management
+- **Scheduling system** with calendar integration
+- **Real-time appointment tracking** and status updates
+- **Cancellation and rescheduling** functionality
+- **Recurring appointments** support
 
-## 📦 Instalação
+### 👨‍💼 Team & Professional Management
+- **Team creation and management** with leader assignments
+- **Professional profiles** with performance tracking
+- **GPS tracking** for field professionals
+- **Check-in/check-out** system with photo capture
 
-1. Clone o repositório:
+### 💰 Financial Management
+- **Payment tracking** and processing
+- **Plan management** with subscription handling
+- **Financial reporting** and analytics
+
+### 📊 Reporting & Analytics
+- **Comprehensive dashboards** with real-time metrics
+- **Performance analytics** for teams and individuals
+- **Material consumption reports**
+- **Customer satisfaction tracking**
+
+### 💬 Communication
+- **Internal chat system** for team communication
+- **Notification system** for important updates
+- **Customer feedback** collection and management
+
+## 🛠️ Technology Stack
+
+### Frontend
+- **Next.js 15** - React framework with App Router
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first CSS framework
+- **shadcn/ui** - Modern UI component library
+- **Lucide React** - Beautiful icons
+
+### Backend Integration
+- **RESTful API** integration with .NET backend
+- **JWT Authentication** for secure API communication
+- **Real-time updates** with optimistic UI patterns
+
+### Development Tools
+- **ESLint** - Code linting and formatting
+- **PostCSS** - CSS processing
+- **TypeScript** - Static type checking
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn package manager
+- Access to the Noah API backend
+
+### Installation
+
+1. **Clone the repository**
+   \`\`\`bash
+   git clone https://github.com/your-username/noah-platform.git
+   cd noah-platform
+   \`\`\`
+
+2. **Install dependencies**
+   \`\`\`bash
+   npm install
+   # or
+   yarn install
+   \`\`\`
+
+3. **Environment Setup**
+   Create a `.env.local` file in the root directory:
+   \`\`\`env
+   NEXT_PUBLIC_API_URL=https://localhost:44394/api
+   NEXT_PUBLIC_APP_NAME=Noah - Multi empresas
+   \`\`\`
+
+4. **Run the development server**
+   \`\`\`bash
+   npm run dev
+   # or
+   yarn dev
+   \`\`\`
+
+5. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 📁 Project Structure
+
+\`\`\`
+noah-platform/
+├── app/                    # Next.js App Router pages
+│   ├── admin/             # Admin dashboard pages
+│   ├── company/           # Company dashboard pages
+│   ├── professional/      # Professional dashboard pages
+│   ├── login/             # Authentication pages
+│   └── register/          
+├── components/            # Reusable UI components
+│   ├── admin/            # Admin-specific components
+│   ├── company/          # Company-specific components
+│   ├── professional/     # Professional-specific components
+│   └── ui/               # Base UI components (shadcn/ui)
+├── contexts/             # React Context providers
+├── hooks/                # Custom React hooks
+├── lib/                  # Utility functions and API clients
+│   └── api/              # API integration modules
+├── types/                # TypeScript type definitions
+└── public/               # Static assets
+\`\`\`
+
+## 🔧 API Integration
+
+The platform integrates with a .NET backend API providing:
+
+### Authentication Endpoints
+- `POST /api/auth/login` - User authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/refresh` - Token refresh
+
+### Core Entities
+- **Leaders**: `GET|POST|PUT|DELETE /api/Leader`
+- **Teams**: `GET|POST|PUT|DELETE /api/Team`
+- **Companies**: `GET|POST|PUT|DELETE /api/Company`
+- **Professionals**: `GET|POST|PUT|DELETE /api/Professional`
+- **Appointments**: `GET|POST|PUT|DELETE /api/Appointment`
+
+### Features
+- **Pagination support** for large datasets
+- **Filtering and search** capabilities
+- **Real-time status updates**
+- **File upload** for photos and documents
+
+## 🎨 UI/UX Design
+
+### Design System
+- **Dark theme** with cyan accent colors
+- **Responsive design** for all device sizes
+- **Consistent spacing** and typography
+- **Accessible components** with proper ARIA labels
+
+### Color Palette
+- **Primary**: Cyan (#06b6d4)
+- **Background**: Dark slate (#0f172a, #1a2234)
+- **Borders**: Muted slate (#2a3349)
+- **Text**: White and gray variants
+
+## 🔒 Security Features
+
+- **JWT token management** with automatic refresh
+- **Role-based route protection**
+- **Secure API communication** with bearer tokens
+- **Input validation** and sanitization
+- **CORS configuration** for cross-origin requests
+
+## 📱 Responsive Design
+
+The platform is fully responsive and optimized for:
+- **Desktop** (1024px+)
+- **Tablet** (768px - 1023px)
+- **Mobile** (320px - 767px)
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### Manual Deployment
 \`\`\`bash
-git clone https://github.com/your-username/maids-flow-platform.git
-cd maids-flow-platform
+# Build the application
+npm run build
+
+# Start production server
+npm start
 \`\`\`
 
-2. Instale as dependências:
-\`\`\`bash
-npm install
-# ou
-yarn install
-# ou
-pnpm install
-\`\`\`
+## 🤝 Contributing
 
-3. Configure as variáveis de ambiente:
-\`\`\`bash
-cp .env.example .env.local
-\`\`\`
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-4. Edite o arquivo `.env.local` com suas configurações:
-\`\`\`env
-NEXT_PUBLIC_API_BASE_URL=https://206.189.191.51:5000/api
-NEXT_PUBLIC_APP_NAME=Maids Flow - Multi empresas
-\`\`\`
+## 📄 License
 
-5. Execute o projeto em modo de desenvolvimento:
-\`\`\`bash
-npm run dev
-# ou
-yarn dev
-# ou
-pnpm dev
-\`\`\`
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-6. Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
+## 🆘 Support
 
-## 🌐 Ambientes
+For support and questions:
+- Create an issue in the GitHub repository
+- Contact the development team
+- Check the documentation wiki
 
-### Desenvolvimento
-- **URL**: http://localhost:3000
-- **API**: https://206.189.191.51:5000/api
+## 🔄 Version History
 
-### Produção
-- **URL**: https://maidsflow.com
-- **API**: https://api.maidsflow.com/api
-
-## 📁 Estrutura do Projeto
-
-\`\`\`
-maids-flow-platform/
-├── app/                          # App Router (Next.js 14)
-│   ├── admin/                    # Páginas do administrador
-│   ├── company/                  # Páginas das empresas
-│   ├── professional/             # Páginas dos profissionais
-│   ├── login/                    # Página de login
-│   ├── register/                 # Página de registro
-│   └── layout.tsx                # Layout principal
-├── components/                   # Componentes reutilizáveis
-│   ├── admin/                    # Componentes específicos do admin
-│   ├── company/                  # Componentes específicos das empresas
-│   ├── professional/             # Componentes dos profissionais
-│   └── ui/                       # Componentes base (shadcn/ui)
-├── contexts/                     # Context providers
-├── hooks/                        # Custom hooks
-├── lib/                          # Utilitários e configurações
-│   └── api/                      # Funções de API
-├── types/                        # Definições de tipos TypeScript
-├── public/                       # Arquivos estáticos
-└── styles/                       # Estilos globais
-\`\`\`
-
-## 🔐 Autenticação
-
-O sistema utiliza JWT (JSON Web Tokens) para autenticação:
-
-- **Admin**: Acesso completo ao sistema
-- **Company**: Acesso às funcionalidades da empresa
-- **Professional**: Acesso às funcionalidades do profissional
-
-## 📱 Responsividade
-
-A aplicação é totalmente responsiva e otimizada para:
-- **Desktop**: Interface completa com sidebars
-- **Tablet**: Layout adaptado com navegação otimizada
-- **Mobile**: Interface mobile-first para profissionais
-
-## 🚀 Deploy
-
-### Vercel (Recomendado)
-1. Conecte seu repositório ao Vercel
-2. Configure as variáveis de ambiente
-3. Deploy automático a cada push
-
-### Docker
-\`\`\`bash
-# Build da imagem
-docker build -t maids-flow .
-
-# Executar container
-docker run -p 3000:3000 maids-flow
-\`\`\`
-
-## 🧪 Testes
-
-\`\`\`bash
-# Executar testes
-npm run test
-
-# Testes com coverage
-npm run test:coverage
-
-# Testes e2e
-npm run test:e2e
-\`\`\`
-
-## 📊 Scripts Disponíveis
-
-\`\`\`bash
-npm run dev          # Desenvolvimento
-npm run build        # Build de produção
-npm run start        # Iniciar produção
-npm run lint         # Linting
-npm run type-check   # Verificação de tipos
-\`\`\`
-
-## 🤝 Contribuição
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
-## 📞 Suporte
-
-Para suporte técnico, entre em contato:
-- **Email**: suporte@maidsflow.com
-- **WhatsApp**: +55 (11) 99999-9999
-- **Website**: https://maidsflow.com
-
-## 🏆 Créditos
-
-Desenvolvido com ❤️ pela equipe Maids Flow Development Team.
+- **v1.0.0** - Initial release with core functionality
+- **v1.1.0** - Added team and leader management
+- **v1.2.0** - Enhanced API integration and real-time features
 
 ---
 
-**Maids Flow** - Transformando a gestão de empresas de limpeza através da tecnologia.
+Built with ❤️ by the Noah Development Team

@@ -1,14 +1,13 @@
 // Função para fazer delay nas requisições (simulação)
 export const apiDelay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-// URL base da API - agora usando variável de ambiente
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://206.189.191.51:5000/api"
+// URL base da API
+const API_BASE_URL = "https://206.189.191.51:5000/api"
 
 // Função para obter o token de autenticação
 function getAuthToken(): string | null {
   if (typeof window === "undefined") return null
-  const tokenKey = process.env.NEXT_PUBLIC_TOKEN_KEY || "maids_flow_token"
-  return localStorage.getItem(tokenKey)
+  return localStorage.getItem("noah_token")
 }
 
 // Função para criar headers de autenticação
@@ -74,8 +73,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     // Se não autorizado, limpar token e redirecionar
     if (response.status === 401) {
       if (typeof window !== "undefined") {
-        const tokenKey = process.env.NEXT_PUBLIC_TOKEN_KEY || "maids_flow_token"
-        localStorage.removeItem(tokenKey)
+        localStorage.removeItem("noah_token")
         window.location.href = "/login"
       }
       throw new Error("Unauthorized")
@@ -103,8 +101,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
 // Utility function for making authenticated API requests
 export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   // Get token from localStorage
-  const tokenKey = process.env.NEXT_PUBLIC_TOKEN_KEY || "maids_flow_token"
-  const token = localStorage.getItem(tokenKey)
+  const token = localStorage.getItem("token")
 
   // Prepare headers
   const headers = {
@@ -126,13 +123,12 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 
 // Utility function to get API base URL
 export function getApiUrl(): string {
-  return API_BASE_URL
+  return "https://206.189.191.51:5000/api"
 }
 
 // Utility function to get user data from localStorage
 export function getUserData() {
-  const userKey = process.env.NEXT_PUBLIC_USER_KEY || "maids_flow_user"
-  const userData = localStorage.getItem(userKey)
+  const userData = localStorage.getItem("user")
   return userData ? JSON.parse(userData) : null
 }
 
@@ -140,36 +136,4 @@ export function getUserData() {
 export function getCompanyId(): number | null {
   const user = getUserData()
   return user?.companyId || null
-}
-
-// Utility function to clear authentication data
-export function clearAuthData(): void {
-  if (typeof window === "undefined") return
-
-  const tokenKey = process.env.NEXT_PUBLIC_TOKEN_KEY || "maids_flow_token"
-  const userKey = process.env.NEXT_PUBLIC_USER_KEY || "maids_flow_user"
-
-  localStorage.removeItem(tokenKey)
-  localStorage.removeItem(userKey)
-}
-
-// Utility function to set authentication data
-export function setAuthData(token: string, user: any): void {
-  if (typeof window === "undefined") return
-
-  const tokenKey = process.env.NEXT_PUBLIC_TOKEN_KEY || "maids_flow_token"
-  const userKey = process.env.NEXT_PUBLIC_USER_KEY || "maids_flow_user"
-
-  localStorage.setItem(tokenKey, token)
-  localStorage.setItem(userKey, JSON.stringify(user))
-}
-
-// Utility function to check if user is authenticated
-export function isAuthenticated(): boolean {
-  if (typeof window === "undefined") return false
-
-  const tokenKey = process.env.NEXT_PUBLIC_TOKEN_KEY || "maids_flow_token"
-  const token = localStorage.getItem(tokenKey)
-
-  return !!token
 }
