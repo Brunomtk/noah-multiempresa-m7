@@ -1,182 +1,231 @@
 "use client"
+
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   LayoutDashboard,
   Calendar,
-  Users,
-  UserCheck,
+  MessageSquare,
+  BarChart3,
+  CreditCard,
   MapPin,
+  Star,
+  AlertCircle,
+  Bell,
   ChevronLeft,
   ChevronRight,
-  Bell,
-  XCircle,
-  CreditCard,
+  LogOut,
+  Building2,
+  Clock,
+  UserCheck,
+  FileText,
+  Shield,
+  UserPlus,
+  Briefcase,
   Package,
-  User,
-  CheckSquare,
-  MessageSquare,
 } from "lucide-react"
-import { NoahLogo } from "@/components/noah-logo"
-import { useCompanySidebar } from "./company-sidebar-context"
-import { useAuth } from "@/contexts/auth-context"
 
-const menuItems = [
+const navigation = [
   {
-    title: "Dashboard",
+    name: "Dashboard",
     href: "/company/dashboard",
     icon: LayoutDashboard,
   },
   {
-    title: "Schedule",
+    name: "Agendamentos",
     href: "/company/schedule",
     icon: Calendar,
   },
   {
-    title: "Check Management",
-    href: "/company/check-management",
-    icon: CheckSquare,
-  },
-  {
-    title: "Clients",
-    href: "/company/clients",
-    icon: Users,
-  },
-  {
-    title: "Teams",
-    href: "/company/teams",
-    icon: Users,
-  },
-  {
-    title: "Professionals",
+    name: "Profissionais",
     href: "/company/professionals",
     icon: UserCheck,
   },
   {
-    title: "Payments",
-    href: "/company/payments",
-    icon: CreditCard,
+    name: "Equipes",
+    href: "/company/teams",
+    icon: Briefcase,
   },
   {
-    title: "Plan",
-    href: "/company/plan",
-    icon: Package,
+    name: "Clientes",
+    href: "/company/clients",
+    icon: UserPlus,
   },
   {
-    title: "Cancellations",
-    href: "/company/cancellations",
-    icon: XCircle,
+    name: "Check-in",
+    href: "/company/check-in",
+    icon: Clock,
   },
   {
-    title: "Feedback",
-    href: "/company/feedback",
-    icon: MessageSquare,
+    name: "Check-out",
+    href: "/company/check-out",
+    icon: Clock,
   },
   {
-    title: "GPS Tracking",
+    name: "Gestão de Checks",
+    href: "/company/check-management",
+    icon: FileText,
+  },
+  {
+    name: "Recorrências",
+    href: "/company/recurrence",
+    icon: FileText,
+  },
+  {
+    name: "GPS Tracking",
     href: "/company/gps-tracking",
     icon: MapPin,
   },
   {
-    title: "Profile",
-    href: "/company/profile",
-    icon: User,
+    name: "Chat",
+    href: "/company/chat",
+    icon: MessageSquare,
   },
   {
-    title: "Notifications",
+    name: "Avaliações",
+    href: "/company/reviews",
+    icon: Star,
+  },
+  {
+    name: "Feedback",
+    href: "/company/feedback",
+    icon: MessageSquare,
+  },
+  {
+    name: "Reagendamentos",
+    href: "/company/reschedule",
+    icon: Calendar,
+  },
+  {
+    name: "Cancelamentos",
+    href: "/company/cancellations",
+    icon: AlertCircle,
+  },
+  {
+    name: "Notificações",
     href: "/company/notifications",
     icon: Bell,
   },
+  {
+    name: "Relatórios",
+    href: "/company/reports",
+    icon: BarChart3,
+  },
+  {
+    name: "Materiais",
+    href: "/company/materials",
+    icon: Package,
+  },
+  {
+    name: "Pagamentos",
+    href: "/company/payments",
+    icon: CreditCard,
+  },
+  {
+    name: "Plano",
+    href: "/company/plan",
+    icon: Shield,
+  },
+  {
+    name: "Perfil",
+    href: "/company/profile",
+    icon: Building2,
+  },
 ]
 
-export function CompanySidebar() {
-  const pathname = usePathname()
-  const { collapsed, setCollapsed } = useCompanySidebar()
-  const { user } = useAuth()
+interface CompanySidebarProps {
+  className?: string
+}
 
-  // Get user initials for avatar fallback
-  const getUserInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((word) => word.charAt(0))
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
+export function CompanySidebar({ className }: CompanySidebarProps) {
+  const pathname = usePathname()
+  const [collapsed, setCollapsed] = useState(false)
+
+  const handleLogout = () => {
+    const tokenKey = process.env.NEXT_PUBLIC_TOKEN_KEY || "maids_flow_token"
+    const userKey = process.env.NEXT_PUBLIC_USER_KEY || "maids_flow_user"
+
+    localStorage.removeItem(tokenKey)
+    localStorage.removeItem(userKey)
+    window.location.href = "/login"
   }
 
+  // Mock data for notifications
+  const notificationCount = 3
+
   return (
-    <div
-      className={cn(
-        "relative flex h-screen flex-col border-r border-[#2a3349] bg-[#0f172a] transition-all duration-300",
-        collapsed ? "w-[70px]" : "w-64",
-      )}
-    >
-      <div className="flex h-16 items-center justify-between px-4">
-        {!collapsed && (
-          <Link href="/company/dashboard" className="flex items-center space-x-2">
-            <NoahLogo className="h-8 w-8" />
-            <span className="text-xl font-bold text-white">Maids Flow</span>
-          </Link>
-        )}
-        {collapsed && (
-          <Link href="/company/dashboard" className="flex items-center justify-center w-full">
-            <NoahLogo className="h-8 w-8" />
-          </Link>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className="absolute right-[-12px] top-8 h-6 w-6 rounded-full bg-[#0f172a] border border-[#2a3349] text-gray-400 hover:text-white hover:bg-[#1a2234] z-10"
-        >
-          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-        </Button>
-      </div>
-
-      <ScrollArea className="flex-1 px-3">
-        <div className="space-y-1 py-4">
-          {menuItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive ? "bg-[#06b6d4] text-white" : "text-gray-400 hover:bg-[#1a2234] hover:text-white",
-                  collapsed && "justify-center",
-                )}
-                title={collapsed ? item.title : undefined}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && <span>{item.title}</span>}
-              </Link>
-            )
-          })}
-        </div>
-      </ScrollArea>
-
-      <div className="border-t border-[#2a3349] p-4">
-        <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user?.avatar || ""} alt={user?.name || "User"} />
-            <AvatarFallback className="bg-[#06b6d4] text-white text-xs font-semibold">
-              {user?.name ? getUserInitials(user.name) : "U"}
-            </AvatarFallback>
-          </Avatar>
+    <div className={cn("flex h-full flex-col bg-white border-r", className)}>
+      {/* Header */}
+      <div className="flex h-16 items-center justify-between px-4 border-b">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-white" />
+          </div>
           {!collapsed && (
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">{user?.name || "User"}</p>
-              <p className="text-xs text-gray-400 truncate">{user?.email || "user@company.com"}</p>
+            <div>
+              <h1 className="text-lg font-semibold">Maids Flow</h1>
+              <p className="text-xs text-muted-foreground">Empresa</p>
             </div>
           )}
         </div>
+        <Button variant="ghost" size="sm" onClick={() => setCollapsed(!collapsed)} className="h-8 w-8 p-0">
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      {/* Navigation */}
+      <ScrollArea className="flex-1 px-3 py-4">
+        <nav className="space-y-1">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href
+            const showBadge = item.name === "Notificações" && notificationCount > 0
+
+            return (
+              <Link key={item.name} href={item.href}>
+                <Button
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn(
+                    "w-full justify-start",
+                    collapsed ? "px-2" : "px-3",
+                    isActive && "bg-green-50 text-green-700 hover:bg-green-100",
+                  )}
+                >
+                  <item.icon className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-3")} />
+                  {!collapsed && (
+                    <div className="flex items-center justify-between w-full">
+                      <span>{item.name}</span>
+                      {showBadge && (
+                        <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 text-xs">
+                          {notificationCount}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </Button>
+              </Link>
+            )
+          })}
+        </nav>
+      </ScrollArea>
+
+      {/* Footer */}
+      <div className="p-3 border-t">
+        <Button
+          variant="ghost"
+          onClick={handleLogout}
+          className={cn(
+            "w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50",
+            collapsed ? "px-2" : "px-3",
+          )}
+        >
+          <LogOut className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-3")} />
+          {!collapsed && <span>Sair</span>}
+        </Button>
       </div>
     </div>
   )

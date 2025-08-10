@@ -1,45 +1,45 @@
 # Maids Flow - Multi Empresas
 
-Uma plataforma completa de gestão para empresas de limpeza, permitindo o gerenciamento de múltiplas empresas, profissionais, agendamentos, pagamentos e muito mais.
+Uma plataforma completa de gestão para empresas de limpeza, permitindo o gerenciamento de múltiplas empresas, profissionais, agendamentos e muito mais.
 
 ## 🚀 Funcionalidades
 
 ### Para Administradores
-- **Dashboard Completo**: Visão geral de todas as empresas e métricas
+- **Dashboard Completo**: Visão geral de todas as empresas e atividades
 - **Gestão de Empresas**: Cadastro e gerenciamento de empresas parceiras
 - **Gestão de Usuários**: Controle de acesso e permissões
 - **Gestão de Profissionais**: Cadastro e acompanhamento de profissionais
-- **Relatórios Avançados**: Relatórios detalhados de performance e financeiro
-- **Sistema de Pagamentos**: Controle de pagamentos e comissões
-- **GPS Tracking**: Rastreamento em tempo real dos profissionais
-- **Gestão de Planos**: Criação e gerenciamento de planos de assinatura
+- **Relatórios Avançados**: Análises detalhadas de performance
+- **Sistema de Pagamentos**: Controle financeiro integrado
+- **GPS Tracking**: Monitoramento em tempo real
+- **Gestão de Planos**: Diferentes níveis de serviço
 
 ### Para Empresas
-- **Dashboard Empresarial**: Métricas específicas da empresa
-- **Gestão de Clientes**: Cadastro e histórico de clientes
-- **Agendamentos**: Sistema completo de agendamento de serviços
+- **Dashboard Personalizado**: Métricas específicas da empresa
 - **Gestão de Equipes**: Organização de profissionais em equipes
-- **Chat Interno**: Comunicação com profissionais
-- **Relatórios**: Relatórios de performance e financeiro
-- **Gestão de Materiais**: Controle de estoque e consumo
-- **Avaliações**: Sistema de feedback e avaliações
+- **Agendamentos**: Sistema completo de agendamento de serviços
+- **Chat Integrado**: Comunicação com profissionais
+- **Relatórios**: Análises de performance e produtividade
+- **Gestão de Clientes**: Cadastro e histórico de clientes
+- **Sistema de Avaliações**: Feedback de clientes
+- **Controle de Materiais**: Gestão de estoque e consumo
 
 ### Para Profissionais
 - **App Mobile-First**: Interface otimizada para dispositivos móveis
-- **Check-in/Check-out**: Sistema de ponto com GPS e foto
+- **Check-in/Check-out**: Sistema de ponto com GPS
 - **Agenda Pessoal**: Visualização de agendamentos
 - **Chat**: Comunicação com supervisores
-- **Histórico**: Histórico completo de serviços
-- **Performance**: Métricas de desempenho pessoal
+- **Histórico**: Registro de atividades realizadas
+- **Performance**: Acompanhamento de métricas pessoais
 
-## 🛠️ Tecnologias
+## 🛠️ Tecnologias Utilizadas
 
 - **Frontend**: Next.js 14, React 18, TypeScript
 - **Styling**: Tailwind CSS, shadcn/ui
 - **State Management**: React Context API
+- **Forms**: React Hook Form
 - **Charts**: Recharts
 - **Icons**: Lucide React
-- **Forms**: React Hook Form
 - **Date Handling**: date-fns
 - **HTTP Client**: Fetch API nativo
 
@@ -67,12 +67,11 @@ cp .env.example .env.local
 
 4. Edite o arquivo `.env.local` com suas configurações:
 \`\`\`env
-NEXT_PUBLIC_API_BASE_URL=https://localhost:44394/api
+NEXT_PUBLIC_API_BASE_URL=https://206.189.191.51:5000/api
 NEXT_PUBLIC_APP_NAME=Maids Flow - Multi empresas
-NEXT_PUBLIC_ENVIRONMENT=development
 \`\`\`
 
-5. Execute o projeto:
+5. Execute o projeto em modo de desenvolvimento:
 \`\`\`bash
 npm run dev
 # ou
@@ -81,45 +80,17 @@ yarn dev
 pnpm dev
 \`\`\`
 
-6. Acesse [http://localhost:3000](http://localhost:3000) no seu navegador.
+6. Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
 
-## 🔧 Configuração da API
+## 🌐 Ambientes
 
-### URLs de Ambiente
+### Desenvolvimento
+- **URL**: http://localhost:3000
+- **API**: https://206.189.191.51:5000/api
 
-O projeto suporta diferentes URLs de API através de variáveis de ambiente:
-
-**Desenvolvimento:**
-\`\`\`env
-NEXT_PUBLIC_API_BASE_URL=https://localhost:44394/api
-\`\`\`
-
-**Produção:**
-\`\`\`env
-NEXT_PUBLIC_API_BASE_URL=https://api.maidsflow.com/api
-\`\`\`
-
-**Staging:**
-\`\`\`env
-NEXT_PUBLIC_API_BASE_URL=https://staging-api.maidsflow.com/api
-\`\`\`
-
-### Configurações Disponíveis
-
-\`\`\`env
-# API
-NEXT_PUBLIC_API_BASE_URL=https://localhost:44394/api
-NEXT_PUBLIC_API_TIMEOUT=30000
-
-# App
-NEXT_PUBLIC_APP_NAME=Maids Flow - Multi empresas
-NEXT_PUBLIC_APP_VERSION=1.0.0
-
-# Features
-NEXT_PUBLIC_ENABLE_GPS_TRACKING=true
-NEXT_PUBLIC_ENABLE_CHAT=true
-NEXT_PUBLIC_ENABLE_NOTIFICATIONS=true
-\`\`\`
+### Produção
+- **URL**: https://maidsflow.com
+- **API**: https://api.maidsflow.com/api
 
 ## 📁 Estrutura do Projeto
 
@@ -127,14 +98,15 @@ NEXT_PUBLIC_ENABLE_NOTIFICATIONS=true
 maids-flow-platform/
 ├── app/                          # App Router (Next.js 14)
 │   ├── admin/                    # Páginas do administrador
-│   ├── company/                  # Páginas da empresa
-│   ├── professional/             # Páginas do profissional
+│   ├── company/                  # Páginas das empresas
+│   ├── professional/             # Páginas dos profissionais
 │   ├── login/                    # Página de login
-│   └── register/                 # Página de registro
+│   ├── register/                 # Página de registro
+│   └── layout.tsx                # Layout principal
 ├── components/                   # Componentes reutilizáveis
 │   ├── admin/                    # Componentes específicos do admin
-│   ├── company/                  # Componentes específicos da empresa
-│   ├── professional/             # Componentes específicos do profissional
+│   ├── company/                  # Componentes específicos das empresas
+│   ├── professional/             # Componentes dos profissionais
 │   └── ui/                       # Componentes base (shadcn/ui)
 ├── contexts/                     # Context providers
 ├── hooks/                        # Custom hooks
@@ -155,7 +127,7 @@ O sistema utiliza JWT (JSON Web Tokens) para autenticação:
 
 ## 📱 Responsividade
 
-O projeto é totalmente responsivo e otimizado para:
+A aplicação é totalmente responsiva e otimizada para:
 - **Desktop**: Interface completa com sidebars
 - **Tablet**: Layout adaptado com navegação otimizada
 - **Mobile**: Interface mobile-first para profissionais
@@ -163,23 +135,17 @@ O projeto é totalmente responsivo e otimizado para:
 ## 🚀 Deploy
 
 ### Vercel (Recomendado)
-
 1. Conecte seu repositório ao Vercel
-2. Configure as variáveis de ambiente no painel do Vercel
+2. Configure as variáveis de ambiente
 3. Deploy automático a cada push
 
-### Build Manual
-
+### Docker
 \`\`\`bash
-npm run build
-npm run start
-\`\`\`
+# Build da imagem
+docker build -t maids-flow .
 
-### Export Estático
-
-\`\`\`bash
-npm run build
-npm run export
+# Executar container
+docker run -p 3000:3000 maids-flow
 \`\`\`
 
 ## 🧪 Testes
@@ -188,11 +154,11 @@ npm run export
 # Executar testes
 npm run test
 
-# Executar testes em modo watch
-npm run test:watch
-
-# Coverage
+# Testes com coverage
 npm run test:coverage
+
+# Testes e2e
+npm run test:e2e
 \`\`\`
 
 ## 📊 Scripts Disponíveis
@@ -217,24 +183,17 @@ npm run type-check   # Verificação de tipos
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-## 🆘 Suporte
+## 📞 Suporte
 
-Para suporte, entre em contato:
-- Email: suporte@maidsflow.com
-- WhatsApp: (11) 99999-9999
-- Website: https://maidsflow.com
+Para suporte técnico, entre em contato:
+- **Email**: suporte@maidsflow.com
+- **WhatsApp**: +55 (11) 99999-9999
+- **Website**: https://maidsflow.com
 
-## 🔄 Changelog
+## 🏆 Créditos
 
-### v1.0.0
-- Lançamento inicial
-- Sistema completo de gestão multi-empresas
-- Interface responsiva
-- Sistema de autenticação JWT
-- GPS tracking
-- Chat interno
-- Sistema de pagamentos
+Desenvolvido com ❤️ pela equipe Maids Flow Development Team.
 
 ---
 
-Desenvolvido com ❤️ pela equipe Maids Flow Development Team
+**Maids Flow** - Transformando a gestão de empresas de limpeza através da tecnologia.
