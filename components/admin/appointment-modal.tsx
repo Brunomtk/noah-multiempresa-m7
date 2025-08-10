@@ -34,18 +34,23 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
   const [isLoading, setIsLoading] = useState(false)
   const [companies, setCompanies] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
   const [professionals, setProfessionals] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(false)
   const [formData, setFormData] = useState({
+    title: "",
+    address: "",
     companyId: "",
     customerId: "",
+    teamId: "",
     professionalId: "",
-    serviceType: "",
-    scheduledDate: undefined as Date | undefined,
-    scheduledTime: "",
-    address: "",
+    type: "",
+    status: "0",
+    startDate: undefined as Date | undefined,
+    startTime: "",
+    endDate: undefined as Date | undefined,
+    endTime: "",
     notes: "",
-    status: "1",
   })
 
   const apiCall = async (endpoint: string, options: RequestInit = {}) => {
@@ -55,10 +60,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
       throw new Error("No authentication token found")
     }
 
-    // Clean endpoint to avoid double /api
-    const cleanEndpoint = endpoint.startsWith("/api/") ? endpoint.substring(4) : endpoint
-    const url = `${getApiUrl()}/${cleanEndpoint}`
-
+    const url = `${getApiUrl()}/${endpoint}`
     console.log("Making API call to:", url)
 
     const response = await fetch(url, {
@@ -85,28 +87,41 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
 
   useEffect(() => {
     if (appointment) {
+      const startDate =
+        appointment.start && appointment.start !== "0001-01-01T00:00:00" ? new Date(appointment.start) : undefined
+      const endDate =
+        appointment.end && appointment.end !== "0001-01-01T00:00:00" ? new Date(appointment.end) : undefined
+
       setFormData({
+        title: appointment.title || "",
+        address: appointment.address || "",
         companyId: appointment.companyId?.toString() || "",
         customerId: appointment.customerId?.toString() || "",
+        teamId: appointment.teamId?.toString() || "",
         professionalId: appointment.professionalId?.toString() || "",
-        serviceType: appointment.serviceType || "",
-        scheduledDate: appointment.scheduledDate ? new Date(appointment.scheduledDate) : undefined,
-        scheduledTime: appointment.scheduledTime || "",
-        address: appointment.address || "",
+        type: appointment.type?.toString() || "",
+        status: appointment.status?.toString() || "0",
+        startDate: startDate,
+        startTime: startDate ? format(startDate, "HH:mm") : "",
+        endDate: endDate,
+        endTime: endDate ? format(endDate, "HH:mm") : "",
         notes: appointment.notes || "",
-        status: appointment.status?.toString() || "1",
       })
     } else {
       setFormData({
+        title: "",
+        address: "",
         companyId: "",
         customerId: "",
+        teamId: "",
         professionalId: "",
-        serviceType: "",
-        scheduledDate: undefined,
-        scheduledTime: "",
-        address: "",
+        type: "",
+        status: "0",
+        startDate: undefined,
+        startTime: "",
+        endDate: undefined,
+        endTime: "",
         notes: "",
-        status: "1",
       })
     }
   }, [appointment])
@@ -114,14 +129,16 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
   const loadInitialData = async () => {
     setLoadingData(true)
     try {
-      const [companiesData, customersData, professionalsData] = await Promise.all([
+      const [companiesData, customersData, teamsData, professionalsData] = await Promise.all([
         apiCall("Companies/paged?PageNumber=1&PageSize=100"),
         apiCall("Customer?PageNumber=1&PageSize=100"),
+        apiCall("Team/paged?Page=1&PageSize=100"),
         apiCall("Professional?PageNumber=1&PageSize=100"),
       ])
 
       setCompanies(companiesData.result || companiesData.results || [])
       setCustomers(customersData.result || customersData.results || [])
+      setTeams(teamsData.result || teamsData.results || [])
       setProfessionals(professionalsData.result || professionalsData.results || [])
     } catch (error) {
       console.error("Error loading initial data:", error)
@@ -135,16 +152,36 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
     setIsLoading(true)
 
     try {
+      // Combine date and time for start and end
+      let startDateTime = ""
+      let endDateTime = ""
+
+      if (formData.startDate && formData.startTime) {
+        const [hours, minutes] = formData.startTime.split(":")
+        const start = new Date(formData.startDate)
+        start.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0)
+        startDateTime = start.toISOString()
+      }
+
+      if (formData.endDate && formData.endTime) {
+        const [hours, minutes] = formData.endTime.split(":")
+        const end = new Date(formData.endDate)
+        end.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0)
+        endDateTime = end.toISOString()
+      }
+
       const appointmentData = {
+        title: formData.title,
+        address: formData.address,
+        start: startDateTime,
+        end: endDateTime,
         companyId: Number.parseInt(formData.companyId),
         customerId: Number.parseInt(formData.customerId),
-        professionalId: Number.parseInt(formData.professionalId),
-        serviceType: formData.serviceType,
-        scheduledDate: formData.scheduledDate?.toISOString(),
-        scheduledTime: formData.scheduledTime,
-        address: formData.address,
-        notes: formData.notes,
+        teamId: formData.teamId ? Number.parseInt(formData.teamId) : null,
+        professionalId: formData.professionalId ? Number.parseInt(formData.professionalId) : null,
         status: Number.parseInt(formData.status),
+        type: Number.parseInt(formData.type),
+        notes: formData.notes,
       }
 
       await onSubmit(appointmentData)
@@ -161,7 +198,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-[#1a2234] border-[#2a3349] text-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] bg-[#1a2234] border-[#2a3349] text-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{appointment ? "Edit Appointment" : "New Appointment"}</DialogTitle>
           <DialogDescription className="text-gray-400">
@@ -172,6 +209,52 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => handleChange("title", e.target.value)}
+                  className="bg-[#0f172a] border-[#2a3349] text-white"
+                  placeholder="Enter appointment title"
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="type">Service Type</Label>
+                <Select value={formData.type} onValueChange={(value) => handleChange("type", value)}>
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder="Select service type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                    <SelectItem value="0" className="hover:bg-[#2a3349]">
+                      Residential
+                    </SelectItem>
+                    <SelectItem value="1" className="hover:bg-[#2a3349]">
+                      Commercial
+                    </SelectItem>
+                    <SelectItem value="2" className="hover:bg-[#2a3349]">
+                      Industrial
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => handleChange("address", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+                placeholder="Enter service address"
+                required
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="company">Company</Label>
@@ -216,7 +299,30 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="professional">Professional</Label>
+                <Label htmlFor="team">Team (Optional)</Label>
+                <Select
+                  value={formData.teamId}
+                  onValueChange={(value) => handleChange("teamId", value)}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder={loadingData ? "Loading..." : "Select a team"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                    <SelectItem value="" className="hover:bg-[#2a3349]">
+                      No team
+                    </SelectItem>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id.toString()} className="hover:bg-[#2a3349]">
+                        {team.name || `Team #${team.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="professional">Professional (Optional)</Label>
                 <Select
                   value={formData.professionalId}
                   onValueChange={(value) => handleChange("professionalId", value)}
@@ -226,6 +332,9 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
                     <SelectValue placeholder={loadingData ? "Loading..." : "Select a professional"} />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                    <SelectItem value="" className="hover:bg-[#2a3349]">
+                      No professional
+                    </SelectItem>
                     {professionals.map((professional) => (
                       <SelectItem
                         key={professional.id}
@@ -238,52 +347,29 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="serviceType">Service Type</Label>
-                <Select value={formData.serviceType} onValueChange={(value) => handleChange("serviceType", value)}>
-                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                    <SelectValue placeholder="Select service type" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                    <SelectItem value="residential" className="hover:bg-[#2a3349]">
-                      Residential Cleaning
-                    </SelectItem>
-                    <SelectItem value="commercial" className="hover:bg-[#2a3349]">
-                      Commercial Cleaning
-                    </SelectItem>
-                    <SelectItem value="deep" className="hover:bg-[#2a3349]">
-                      Deep Cleaning
-                    </SelectItem>
-                    <SelectItem value="maintenance" className="hover:bg-[#2a3349]">
-                      Maintenance
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div className="grid gap-2">
-                <Label>Scheduled Date</Label>
+                <Label>Start Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
                         "justify-start text-left font-normal bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]",
-                        !formData.scheduledDate && "text-gray-400",
+                        !formData.startDate && "text-gray-400",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.scheduledDate ? format(formData.scheduledDate, "PPP") : "Pick a date"}
+                      {formData.startDate ? format(formData.startDate, "PPP") : "Pick date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 bg-[#1a2234] border-[#2a3349]" align="start">
                     <Calendar
                       mode="single"
-                      selected={formData.scheduledDate}
-                      onSelect={(date) => handleChange("scheduledDate", date)}
+                      selected={formData.startDate}
+                      onSelect={(date) => handleChange("startDate", date)}
                       initialFocus
                       className="text-white"
                     />
@@ -292,28 +378,55 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="scheduledTime">Scheduled Time</Label>
+                <Label htmlFor="startTime">Start Time</Label>
                 <Input
-                  id="scheduledTime"
+                  id="startTime"
                   type="time"
-                  value={formData.scheduledTime}
-                  onChange={(e) => handleChange("scheduledTime", e.target.value)}
+                  value={formData.startTime}
+                  onChange={(e) => handleChange("startTime", e.target.value)}
                   className="bg-[#0f172a] border-[#2a3349] text-white"
                   required
                 />
               </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
-                className="bg-[#0f172a] border-[#2a3349] text-white"
-                placeholder="Enter service address"
-                required
-              />
+              <div className="grid gap-2">
+                <Label>End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]",
+                        !formData.endDate && "text-gray-400",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.endDate ? format(formData.endDate, "PPP") : "Pick date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-[#1a2234] border-[#2a3349]" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.endDate}
+                      onSelect={(date) => handleChange("endDate", date)}
+                      initialFocus
+                      className="text-white"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="endTime">End Time</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={formData.endTime}
+                  onChange={(e) => handleChange("endTime", e.target.value)}
+                  className="bg-[#0f172a] border-[#2a3349] text-white"
+                  required
+                />
+              </div>
             </div>
 
             <div className="grid gap-2">
@@ -323,16 +436,16 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  <SelectItem value="1" className="hover:bg-[#2a3349]">
+                  <SelectItem value="0" className="hover:bg-[#2a3349]">
                     Scheduled
                   </SelectItem>
-                  <SelectItem value="2" className="hover:bg-[#2a3349]">
+                  <SelectItem value="1" className="hover:bg-[#2a3349]">
                     In Progress
                   </SelectItem>
-                  <SelectItem value="3" className="hover:bg-[#2a3349]">
+                  <SelectItem value="2" className="hover:bg-[#2a3349]">
                     Completed
                   </SelectItem>
-                  <SelectItem value="0" className="hover:bg-[#2a3349]">
+                  <SelectItem value="3" className="hover:bg-[#2a3349]">
                     Cancelled
                   </SelectItem>
                 </SelectContent>

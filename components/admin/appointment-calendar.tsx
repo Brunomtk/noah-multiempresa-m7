@@ -83,9 +83,16 @@ export function AppointmentCalendar({
   }
 
   const renderDayView = () => {
-    const hours = Array.from({ length: 14 }, (_, i) => i + 7) // 7 AM to 8 PM
+    const hours = Array.from({ length: 17 }, (_, i) => i + 6) // 6 AM to 10 PM
 
-    const dayAppointments = appointments.filter((appointment) => isSameDay(new Date(appointment.start), currentDate))
+    const dayAppointments = appointments.filter((appointment) => {
+      const appointmentDate = new Date(appointment.start)
+      return (
+        appointmentDate.toString() !== "Invalid Date" &&
+        appointmentDate.getFullYear() > 1900 &&
+        isSameDay(appointmentDate, currentDate)
+      )
+    })
 
     return (
       <div className="flex flex-col h-[600px] bg-[#1a2234] rounded-lg border border-[#2a3349]">
@@ -131,12 +138,17 @@ export function AppointmentCalendar({
             {dayAppointments.map((appointment) => {
               const startDate = new Date(appointment.start)
               const endDate = new Date(appointment.end)
+
+              if (startDate.toString() === "Invalid Date" || endDate.toString() === "Invalid Date") {
+                return null
+              }
+
               const startHour = startDate.getHours()
               const startMinutes = startDate.getMinutes()
               const endHour = endDate.getHours()
               const endMinutes = endDate.getMinutes()
 
-              const top = ((startHour - 7) * 60 + startMinutes) * (48 / 60)
+              const top = ((startHour - 6) * 60 + startMinutes) * (48 / 60)
               const height = ((endHour - startHour) * 60 + (endMinutes - startMinutes)) * (48 / 60)
 
               return (
@@ -155,7 +167,7 @@ export function AppointmentCalendar({
                 >
                   <div className="flex justify-between items-start">
                     <div className="overflow-hidden">
-                      <h4 className="font-medium text-sm truncate text-white">{appointment.title}</h4>
+                      <h4 className="font-medium text-sm truncate text-white">{appointment.title || "No Title"}</h4>
                       <p className="text-xs text-gray-400 truncate">{appointment.customer?.name || "No customer"}</p>
                       <div className="flex items-center mt-1">
                         <Badge
@@ -183,7 +195,7 @@ export function AppointmentCalendar({
     const start = startOfWeek(currentDate, { weekStartsOn: 1 }) // Start on Monday
     const end = endOfWeek(currentDate, { weekStartsOn: 1 })
     const weekDays = eachDayOfInterval({ start, end })
-    const hours = Array.from({ length: 14 }, (_, i) => i + 7) // 7 AM to 8 PM
+    const hours = Array.from({ length: 17 }, (_, i) => i + 6) // 6 AM to 10 PM
 
     return (
       <div className="flex flex-col h-[600px] bg-[#1a2234] rounded-lg border border-[#2a3349]">
@@ -253,6 +265,11 @@ export function AppointmentCalendar({
               {/* Appointments overlay */}
               {appointments.map((appointment) => {
                 const appointmentDate = new Date(appointment.start)
+
+                if (appointmentDate.toString() === "Invalid Date" || appointmentDate.getFullYear() <= 1900) {
+                  return null
+                }
+
                 const dayIndex = weekDays.findIndex((day) => isSameDay(day, appointmentDate))
 
                 if (dayIndex === -1) return null
@@ -264,7 +281,7 @@ export function AppointmentCalendar({
                 const endHour = endDate.getHours()
                 const endMinutes = endDate.getMinutes()
 
-                const top = ((startHour - 7) * 60 + startMinutes) * (48 / 60)
+                const top = ((startHour - 6) * 60 + startMinutes) * (48 / 60)
                 const height = Math.max(((endHour - startHour) * 60 + (endMinutes - startMinutes)) * (48 / 60), 24)
 
                 return (
@@ -287,7 +304,7 @@ export function AppointmentCalendar({
                   >
                     <div className="flex justify-between items-start h-full">
                       <div className="overflow-hidden flex-1">
-                        <h4 className="font-medium text-xs truncate text-white">{appointment.title}</h4>
+                        <h4 className="font-medium text-xs truncate text-white">{appointment.title || "No Title"}</h4>
                         <p className="text-xs text-gray-400 truncate">{appointment.customer?.name || "No customer"}</p>
                         <p className="text-xs text-gray-400">{format(startDate, "h:mm a")}</p>
                       </div>
@@ -364,7 +381,14 @@ export function AppointmentCalendar({
           <div className="grid grid-cols-7 auto-rows-[minmax(100px,_1fr)]">
             {allDays.map((day, index) => {
               const isCurrentMonth = isSameMonth(day, currentDate)
-              const dayAppointments = appointments.filter((appointment) => isSameDay(new Date(appointment.start), day))
+              const dayAppointments = appointments.filter((appointment) => {
+                const appointmentDate = new Date(appointment.start)
+                return (
+                  appointmentDate.toString() !== "Invalid Date" &&
+                  appointmentDate.getFullYear() > 1900 &&
+                  isSameDay(appointmentDate, day)
+                )
+              })
 
               return (
                 <div
@@ -397,9 +421,14 @@ export function AppointmentCalendar({
                       >
                         <div className="flex items-center gap-1">
                           <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor(appointment.status)}`}></div>
-                          <span className="truncate">{format(new Date(appointment.start), "h:mm a")}</span>
+                          <span className="truncate">
+                            {new Date(appointment.start).toString() !== "Invalid Date" &&
+                            new Date(appointment.start).getFullYear() > 1900
+                              ? format(new Date(appointment.start), "h:mm a")
+                              : "No time"}
+                          </span>
                         </div>
-                        <div className="truncate font-medium">{appointment.title}</div>
+                        <div className="truncate font-medium">{appointment.title || "No Title"}</div>
                       </div>
                     ))}
 

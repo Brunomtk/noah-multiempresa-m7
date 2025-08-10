@@ -31,16 +31,17 @@ export const appointmentsApi = {
     try {
       const params = new URLSearchParams()
 
-      if (filters.page) params.append("page", filters.page.toString())
-      if (filters.pageSize) params.append("pageSize", filters.pageSize.toString())
-      if (filters.status !== undefined) params.append("status", filters.status.toString())
-      if (filters.search) params.append("search", filters.search)
-      if (filters.companyId) params.append("companyId", filters.companyId.toString())
-      if (filters.customerId) params.append("customerId", filters.customerId.toString())
-      if (filters.teamId) params.append("teamId", filters.teamId.toString())
-      if (filters.professionalId) params.append("professionalId", filters.professionalId.toString())
-      if (filters.startDate) params.append("startDate", filters.startDate)
-      if (filters.endDate) params.append("endDate", filters.endDate)
+      if (filters.page) params.append("Page", filters.page.toString())
+      if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
+      if (filters.status !== undefined) params.append("Status", filters.status.toString())
+      if (filters.type !== undefined) params.append("Type", filters.type.toString())
+      if (filters.search) params.append("Search", filters.search)
+      if (filters.companyId) params.append("CompanyId", filters.companyId.toString())
+      if (filters.customerId) params.append("CustomerId", filters.customerId.toString())
+      if (filters.teamId) params.append("TeamId", filters.teamId.toString())
+      if (filters.professionalId) params.append("ProfessionalId", filters.professionalId.toString())
+      if (filters.startDate) params.append("StartDate", filters.startDate)
+      if (filters.endDate) params.append("EndDate", filters.endDate)
 
       const queryString = params.toString()
       const url = queryString ? `${getApiUrl()}/Appointment?${queryString}` : `${getApiUrl()}/Appointment`
@@ -55,7 +56,19 @@ export const appointmentsApi = {
       }
 
       const data = await response.json()
-      return { data }
+
+      // Transform the response to match our expected format
+      const transformedData = {
+        results: data.results || [],
+        currentPage: data.currentPage || 1,
+        pageCount: data.pageCount || 1,
+        pageSize: data.pageSize || 10,
+        totalItems: data.totalItems || 0,
+        firstRowOnPage: data.firstRowOnPage || 1,
+        lastRowOnPage: data.lastRowOnPage || 0,
+      }
+
+      return { data: transformedData }
     } catch (error) {
       console.error("Error fetching appointments:", error)
       return { error: error instanceof Error ? error.message : "Failed to fetch appointments" }
@@ -97,23 +110,23 @@ export const appointmentsApi = {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // Verificar se a resposta é JSON ou texto
+      // Check if response is JSON or text
       const contentType = response.headers.get("content-type")
       let responseData
 
       if (contentType && contentType.includes("application/json")) {
         responseData = await response.json()
       } else {
-        // Se não for JSON, tratar como texto (mensagem de sucesso)
+        // If not JSON, treat as text (success message)
         const textResponse = await response.text()
         console.log("Appointment created successfully:", textResponse)
 
-        // Retornar um objeto simulado já que a API retorna apenas uma mensagem
+        // Return a simulated object since API returns only a message
         responseData = {
-          id: Date.now(), // ID temporário
+          id: Date.now(), // Temporary ID
           ...appointmentData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdDate: new Date().toISOString(),
+          updatedDate: new Date().toISOString(),
         }
       }
 
@@ -140,22 +153,22 @@ export const appointmentsApi = {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // Verificar se a resposta é JSON ou texto
+      // Check if response is JSON or text
       const contentType = response.headers.get("content-type")
       let responseData
 
       if (contentType && contentType.includes("application/json")) {
         responseData = await response.json()
       } else {
-        // Se não for JSON, tratar como texto (mensagem de sucesso)
+        // If not JSON, treat as text (success message)
         const textResponse = await response.text()
         console.log("Appointment updated successfully:", textResponse)
 
-        // Retornar um objeto simulado já que a API retorna apenas uma mensagem
+        // Return a simulated object since API returns only a message
         responseData = {
           id,
           ...appointmentData,
-          updatedAt: new Date().toISOString(),
+          updatedDate: new Date().toISOString(),
         }
       }
 
@@ -186,7 +199,7 @@ export const appointmentsApi = {
   },
 }
 
-// Funções de compatibilidade para o contexto existente
+// Compatibility functions for existing context
 export const getAppointments = appointmentsApi.getAppointments
 export const getAppointmentById = appointmentsApi.getAppointmentById
 export const createAppointment = appointmentsApi.createAppointment
