@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2 } from "lucide-react"
+import { getApiUrl } from "@/lib/api/utils"
 
 interface TeamModalProps {
   isOpen: boolean
@@ -40,6 +41,23 @@ export function TeamModal({ isOpen, onClose, onSubmit, team, companies }: TeamMo
     status: "1",
   })
 
+  // Helper function to get auth token
+  const getAuthToken = (): string | null => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("noah_token")
+    }
+    return null
+  }
+
+  // Helper function to create headers
+  const createHeaders = (): HeadersInit => {
+    const token = getAuthToken()
+    return {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }
+  }
+
   // Load leaders when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -49,24 +67,14 @@ export function TeamModal({ isOpen, onClose, onSubmit, team, companies }: TeamMo
 
   const loadLeaders = async () => {
     setLoadingLeaders(true)
-    const token = localStorage.getItem("noah_token")
-
-    if (!token) {
-      console.error("No token found")
-      setLoadingLeaders(false)
-      return
-    }
 
     const endpoints = ["/api/Leader", "/api/Professional", "/api/User", "/api/Users"]
 
     for (const endpoint of endpoints) {
       try {
         console.log(`Trying to load leaders from: ${endpoint}`)
-        const response = await fetch(`https://localhost:44394${endpoint}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+        const response = await fetch(`${getApiUrl()}${endpoint}`, {
+          headers: createHeaders(),
         })
 
         if (response.ok) {

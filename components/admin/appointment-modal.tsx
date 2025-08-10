@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { getApiUrl } from "@/lib/api/utils"
 
 // Interfaces baseadas na estrutura real da API
 interface Company {
@@ -118,24 +119,29 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
   const [address, setAddress] = useState("")
   const [notes, setNotes] = useState("")
 
-  // Função para obter o token
-  const getAuthToken = () => {
+  // Helper function to get auth token
+  const getAuthToken = (): string | null => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
     }
     return null
   }
 
+  // Helper function to create headers
+  const createHeaders = (): HeadersInit => {
+    const token = getAuthToken()
+    return {
+      accept: "*/*",
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }
+  }
+
   // Função para fazer chamadas à API
   const apiCall = async (endpoint: string) => {
-    const token = getAuthToken()
-    const response = await fetch(`https://localhost:44394${endpoint}`, {
+    const response = await fetch(`${getApiUrl()}${endpoint}`, {
       method: "GET",
-      headers: {
-        accept: "*/*",
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: createHeaders(),
     })
 
     if (!response.ok) {

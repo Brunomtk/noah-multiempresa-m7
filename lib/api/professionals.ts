@@ -7,9 +7,7 @@ import type {
   ProfessionalFilters,
   ProfessionalPagedResponse,
 } from "@/types"
-import { apiDelay, fetchApi } from "./utils"
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://localhost:44394/api"
+import { apiDelay, getApiUrl } from "./utils"
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
@@ -40,7 +38,7 @@ export async function getProfessionals(
   try {
     await apiDelay(300)
 
-    const url = new URL(`${API_BASE_URL}/Professional`)
+    const url = new URL(`${getApiUrl()}/Professional`)
 
     const response = await fetch(url.toString(), {
       method: "GET",
@@ -115,7 +113,7 @@ export async function getProfessionalById(id: string): Promise<ApiResponse<Profe
   try {
     await apiDelay(300)
 
-    const response = await fetch(`${API_BASE_URL}/Professional/${id}`, {
+    const response = await fetch(`${getApiUrl()}/Professional/${id}`, {
       method: "GET",
       headers: createHeaders(),
     })
@@ -162,7 +160,7 @@ export async function createProfessional(
   try {
     await apiDelay(800)
 
-    const response = await fetch(`${API_BASE_URL}/Professional`, {
+    const response = await fetch(`${getApiUrl()}/Professional`, {
       method: "POST",
       headers: createHeaders(),
       body: JSON.stringify(professionalData),
@@ -195,7 +193,7 @@ export async function updateProfessional(
   try {
     await apiDelay(600)
 
-    const response = await fetch(`${API_BASE_URL}/Professional/${id}`, {
+    const response = await fetch(`${getApiUrl()}/Professional/${id}`, {
       method: "PUT",
       headers: createHeaders(),
       body: JSON.stringify(professionalData),
@@ -231,7 +229,7 @@ export async function deleteProfessional(id: string): Promise<ApiResponse<null>>
   try {
     await apiDelay(400)
 
-    const response = await fetch(`${API_BASE_URL}/Professional/${id}`, {
+    const response = await fetch(`${getApiUrl()}/Professional/${id}`, {
       method: "DELETE",
       headers: createHeaders(),
     })
@@ -263,7 +261,7 @@ export async function getTeams(): Promise<ApiResponse<{ id: number; name: string
   try {
     await apiDelay(300)
 
-    const response = await fetch(`${API_BASE_URL}/Team?page=1&pageSize=100&status=all`, {
+    const response = await fetch(`${getApiUrl()}/Team?page=1&pageSize=100&status=all`, {
       method: "GET",
       headers: createHeaders(),
     })
@@ -305,7 +303,7 @@ export async function getCompanies(): Promise<ApiResponse<{ id: number; name: st
     await apiDelay(300)
 
     // Usar o endpoint correto: /Companies (plural)
-    const response = await fetch(`${API_BASE_URL}/Companies`, {
+    const response = await fetch(`${getApiUrl()}/Companies`, {
       method: "GET",
       headers: createHeaders(),
     })
@@ -431,8 +429,17 @@ export const professionalsApi = {
   // Get all professionals (for dropdowns)
   async getAll(): Promise<{ data?: ProfessionalPagedResponse; error?: string }> {
     try {
-      const response = await fetchApi("/Professionals/paged?PageSize=1000")
-      return { data: response }
+      const response = await fetch(`${getApiUrl()}/Professionals/paged?PageSize=1000`, {
+        method: "GET",
+        headers: createHeaders(),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { data }
     } catch (error) {
       console.error("Error fetching all professionals:", error)
       return { error: error instanceof Error ? error.message : "Failed to fetch professionals" }
@@ -450,9 +457,19 @@ export const professionalsApi = {
       if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
 
       const query = params.toString()
-      const url = query ? `/Professionals/paged?${query}` : "/Professionals/paged"
-      const response = await fetchApi(url)
-      return { data: response }
+      const url = query ? `${getApiUrl()}/Professionals/paged?${query}` : `${getApiUrl()}/Professionals/paged`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: createHeaders(),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { data }
     } catch (error) {
       console.error("Error fetching professionals:", error)
       return { error: error instanceof Error ? error.message : "Failed to fetch professionals" }
@@ -462,8 +479,17 @@ export const professionalsApi = {
   // Get a professional by ID
   async getById(id: number): Promise<{ data?: Professional; error?: string }> {
     try {
-      const response = await fetchApi(`/Professionals/${id}`)
-      return { data: response }
+      const response = await fetch(`${getApiUrl()}/Professionals/${id}`, {
+        method: "GET",
+        headers: createHeaders(),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { data }
     } catch (error) {
       console.error("Error fetching professional:", error)
       return { error: error instanceof Error ? error.message : "Failed to fetch professional" }
@@ -473,11 +499,18 @@ export const professionalsApi = {
   // Create a new professional
   async create(data: CreateProfessionalRequest): Promise<{ data?: Professional; error?: string }> {
     try {
-      const response = await fetchApi("/Professionals/create", {
+      const response = await fetch(`${getApiUrl()}/Professionals/create`, {
         method: "POST",
+        headers: createHeaders(),
         body: JSON.stringify(data),
       })
-      return { data: response }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const responseData = await response.json()
+      return { data: responseData }
     } catch (error) {
       console.error("Error creating professional:", error)
       return { error: error instanceof Error ? error.message : "Failed to create professional" }
@@ -487,11 +520,18 @@ export const professionalsApi = {
   // Update a professional
   async update(id: number, data: UpdateProfessionalRequest): Promise<{ data?: Professional; error?: string }> {
     try {
-      const response = await fetchApi(`/Professionals/${id}`, {
+      const response = await fetch(`${getApiUrl()}/Professionals/${id}`, {
         method: "PUT",
+        headers: createHeaders(),
         body: JSON.stringify(data),
       })
-      return { data: response }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const responseData = await response.json()
+      return { data: responseData }
     } catch (error) {
       console.error("Error updating professional:", error)
       return { error: error instanceof Error ? error.message : "Failed to update professional" }
@@ -501,9 +541,15 @@ export const professionalsApi = {
   // Delete a professional
   async delete(id: number): Promise<{ success?: boolean; error?: string }> {
     try {
-      await fetchApi(`/Professionals/${id}`, {
+      const response = await fetch(`${getApiUrl()}/Professionals/${id}`, {
         method: "DELETE",
+        headers: createHeaders(),
       })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
       return { success: true }
     } catch (error) {
       console.error("Error deleting professional:", error)

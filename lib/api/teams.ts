@@ -1,5 +1,22 @@
 import type { Team, ApiResponse, CreateTeamRequest, UpdateTeamRequest, TeamsResponse } from "@/types"
-import { fetchApi } from "./utils"
+import { getApiUrl } from "./utils"
+
+// Helper function to get auth token
+const getAuthToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("noah_token")
+  }
+  return null
+}
+
+// Helper function to create headers
+const createHeaders = (): HeadersInit => {
+  const token = getAuthToken()
+  return {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+  }
+}
 
 // Get all teams with pagination and filters
 export async function getTeams(
@@ -9,7 +26,7 @@ export async function getTeams(
   search = "",
 ): Promise<ApiResponse<TeamsResponse>> {
   try {
-    let url = `/Team?page=${page}&pageSize=${pageSize}`
+    let url = `${getApiUrl()}/Team?page=${page}&pageSize=${pageSize}`
 
     if (status !== "all") {
       url += `&status=${status}`
@@ -19,17 +36,26 @@ export async function getTeams(
       url += `&search=${encodeURIComponent(search)}`
     }
 
-    const response = await fetchApi(url)
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
 
     return {
       status: 200,
       data: {
-        data: response.results || [],
+        data: data.results || [],
         meta: {
-          currentPage: response.currentPage || 1,
-          totalPages: response.pageCount || 1,
-          totalItems: response.totalItems || 0,
-          itemsPerPage: response.pageSize || pageSize,
+          currentPage: data.currentPage || 1,
+          totalPages: data.pageCount || 1,
+          totalItems: data.totalItems || 0,
+          itemsPerPage: data.pageSize || pageSize,
         },
       },
     }
@@ -45,11 +71,20 @@ export async function getTeams(
 // Get team by ID
 export async function getTeamById(id: string): Promise<ApiResponse<Team>> {
   try {
-    const response = await fetchApi(`/Team/${id}`)
+    const response = await fetch(`${getApiUrl()}/Team/${id}`, {
+      method: "GET",
+      headers: createHeaders(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
 
     return {
       status: 200,
-      data: response,
+      data: data,
     }
   } catch (error) {
     console.error("Error fetching team:", error)
@@ -63,14 +98,21 @@ export async function getTeamById(id: string): Promise<ApiResponse<Team>> {
 // Create new team
 export async function createTeam(data: CreateTeamRequest): Promise<ApiResponse<Team>> {
   try {
-    const response = await fetchApi("/Team", {
+    const response = await fetch(`${getApiUrl()}/Team`, {
       method: "POST",
+      headers: createHeaders(),
       body: JSON.stringify(data),
     })
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const responseData = await response.json()
+
     return {
       status: 201,
-      data: response,
+      data: responseData,
       message: "Team created successfully",
     }
   } catch (error) {
@@ -85,10 +127,15 @@ export async function createTeam(data: CreateTeamRequest): Promise<ApiResponse<T
 // Update team
 export async function updateTeam(id: string, data: UpdateTeamRequest): Promise<ApiResponse<Team>> {
   try {
-    await fetchApi(`/Team/${id}`, {
+    const response = await fetch(`${getApiUrl()}/Team/${id}`, {
       method: "PUT",
+      headers: createHeaders(),
       body: JSON.stringify(data),
     })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
     // Get updated team data
     const updatedTeam = await getTeamById(id)
@@ -110,9 +157,14 @@ export async function updateTeam(id: string, data: UpdateTeamRequest): Promise<A
 // Delete team
 export async function deleteTeam(id: string): Promise<ApiResponse<void>> {
   try {
-    await fetchApi(`/Team/${id}`, {
+    const response = await fetch(`${getApiUrl()}/Team/${id}`, {
       method: "DELETE",
+      headers: createHeaders(),
     })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
     return {
       status: 200,
@@ -131,7 +183,7 @@ export async function deleteTeam(id: string): Promise<ApiResponse<void>> {
 export async function getTeamMembers(teamId: string): Promise<ApiResponse<any[]>> {
   try {
     // This would be the actual API call when endpoint is available
-    // const response = await fetchApi(`/Team/${teamId}/members`)
+    // const response = await fetch(`${getApiUrl()}/Team/${teamId}/members`)
 
     // Mock data for now
     return {
@@ -158,7 +210,7 @@ export async function getTeamPerformance(teamId: string): Promise<
 > {
   try {
     // This would be the actual API call when endpoint is available
-    // const response = await fetchApi(`/Team/${teamId}/performance`)
+    // const response = await fetch(`${getApiUrl()}/Team/${teamId}/performance`)
 
     // Mock data for now
     return {
@@ -194,7 +246,7 @@ export async function getTeamUpcomingServices(teamId: string): Promise<
 > {
   try {
     // This would be the actual API call when endpoint is available
-    // const response = await fetchApi(`/Team/${teamId}/services/upcoming`)
+    // const response = await fetch(`${getApiUrl()}/Team/${teamId}/services/upcoming`)
 
     // Mock data for now
     return {
@@ -214,7 +266,7 @@ export async function getTeamUpcomingServices(teamId: string): Promise<
 export async function getAvailableProfessionals(companyId: string): Promise<ApiResponse<any[]>> {
   try {
     // This would be the actual API call when endpoint is available
-    // const response = await fetchApi(`/Company/${companyId}/professionals/available`)
+    // const response = await fetch(`${getApiUrl()}/Company/${companyId}/professionals/available`)
 
     // Mock data for now
     return {

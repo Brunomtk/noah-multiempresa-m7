@@ -1,4 +1,4 @@
-import { fetchApi } from "./utils"
+import { getApiUrl } from "./utils"
 import type {
   Appointment,
   CreateAppointmentData,
@@ -6,6 +6,24 @@ import type {
   AppointmentFilters,
   AppointmentResponse,
 } from "@/types/appointment"
+
+// Helper function to get auth token
+const getAuthToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
+  }
+  return null
+}
+
+// Helper function to create headers
+const createHeaders = (): HeadersInit => {
+  const token = getAuthToken()
+  return {
+    accept: "*/*",
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+  }
+}
 
 export const appointmentsApi = {
   // Get paginated appointments
@@ -25,10 +43,19 @@ export const appointmentsApi = {
       if (filters.endDate) params.append("endDate", filters.endDate)
 
       const queryString = params.toString()
-      const url = queryString ? `/Appointment?${queryString}` : "/Appointment"
+      const url = queryString ? `${getApiUrl()}/Appointment?${queryString}` : `${getApiUrl()}/Appointment`
 
-      const response = await fetchApi(url)
-      return { data: response }
+      const response = await fetch(url, {
+        method: "GET",
+        headers: createHeaders(),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { data }
     } catch (error) {
       console.error("Error fetching appointments:", error)
       return { error: error instanceof Error ? error.message : "Failed to fetch appointments" }
@@ -38,8 +65,17 @@ export const appointmentsApi = {
   // Get appointment by ID
   async getAppointmentById(id: number): Promise<{ data?: Appointment; error?: string }> {
     try {
-      const response = await fetchApi(`/Appointment/${id}`)
-      return { data: response }
+      const response = await fetch(`${getApiUrl()}/Appointment/${id}`, {
+        method: "GET",
+        headers: createHeaders(),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { data }
     } catch (error) {
       console.error("Error fetching appointment:", error)
       return { error: error instanceof Error ? error.message : "Failed to fetch appointment" }
@@ -51,18 +87,9 @@ export const appointmentsApi = {
     try {
       console.log("Creating appointment with data:", appointmentData)
 
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
-          : null
-
-      const response = await fetch("https://localhost:44394/api/Appointment", {
+      const response = await fetch(`${getApiUrl()}/Appointment`, {
         method: "POST",
-        headers: {
-          accept: "*/*",
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: createHeaders(),
         body: JSON.stringify(appointmentData),
       })
 
@@ -103,18 +130,9 @@ export const appointmentsApi = {
     appointmentData: UpdateAppointmentData,
   ): Promise<{ data?: Appointment; error?: string }> {
     try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
-          : null
-
-      const response = await fetch(`https://localhost:44394/api/Appointment/${id}`, {
+      const response = await fetch(`${getApiUrl()}/Appointment/${id}`, {
         method: "PUT",
-        headers: {
-          accept: "*/*",
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: createHeaders(),
         body: JSON.stringify(appointmentData),
       })
 
@@ -151,18 +169,9 @@ export const appointmentsApi = {
   // Delete appointment
   async deleteAppointment(id: number): Promise<{ success?: boolean; error?: string }> {
     try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
-          : null
-
-      const response = await fetch(`https://localhost:44394/api/Appointment/${id}`, {
+      const response = await fetch(`${getApiUrl()}/Appointment/${id}`, {
         method: "DELETE",
-        headers: {
-          accept: "*/*",
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: createHeaders(),
       })
 
       if (!response.ok) {

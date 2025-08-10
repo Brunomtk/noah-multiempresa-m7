@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Upload } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { professionalsApi } from "@/lib/api/professionals"
+import { getApiUrl } from "@/lib/api/utils"
 import type { Professional, CreateProfessionalRequest, UpdateProfessionalRequest } from "@/types"
 
 interface ProfessionalModalProps {
@@ -44,6 +44,23 @@ export function ProfessionalModal({ isOpen, onClose, onSubmit, professional }: P
     observations: "",
     photo: "",
   })
+
+  // Helper function to get auth token
+  const getAuthToken = (): string | null => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("noah_token")
+    }
+    return null
+  }
+
+  // Helper function to create headers
+  const createHeaders = (): HeadersInit => {
+    const token = getAuthToken()
+    return {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }
+  }
 
   // Load companies and teams when modal opens
   useEffect(() => {
@@ -87,14 +104,27 @@ export function ProfessionalModal({ isOpen, onClose, onSubmit, professional }: P
     console.log("Loading companies...")
     setIsLoadingCompanies(true)
     try {
-      const response = await professionalsApi.getCompanies()
-      console.log("Companies response:", response)
+      const response = await fetch(`${getApiUrl()}/Companies`, {
+        method: "GET",
+        headers: createHeaders(),
+      })
 
-      if (response.data) {
-        console.log("Setting companies:", response.data)
-        setCompanies(response.data)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("Companies response:", data)
+
+      if (Array.isArray(data)) {
+        const companiesData = data.map((company: any) => ({
+          id: company.id,
+          name: company.name,
+        }))
+        console.log("Setting companies:", companiesData)
+        setCompanies(companiesData)
       } else {
-        console.error("Failed to load companies:", response.error)
+        console.error("Companies API returned non-array data:", data)
         setCompanies([])
       }
     } catch (error) {
@@ -109,14 +139,27 @@ export function ProfessionalModal({ isOpen, onClose, onSubmit, professional }: P
     console.log("Loading teams...")
     setIsLoadingTeams(true)
     try {
-      const response = await professionalsApi.getTeams()
-      console.log("Teams response:", response)
+      const response = await fetch(`${getApiUrl()}/Team?page=1&pageSize=100&status=all`, {
+        method: "GET",
+        headers: createHeaders(),
+      })
 
-      if (response.data) {
-        console.log("Setting teams:", response.data)
-        setTeams(response.data)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("Teams response:", data)
+
+      if (data.results && Array.isArray(data.results)) {
+        const teamsData = data.results.map((team: any) => ({
+          id: team.id,
+          name: team.name,
+        }))
+        console.log("Setting teams:", teamsData)
+        setTeams(teamsData)
       } else {
-        console.error("Failed to load teams:", response.error)
+        console.error("Teams API returned unexpected format:", data)
         setTeams([])
       }
     } catch (error) {
