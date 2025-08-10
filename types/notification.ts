@@ -2,25 +2,25 @@ export interface Notification {
   id: number
   title: string
   message: string
-  type: number // 1=Info, 2=Warning, 3=Error, 4=Success
+  type: number // 1=System, 2=Appointment, 3=Message, 4=Alert
   recipientId: number
-  recipientRole: number // 0=Admin, 1=Company, 2=Professional
-  companyId: number
+  recipientRole: number // 1=Admin, 2=Company, 3=Professional
+  companyId?: number
   status: number // 0=Unread, 1=Read
-  sentAt: string | null
-  readAt: string | null
+  sentAt?: string
+  readAt?: string
   createdDate: string
   updatedDate: string
 }
 
-export interface NotificationCreateData {
+export interface NotificationFormData {
   title: string
   message: string
   type: string
   recipientRole: string
-  recipientIds: number[]
+  recipientIds?: number[]
   isBroadcast: boolean
-  companyId: number
+  companyId?: number
 }
 
 export interface NotificationUpdateData {
@@ -31,11 +31,17 @@ export interface NotificationUpdateData {
   readAt?: string
 }
 
+export interface NotificationFilters {
+  type?: string
+  recipientRole?: string
+  search?: string
+}
+
 export enum NotificationType {
-  Info = 1,
-  Warning = 2,
-  Error = 3,
-  Success = 4,
+  System = 1,
+  Appointment = 2,
+  Message = 3,
+  Alert = 4,
 }
 
 export enum NotificationStatus {
@@ -44,7 +50,7 @@ export enum NotificationStatus {
 }
 
 export enum RecipientRole {
-  Admin = 0,
-  Company = 1,
-  Professional = 2,
+  Admin = 1,
+  Company = 2,
+  Professional = 3,
 }

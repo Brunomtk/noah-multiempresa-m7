@@ -183,14 +183,3 @@ export const getAppointmentById = appointmentsApi.getAppointmentById
 export const createAppointment = appointmentsApi.createAppointment
 export const updateAppointment = appointmentsApi.updateAppointment
 export const deleteAppointment = appointmentsApi.deleteAppointment
-
-// Get appointments by company
-export async function getAppointmentsByCompany(
-  companyId: number,
-  filters: Omit<AppointmentFilters, "companyId"> = {},
-): Promise<{ data?: AppointmentResponse; error?: string }> {
-  return appointmentsApi.getAppointments({
-    ...filters,
-    companyId,
-  })
-}

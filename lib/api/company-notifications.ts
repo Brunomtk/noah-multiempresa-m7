@@ -3,7 +3,10 @@ import { fetchApi } from "./utils"
 
 // Helper to parse JWT from localStorage
 function getToken(): string {
-  const t = localStorage.getItem("noah_token") || localStorage.getItem("authToken") || localStorage.getItem("token")
+  const t =
+    localStorage.getItem("noah_token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("token")
   if (!t) throw new Error("No authentication token found")
   return t
 }
@@ -127,88 +130,4 @@ export async function getCompanyUnreadNotificationsCount(): Promise<number> {
   const userId = getUserIdFromToken()
   const data = await fetchApi<number>(`/Notifications/user/${userId}/unread-count`)
   return typeof data === "number" ? data : 0
-}
-
-// Send notification to specific professionals
-export async function sendCompanyNotificationToProfessionals(notificationData: {
-  title: string
-  message: string
-  type: string
-  professionalIds: number[]
-  companyId: number
-}): Promise<Notification[]> {
-  try {
-    const results = []
-    for (const professionalId of notificationData.professionalIds) {
-      const result = await createCompanyNotification({
-        ...notificationData,
-        recipientRole: "professional",
-        recipientIds: [professionalId],
-        isBroadcast: false,
-      })
-      results.push(result)
-    }
-    return results
-  } catch (err) {
-    console.error("Error sending notifications to professionals:", err)
-    throw err
-  }
-}
-
-// Broadcast notification to all company members
-export async function broadcastCompanyNotification(data: {
-  title: string
-  message: string
-  type: string
-  companyId: number
-}): Promise<Notification> {
-  return await createCompanyNotification({
-    ...data,
-    recipientRole: "all",
-    recipientIds: [],
-    isBroadcast: true,
-  })
-}
-
-// Get notification statistics for company
-export async function getCompanyNotificationStats(): Promise<{
-  total: number
-  unread: number
-  read: number
-  byType: Record<string, number>
-  recent: number
-}> {
-  try {
-    const notifications = await getCompanyNotifications()
-    const unreadCount = await getCompanyUnreadNotificationsCount()
-
-    const byType = notifications.reduce(
-      (acc, notification) => {
-        const type = notification.type.toString()
-        acc[type] = (acc[type] || 0) + 1
-        return acc
-      },
-      {} as Record<string, number>,
-    )
-
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const recent = notifications.filter((n) => new Date(n.createdDate) >= oneWeekAgo).length
-
-    return {
-      total: notifications.length,
-      unread: unreadCount,
-      read: notifications.length - unreadCount,
-      byType,
-      recent,
-    }
-  } catch (err) {
-    console.error("Error getting notification stats:", err)
-    return {
-      total: 0,
-      unread: 0,
-      read: 0,
-      byType: {},
-      recent: 0,
-    }
-  }
 }

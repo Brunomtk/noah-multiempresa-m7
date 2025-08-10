@@ -66,29 +66,43 @@ export async function getUserNotifications(userId: number): Promise<Notification
 }
 
 // Send notification to specific recipients
-export async function sendNotification(data: {
-  title: string
-  message: string
-  type: string
-  recipientIds: number[]
-  recipientRole: string
-}): Promise<Notification> {
-  return createNotification({
-    ...data,
-    isBroadcast: false,
+export async function sendNotification(
+  title: string,
+  message: string,
+  type: string,
+  recipientIds: number[],
+  recipientRole: string,
+  companyId?: number,
+): Promise<void> {
+  return fetchApi<void>(`${API_BASE}/send`, {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+      message,
+      type,
+      recipientIds,
+      recipientRole,
+      companyId,
+    }),
   })
 }
 
-// Broadcast notification to all users of a specific role
-export async function broadcastNotification(data: {
-  title: string
-  message: string
-  type: string
-  recipientRole: string
-}): Promise<Notification> {
-  return createNotification({
-    ...data,
-    recipientIds: [],
-    isBroadcast: true,
+// Broadcast notification to all users of a role
+export async function broadcastNotification(
+  title: string,
+  message: string,
+  type: string,
+  recipientRole: string,
+  companyId?: number,
+): Promise<void> {
+  return fetchApi<void>(`${API_BASE}/broadcast`, {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+      message,
+      type,
+      recipientRole,
+      companyId,
+    }),
   })
 }

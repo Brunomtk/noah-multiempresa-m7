@@ -270,6 +270,3 @@ export function useReviews() {
   }
   return context
 }
-
-// Export alias for backward compatibility
-export const useReviewsContext = useReviews
