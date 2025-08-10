@@ -1,394 +1,375 @@
-import type { CheckRecord } from "@/types/check-record"
+import type { ApiResponse } from "@/types"
 import { getApiUrl } from "./utils"
 
-// Helper function to make API calls with authentication
-const apiCall = async (url: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem("noah_token")
-
-  if (!token) {
-    throw new Error("No authentication token found")
+// Helper function to get auth token
+const getAuthToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("noah_token")
   }
-
-  const response = await fetch(`${getApiUrl()}${url}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
-  }
-
-  return response.json()
+  return null
 }
 
-// Type for filtering check records
-export interface CheckRecordFilters {
-  professionalId?: number
-  companyId?: number
-  customerId?: number
-  teamId?: number
-  appointmentId?: number
-  status?: string | number
-  serviceType?: string
-  startDate?: string
-  endDate?: string
-  search?: string
-  pageNumber?: number
-  pageSize?: number
+// Helper function to create headers
+const createHeaders = (): HeadersInit => {
+  const token = getAuthToken()
+  return {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+  }
 }
 
-// Get all check records with optional filtering
-export const getCheckRecords = async (filters?: CheckRecordFilters): Promise<CheckRecord[]> => {
+// Get all check records with pagination and filters
+export async function getCheckRecords(
+  page = 1,
+  pageSize = 10,
+  status = "all",
+  search = "",
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<ApiResponse<any>> {
   try {
-    const params = new URLSearchParams()
+    let url = `${getApiUrl()}/CheckRecord?PageNumber=${page}&PageSize=${pageSize}`
 
-    if (filters) {
-      if (filters.professionalId) params.append("ProfessionalId", filters.professionalId.toString())
-      if (filters.companyId) params.append("CompanyId", filters.companyId.toString())
-      if (filters.customerId) params.append("CustomerId", filters.customerId.toString())
-      if (filters.teamId) params.append("TeamId", filters.teamId.toString())
-      if (filters.appointmentId) params.append("AppointmentId", filters.appointmentId.toString())
-      if (filters.status !== undefined) params.append("Status", filters.status.toString())
-      if (filters.serviceType) params.append("ServiceType", filters.serviceType)
-      if (filters.startDate) params.append("StartDate", filters.startDate)
-      if (filters.endDate) params.append("EndDate", filters.endDate)
-      if (filters.search) params.append("Search", filters.search)
-      if (filters.pageNumber) params.append("PageNumber", filters.pageNumber.toString())
-      if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
+    if (status !== "all") {
+      url += `&status=${status}`
     }
 
-    // Set default pagination if not provided
-    if (!params.has("PageNumber")) params.append("PageNumber", "1")
-    if (!params.has("PageSize")) params.append("PageSize", "100")
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`
+    }
 
-    const queryString = params.toString()
-    const url = `/CheckRecord${queryString ? `?${queryString}` : ""}`
+    if (dateFrom) {
+      url += `&dateFrom=${dateFrom}`
+    }
 
-    console.log("Fetching check records from:", `${getApiUrl()}${url}`)
-    const data = await apiCall(url)
-    console.log("Check records response:", data)
+    if (dateTo) {
+      url += `&dateTo=${dateTo}`
+    }
 
-    return data.results || []
+    console.log("Fetching check records from URL:", url)
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log("Check records API response:", data)
+
+    return {
+      status: 200,
+      data: {
+        data: data.results || data.result || [],
+        meta: {
+          currentPage: data.currentPage || page,
+          totalPages: data.pageCount || data.totalPages || 1,
+          totalItems: data.totalItems || data.totalCount || 0,
+          itemsPerPage: data.pageSize || pageSize,
+        },
+      },
+    }
   } catch (error) {
     console.error("Error fetching check records:", error)
-    throw error
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to fetch check records",
+    }
   }
 }
 
-// Get a single check record by ID
-export const getCheckRecordById = async (id: string): Promise<CheckRecord> => {
+// Get check record by ID
+export async function getCheckRecordById(id: string): Promise<ApiResponse<any>> {
   try {
-    console.log("Fetching check record by ID:", id)
-    const data = await apiCall(`/CheckRecord/${id}`)
-    console.log("Check record response:", data)
-    return data
-  } catch (error) {
-    console.error("Error fetching check record by ID:", error)
-    throw error
-  }
-}
+    const url = `${getApiUrl()}/CheckRecord/${id}`
+    console.log("Fetching check record by ID from URL:", url)
 
-// Create a new check record
-export const createCheckRecord = async (
-  data: Omit<CheckRecord, "id" | "createdDate" | "updatedDate">,
-): Promise<CheckRecord> => {
-  try {
-    console.log("Creating check record:", data)
-    const response = await apiCall("/CheckRecord", {
-      method: "POST",
-      body: JSON.stringify({
-        professionalId: data.professionalId,
-        professionalName: data.professionalName,
-        companyId: data.companyId,
-        customerId: data.customerId,
-        customerName: data.customerName,
-        appointmentId: data.appointmentId,
-        address: data.address,
-        teamId: data.teamId,
-        teamName: data.teamName,
-        serviceType: data.serviceType,
-        notes: data.notes,
-      }),
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
     })
-    console.log("Create check record response:", response)
-    return response
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    return {
+      status: 200,
+      data: data,
+    }
+  } catch (error) {
+    console.error("Error fetching check record:", error)
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to fetch check record",
+    }
+  }
+}
+
+// Create new check record
+export async function createCheckRecord(data: any): Promise<ApiResponse<any>> {
+  try {
+    const url = `${getApiUrl()}/CheckRecord`
+    console.log("Creating check record at URL:", url)
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: createHeaders(),
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const responseData = await response.json()
+
+    return {
+      status: 201,
+      data: responseData,
+      message: "Check record created successfully",
+    }
   } catch (error) {
     console.error("Error creating check record:", error)
-    throw error
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to create check record",
+    }
   }
 }
 
-// Update an existing check record
-export const updateCheckRecord = async (id: string, data: Partial<CheckRecord>): Promise<CheckRecord> => {
+// Update check record
+export async function updateCheckRecord(id: string, data: any): Promise<ApiResponse<any>> {
   try {
-    console.log("Updating check record:", id, data)
-    const response = await apiCall(`/CheckRecord/${id}`, {
+    const url = `${getApiUrl()}/CheckRecord/${id}`
+    console.log("Updating check record at URL:", url)
+
+    const response = await fetch(url, {
       method: "PUT",
-      body: JSON.stringify({
-        professionalId: data.professionalId,
-        professionalName: data.professionalName,
-        companyId: data.companyId,
-        customerId: data.customerId,
-        customerName: data.customerName,
-        appointmentId: data.appointmentId,
-        address: data.address,
-        teamId: data.teamId,
-        teamName: data.teamName,
-        checkInTime: data.checkInTime,
-        checkOutTime: data.checkOutTime,
-        status: data.status,
-        serviceType: data.serviceType,
-        notes: data.notes,
-      }),
+      headers: createHeaders(),
+      body: JSON.stringify(data),
     })
-    console.log("Update check record response:", response)
-    return response
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    // Get updated check record data
+    const updatedRecord = await getCheckRecordById(id)
+
+    return {
+      status: 200,
+      data: updatedRecord.data,
+      message: "Check record updated successfully",
+    }
   } catch (error) {
     console.error("Error updating check record:", error)
-    throw error
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to update check record",
+    }
   }
 }
 
-// Delete a check record
-export const deleteCheckRecord = async (id: string): Promise<void> => {
+// Delete check record
+export async function deleteCheckRecord(id: string): Promise<ApiResponse<void>> {
   try {
-    console.log("Deleting check record:", id)
-    await apiCall(`/CheckRecord/${id}`, {
+    const url = `${getApiUrl()}/CheckRecord/${id}`
+    console.log("Deleting check record at URL:", url)
+
+    const response = await fetch(url, {
       method: "DELETE",
+      headers: createHeaders(),
     })
-    console.log("Check record deleted successfully")
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return {
+      status: 200,
+      message: "Check record deleted successfully",
+    }
   } catch (error) {
     console.error("Error deleting check record:", error)
-    throw error
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to delete check record",
+    }
   }
 }
 
-// Perform check-in
-export const performCheckIn = async (
-  data: Omit<CheckRecord, "id" | "createdDate" | "updatedDate" | "checkOutTime" | "status" | "checkInTime">,
-): Promise<CheckRecord> => {
+// Get check-in records
+export async function getCheckInRecords(page = 1, pageSize = 10, filters?: any): Promise<ApiResponse<any>> {
   try {
-    console.log("Performing check-in:", data)
-    const response = await apiCall("/CheckRecord/check-in", {
-      method: "POST",
-      body: JSON.stringify({
-        professionalId: data.professionalId,
-        professionalName: data.professionalName,
-        companyId: data.companyId,
-        customerId: data.customerId,
-        customerName: data.customerName,
-        appointmentId: data.appointmentId,
-        address: data.address,
-        teamId: data.teamId,
-        teamName: data.teamName,
-        serviceType: data.serviceType,
-        notes: data.notes,
-      }),
+    let url = `${getApiUrl()}/CheckRecord/checkin?PageNumber=${page}&PageSize=${pageSize}`
+
+    if (filters?.professionalId) {
+      url += `&professionalId=${filters.professionalId}`
+    }
+
+    if (filters?.companyId) {
+      url += `&companyId=${filters.companyId}`
+    }
+
+    if (filters?.dateFrom) {
+      url += `&dateFrom=${filters.dateFrom}`
+    }
+
+    if (filters?.dateTo) {
+      url += `&dateTo=${filters.dateTo}`
+    }
+
+    console.log("Fetching check-in records from URL:", url)
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
     })
-    console.log("Check-in response:", response)
-    return response
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    return {
+      status: 200,
+      data: {
+        data: data.results || data.result || [],
+        meta: {
+          currentPage: data.currentPage || page,
+          totalPages: data.pageCount || data.totalPages || 1,
+          totalItems: data.totalItems || data.totalCount || 0,
+          itemsPerPage: data.pageSize || pageSize,
+        },
+      },
+    }
   } catch (error) {
-    console.error("Error performing check-in:", error)
-    throw error
+    console.error("Error fetching check-in records:", error)
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to fetch check-in records",
+    }
   }
 }
 
-// Perform check-out
-export const performCheckOut = async (id: string): Promise<CheckRecord> => {
+// Get check-out records
+export async function getCheckOutRecords(page = 1, pageSize = 10, filters?: any): Promise<ApiResponse<any>> {
   try {
-    console.log("Performing check-out for record:", id)
-    const response = await apiCall(`/CheckRecord/check-out/${id}`, {
-      method: "POST",
-      body: "",
+    let url = `${getApiUrl()}/CheckRecord/checkout?PageNumber=${page}&PageSize=${pageSize}`
+
+    if (filters?.professionalId) {
+      url += `&professionalId=${filters.professionalId}`
+    }
+
+    if (filters?.companyId) {
+      url += `&companyId=${filters.companyId}`
+    }
+
+    if (filters?.dateFrom) {
+      url += `&dateFrom=${filters.dateFrom}`
+    }
+
+    if (filters?.dateTo) {
+      url += `&dateTo=${filters.dateTo}`
+    }
+
+    console.log("Fetching check-out records from URL:", url)
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
     })
-    console.log("Check-out response:", response)
-    return response
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    return {
+      status: 200,
+      data: {
+        data: data.results || data.result || [],
+        meta: {
+          currentPage: data.currentPage || page,
+          totalPages: data.pageCount || data.totalPages || 1,
+          totalItems: data.totalItems || data.totalCount || 0,
+          itemsPerPage: data.pageSize || pageSize,
+        },
+      },
+    }
   } catch (error) {
-    console.error("Error performing check-out:", error)
-    throw error
+    console.error("Error fetching check-out records:", error)
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to fetch check-out records",
+    }
   }
 }
 
-// Get professionals for dropdown
-export const getProfessionals = async (companyId?: number): Promise<any[]> => {
+// Get companies for filters
+export async function getCompaniesForFilters(): Promise<ApiResponse<any[]>> {
   try {
-    console.log("Fetching professionals...")
+    const url = `${getApiUrl()}/Companies/paged?PageNumber=1&PageSize=100`
+    console.log("Fetching companies for filters from URL:", url)
 
-    const endpoints = [
-      `/Professional?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/Professionals?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/Professional?page=1&pageSize=100",
-      "/Professionals?page=1&pageSize=100",
-    ]
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
+    })
 
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
-        const data = await apiCall(endpoint)
-        console.log("Professionals response:", data)
-
-        if (data && (data.results || data.data || Array.isArray(data))) {
-          const results = data.results || data.data || data
-          console.log(`Successfully loaded ${results.length} professionals from ${endpoint}`)
-          return results
-        }
-      } catch (endpointError) {
-        console.log(`Endpoint ${endpoint} failed:`, endpointError)
-        continue
-      }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    console.warn("All professional endpoints failed")
-    return []
+    const data = await response.json()
+
+    return {
+      status: 200,
+      data: data.result || data.results || [],
+    }
   } catch (error) {
-    console.error("Error fetching professionals:", error)
-    return []
+    console.error("Error fetching companies for filters:", error)
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to fetch companies",
+    }
   }
 }
 
-// Get companies for dropdown
-export const getCompanies = async (): Promise<any[]> => {
+// Get professionals for filters
+export async function getProfessionalsForFilters(): Promise<ApiResponse<any[]>> {
   try {
-    console.log("Fetching companies...")
+    const url = `${getApiUrl()}/Professional?PageNumber=1&PageSize=100`
+    console.log("Fetching professionals for filters from URL:", url)
 
-    const endpoints = ["/Companies?page=1&pageSize=100", "/Company?page=1&pageSize=100"]
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
+    })
 
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
-        const data = await apiCall(endpoint)
-        console.log("Companies response:", data)
-
-        if (data && (data.results || data.data || Array.isArray(data))) {
-          const results = data.results || data.data || data
-          console.log(`Successfully loaded ${results.length} companies from ${endpoint}`)
-          return results
-        }
-      } catch (endpointError) {
-        console.log(`Endpoint ${endpoint} failed:`, endpointError)
-        continue
-      }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    console.warn("All company endpoints failed")
-    return []
-  } catch (error) {
-    console.error("Error fetching companies:", error)
-    return []
-  }
-}
+    const data = await response.json()
 
-// Get customers for dropdown
-export const getCustomers = async (companyId?: number): Promise<any[]> => {
-  try {
-    console.log("Fetching customers for company:", companyId)
-
-    const endpoints = [
-      `/Customers?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/Customer?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/Customers?page=1&pageSize=100",
-      "/Customer?page=1&pageSize=100",
-    ]
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
-        const data = await apiCall(endpoint)
-        console.log("Customers response:", data)
-
-        if (data && (data.results || data.data || Array.isArray(data))) {
-          const results = data.results || data.data || data
-          console.log(`Successfully loaded ${results.length} customers from ${endpoint}`)
-          return results
-        }
-      } catch (endpointError) {
-        console.log(`Endpoint ${endpoint} failed:`, endpointError)
-        continue
-      }
+    return {
+      status: 200,
+      data: data.result || data.results || [],
     }
-
-    console.warn("All customer endpoints failed")
-    return []
   } catch (error) {
-    console.error("Error fetching customers:", error)
-    return []
-  }
-}
-
-// Get teams for dropdown
-export const getTeams = async (companyId?: number): Promise<any[]> => {
-  try {
-    console.log("Fetching teams for company:", companyId)
-
-    const endpoints = [
-      `/Teams?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/Team?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/Teams?page=1&pageSize=100",
-      "/Team?page=1&pageSize=100",
-    ]
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
-        const data = await apiCall(endpoint)
-        console.log("Teams response:", data)
-
-        if (data && (data.results || data.data || Array.isArray(data))) {
-          const results = data.results || data.data || data
-          console.log(`Successfully loaded ${results.length} teams from ${endpoint}`)
-          return results
-        }
-      } catch (endpointError) {
-        console.log(`Endpoint ${endpoint} failed:`, endpointError)
-        continue
-      }
+    console.error("Error fetching professionals for filters:", error)
+    return {
+      status: 500,
+      error: error instanceof Error ? error.message : "Failed to fetch professionals",
     }
-
-    console.warn("All team endpoints failed")
-    return []
-  } catch (error) {
-    console.error("Error fetching teams:", error)
-    return []
-  }
-}
-
-// Get appointments for dropdown
-export const getAppointments = async (companyId?: number): Promise<any[]> => {
-  try {
-    console.log("Fetching appointments for company:", companyId)
-
-    const endpoints = [
-      `/Appointments?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/Appointment?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/Appointments?page=1&pageSize=100",
-      "/Appointment?page=1&pageSize=100",
-    ]
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
-        const data = await apiCall(endpoint)
-        console.log("Appointments response:", data)
-
-        if (data && (data.results || data.data || Array.isArray(data))) {
-          const results = data.results || data.data || data
-          console.log(`Successfully loaded ${results.length} appointments from ${endpoint}`)
-          return results
-        }
-      } catch (endpointError) {
-        console.log(`Endpoint ${endpoint} failed:`, endpointError)
-        continue
-      }
-    }
-
-    console.warn("All appointment endpoints failed")
-    return []
-  } catch (error) {
-    console.error("Error fetching appointments:", error)
-    return []
   }
 }

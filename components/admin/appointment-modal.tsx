@@ -2,11 +2,8 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -15,75 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { getApiUrl } from "@/lib/api/utils"
-
-// Interfaces baseadas na estrutura real da API
-interface Company {
-  id: number
-  name: string
-  cnpj: string
-  responsible: string
-  email: string
-  phone: string
-  planId: number
-  status: number
-  createdDate: string
-  updatedDate: string
-}
-
-interface Customer {
-  id: number
-  name: string
-  document: string
-  email: string
-  phone: string
-  address: string
-  city: string
-  state: string
-  observations: string
-  status: number
-  companyId: number
-  company: Company
-  createdDate: string
-  updatedDate: string
-}
-
-interface Team {
-  id: number
-  name: string
-  region: string
-  description: string
-  rating: number
-  completedServices: number
-  status: number
-  companyId: number
-  company: Company
-  leaderId: number
-  leader: any
-  createdDate: string
-  updatedDate: string
-}
-
-interface Professional {
-  id: number
-  name: string
-  cpf: string
-  email: string
-  phone: string
-  teamId: number
-  companyId: number
-  status: string
-  rating: number | null
-  completedServices: number | null
-  createdAt: string
-  updatedAt: string
-}
 
 interface AppointmentModalProps {
   isOpen: boolean
@@ -93,61 +31,43 @@ interface AppointmentModalProps {
 }
 
 export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: AppointmentModalProps) {
-  // Estados para os dados
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [teams, setTeams] = useState<Team[]>([])
-  const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [companies, setCompanies] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [professionals, setProfessionals] = useState<any[]>([])
+  const [loadingData, setLoadingData] = useState(false)
+  const [formData, setFormData] = useState({
+    companyId: "",
+    customerId: "",
+    professionalId: "",
+    serviceType: "",
+    scheduledDate: undefined as Date | undefined,
+    scheduledTime: "",
+    address: "",
+    notes: "",
+    status: "1",
+  })
 
-  // Estados de loading
-  const [loadingCompanies, setLoadingCompanies] = useState(false)
-  const [loadingCustomers, setLoadingCustomers] = useState(false)
-  const [loadingTeams, setLoadingTeams] = useState(false)
-  const [loadingProfessionals, setLoadingProfessionals] = useState(false)
+  const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+    const token = localStorage.getItem("noah_token")
 
-  // Estados do formulário
-  const [title, setTitle] = useState("")
-  const [selectedCompany, setSelectedCompany] = useState("")
-  const [selectedCustomer, setSelectedCustomer] = useState("")
-  const [selectedTeam, setSelectedTeam] = useState("")
-  const [selectedProfessional, setSelectedProfessional] = useState("")
-  const [type, setType] = useState("0") // 0 = Regular
-  const [status, setStatus] = useState("0") // 0 = Scheduled
-  const [startDate, setStartDate] = useState<Date>()
-  const [startTime, setStartTime] = useState("")
-  const [endTime, setEndTime] = useState("")
-  const [address, setAddress] = useState("")
-  const [notes, setNotes] = useState("")
-
-  // Helper function to get auth token
-  const getAuthToken = (): string | null => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("noah_token") || localStorage.getItem("token") || localStorage.getItem("authToken")
+    if (!token) {
+      throw new Error("No authentication token found")
     }
-    return null
-  }
 
-  // Helper function to create headers
-  const createHeaders = (): HeadersInit => {
-    const token = getAuthToken()
-    return {
-      accept: "*/*",
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-    }
-  }
-
-  // Função para fazer chamadas à API
-  const apiCall = async (endpoint: string) => {
-    // Remove /api prefix if it exists in endpoint to avoid duplication
-    const cleanEndpoint = endpoint.startsWith("/api") ? endpoint.substring(4) : endpoint
-    const url = `${getApiUrl()}${cleanEndpoint}`
+    // Clean endpoint to avoid double /api
+    const cleanEndpoint = endpoint.startsWith("/api/") ? endpoint.substring(4) : endpoint
+    const url = `${getApiUrl()}/${cleanEndpoint}`
 
     console.log("Making API call to:", url)
 
     const response = await fetch(url, {
-      method: "GET",
-      headers: createHeaders(),
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
     })
 
     if (!response.ok) {
@@ -157,423 +77,280 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
     return response.json()
   }
 
-  // Carregar companies
-  const loadCompanies = async () => {
-    try {
-      setLoadingCompanies(true)
-      const data = await apiCall("/Companies")
-      console.log("Companies response:", data)
-      setCompanies(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error("Error loading companies:", error)
-      setCompanies([])
-    } finally {
-      setLoadingCompanies(false)
-    }
-  }
-
-  // Carregar customers
-  const loadCustomers = async () => {
-    try {
-      setLoadingCustomers(true)
-      const data = await apiCall("/Customer")
-      console.log("Customers response:", data)
-      setCustomers(data.results || [])
-    } catch (error) {
-      console.error("Error loading customers:", error)
-      setCustomers([])
-    } finally {
-      setLoadingCustomers(false)
-    }
-  }
-
-  // Carregar teams
-  const loadTeams = async () => {
-    try {
-      setLoadingTeams(true)
-      const data = await apiCall("/Team?page=1&pageSize=100&status=all")
-      console.log("Teams response:", data)
-      setTeams(data.results || [])
-    } catch (error) {
-      console.error("Error loading teams:", error)
-      setTeams([])
-    } finally {
-      setLoadingTeams(false)
-    }
-  }
-
-  // Carregar professionals
-  const loadProfessionals = async () => {
-    try {
-      setLoadingProfessionals(true)
-      const data = await apiCall("/Professional")
-      console.log("Professionals response:", data)
-      setProfessionals(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error("Error loading professionals:", error)
-      setProfessionals([])
-    } finally {
-      setLoadingProfessionals(false)
-    }
-  }
-
-  // Carregar todos os dados quando o modal abrir
   useEffect(() => {
     if (isOpen) {
-      loadCompanies()
-      loadCustomers()
-      loadTeams()
-      loadProfessionals()
+      loadInitialData()
     }
   }, [isOpen])
 
-  // Resetar formulário quando fechar
   useEffect(() => {
-    if (!isOpen) {
-      setTitle("")
-      setSelectedCompany("")
-      setSelectedCustomer("")
-      setSelectedTeam("")
-      setSelectedProfessional("")
-      setType("0")
-      setStatus("0")
-      setStartDate(undefined)
-      setStartTime("")
-      setEndTime("")
-      setAddress("") // Limpar endereço também
-      setNotes("")
+    if (appointment) {
+      setFormData({
+        companyId: appointment.companyId?.toString() || "",
+        customerId: appointment.customerId?.toString() || "",
+        professionalId: appointment.professionalId?.toString() || "",
+        serviceType: appointment.serviceType || "",
+        scheduledDate: appointment.scheduledDate ? new Date(appointment.scheduledDate) : undefined,
+        scheduledTime: appointment.scheduledTime || "",
+        address: appointment.address || "",
+        notes: appointment.notes || "",
+        status: appointment.status?.toString() || "1",
+      })
+    } else {
+      setFormData({
+        companyId: "",
+        customerId: "",
+        professionalId: "",
+        serviceType: "",
+        scheduledDate: undefined,
+        scheduledTime: "",
+        address: "",
+        notes: "",
+        status: "1",
+      })
     }
-  }, [isOpen])
+  }, [appointment])
 
-  // Preencher endereço automaticamente quando selecionar cliente
-  useEffect(() => {
-    if (selectedCustomer && customers.length > 0) {
-      const selectedCustomerData = customers.find((customer) => customer.id.toString() === selectedCustomer)
-      if (selectedCustomerData && selectedCustomerData.address) {
-        setAddress(selectedCustomerData.address)
-      }
+  const loadInitialData = async () => {
+    setLoadingData(true)
+    try {
+      const [companiesData, customersData, professionalsData] = await Promise.all([
+        apiCall("Companies/paged?PageNumber=1&PageSize=100"),
+        apiCall("Customer?PageNumber=1&PageSize=100"),
+        apiCall("Professional?PageNumber=1&PageSize=100"),
+      ])
+
+      setCompanies(companiesData.result || companiesData.results || [])
+      setCustomers(customersData.result || customersData.results || [])
+      setProfessionals(professionalsData.result || professionalsData.results || [])
+    } catch (error) {
+      console.error("Error loading initial data:", error)
+    } finally {
+      setLoadingData(false)
     }
-  }, [selectedCustomer, customers])
+  }
 
-  // Preencher dados quando editando
-  useEffect(() => {
-    if (appointment && isOpen) {
-      setTitle(appointment.title || "")
-      setSelectedCompany(appointment.companyId?.toString() || "")
-      setSelectedCustomer(appointment.customerId?.toString() || "")
-      setSelectedTeam(appointment.teamId?.toString() || "")
-      setSelectedProfessional(appointment.professionalId?.toString() || "")
-      setType(appointment.type?.toString() || "0")
-      setStatus(appointment.status?.toString() || "0")
-      setAddress(appointment.address || "")
-      setNotes(appointment.notes || "")
-
-      if (appointment.start) {
-        const startDateTime = new Date(appointment.start)
-        setStartDate(startDateTime)
-        setStartTime(format(startDateTime, "HH:mm"))
-      }
-
-      if (appointment.end) {
-        const endDateTime = new Date(appointment.end)
-        setEndTime(format(endDateTime, "HH:mm"))
-      }
-    }
-  }, [appointment, isOpen])
-
-  // Filtrar dados baseado na empresa selecionada
-  const filteredCustomers = customers.filter(
-    (customer) => !selectedCompany || customer.companyId.toString() === selectedCompany,
-  )
-
-  const filteredTeams = teams.filter((team) => !selectedCompany || team.companyId.toString() === selectedCompany)
-
-  const filteredProfessionals = professionals.filter(
-    (professional) => !selectedCompany || professional.companyId.toString() === selectedCompany,
-  )
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
 
-    if (
-      !title ||
-      !selectedCompany ||
-      !selectedCustomer ||
-      !selectedTeam ||
-      !selectedProfessional ||
-      !startDate ||
-      !startTime ||
-      !endTime ||
-      !address
-    ) {
-      alert("Please fill in all required fields")
-      return
+    try {
+      const appointmentData = {
+        companyId: Number.parseInt(formData.companyId),
+        customerId: Number.parseInt(formData.customerId),
+        professionalId: Number.parseInt(formData.professionalId),
+        serviceType: formData.serviceType,
+        scheduledDate: formData.scheduledDate?.toISOString(),
+        scheduledTime: formData.scheduledTime,
+        address: formData.address,
+        notes: formData.notes,
+        status: Number.parseInt(formData.status),
+      }
+
+      await onSubmit(appointmentData)
+    } catch (error) {
+      console.error("Error submitting appointment:", error)
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    // Criar as datas de início e fim
-    const startDateTime = new Date(startDate)
-    const [startHour, startMinute] = startTime.split(":")
-    startDateTime.setHours(Number.parseInt(startHour), Number.parseInt(startMinute), 0, 0)
-
-    const endDateTime = new Date(startDate)
-    const [endHour, endMinute] = endTime.split(":")
-    endDateTime.setHours(Number.parseInt(endHour), Number.parseInt(endMinute), 0, 0)
-
-    const appointmentData = {
-      title,
-      address,
-      start: startDateTime.toISOString(),
-      end: endDateTime.toISOString(),
-      companyId: Number.parseInt(selectedCompany),
-      customerId: Number.parseInt(selectedCustomer),
-      teamId: Number.parseInt(selectedTeam),
-      professionalId: Number.parseInt(selectedProfessional),
-      status: Number.parseInt(status),
-      type: Number.parseInt(type),
-      notes,
-    }
-
-    console.log("Submitting appointment data:", appointmentData)
-    onSubmit(appointmentData)
+  const handleChange = (field: string, value: string | Date | undefined) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] bg-[#1a2234] border-[#2a3349] text-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
-            {appointment && appointment.id ? "Edit Appointment" : "New Appointment"}
-          </DialogTitle>
+          <DialogTitle>{appointment ? "Edit Appointment" : "New Appointment"}</DialogTitle>
           <DialogDescription className="text-gray-400">
-            Fill in the information to schedule a new appointment.
+            {appointment
+              ? "Update the appointment information below."
+              : "Fill in the information to create a new appointment."}
           </DialogDescription>
         </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="company">Company</Label>
+                <Select
+                  value={formData.companyId}
+                  onValueChange={(value) => handleChange("companyId", value)}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder={loadingData ? "Loading..." : "Select a company"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id.toString()} className="hover:bg-[#2a3349]">
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-white">
-              Title *
-            </Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter appointment title"
-              className="bg-[#0f172a] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
-              required
-            />
-          </div>
+              <div className="grid gap-2">
+                <Label htmlFor="customer">Customer</Label>
+                <Select
+                  value={formData.customerId}
+                  onValueChange={(value) => handleChange("customerId", value)}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder={loadingData ? "Loading..." : "Select a customer"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id.toString()} className="hover:bg-[#2a3349]">
+                        {customer.name || customer.customerName || `Customer #${customer.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Company */}
-            <div className="space-y-2">
-              <Label htmlFor="company" className="text-white">
-                Company *
-              </Label>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder={loadingCompanies ? "Loading..." : "Select company"} />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id.toString()}>
-                      {company.name}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="professional">Professional</Label>
+                <Select
+                  value={formData.professionalId}
+                  onValueChange={(value) => handleChange("professionalId", value)}
+                  disabled={loadingData}
+                >
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder={loadingData ? "Loading..." : "Select a professional"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
+                    {professionals.map((professional) => (
+                      <SelectItem
+                        key={professional.id}
+                        value={professional.id.toString()}
+                        className="hover:bg-[#2a3349]"
+                      >
+                        {professional.name || professional.professionalName || `Professional #${professional.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="serviceType">Service Type</Label>
+                <Select value={formData.serviceType} onValueChange={(value) => handleChange("serviceType", value)}>
+                  <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                    <SelectValue placeholder="Select service type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                    <SelectItem value="residential" className="hover:bg-[#2a3349]">
+                      Residential Cleaning
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Customer */}
-            <div className="space-y-2">
-              <Label htmlFor="customer" className="text-white">
-                Customer *
-              </Label>
-              <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder={loadingCustomers ? "Loading..." : "Select customer"} />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {filteredCustomers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id.toString()}>
-                      {customer.name}
+                    <SelectItem value="commercial" className="hover:bg-[#2a3349]">
+                      Commercial Cleaning
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Team */}
-            <div className="space-y-2">
-              <Label htmlFor="team" className="text-white">
-                Team *
-              </Label>
-              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder={loadingTeams ? "Loading..." : "Select team"} />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {filteredTeams.map((team) => (
-                    <SelectItem key={team.id} value={team.id.toString()}>
-                      {team.name}
+                    <SelectItem value="deep" className="hover:bg-[#2a3349]">
+                      Deep Cleaning
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Professional */}
-            <div className="space-y-2">
-              <Label htmlFor="professional" className="text-white">
-                Professional *
-              </Label>
-              <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder={loadingProfessionals ? "Loading..." : "Select professional"} />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {filteredProfessionals.map((professional) => (
-                    <SelectItem key={professional.id} value={professional.id.toString()}>
-                      {professional.name}
+                    <SelectItem value="maintenance" className="hover:bg-[#2a3349]">
+                      Maintenance
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Type */}
-            <div className="space-y-2">
-              <Label htmlFor="type" className="text-white">
-                Type *
-              </Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  <SelectItem value="0">Regular</SelectItem>
-                  <SelectItem value="1">Deep Cleaning</SelectItem>
-                  <SelectItem value="2">Specialized</SelectItem>
-                </SelectContent>
-              </Select>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Status */}
-            <div className="space-y-2">
-              <Label htmlFor="status" className="text-white">
-                Status
-              </Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  <SelectItem value="0">Scheduled</SelectItem>
-                  <SelectItem value="1">In Progress</SelectItem>
-                  <SelectItem value="2">Completed</SelectItem>
-                  <SelectItem value="3">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Scheduled Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]",
+                        !formData.scheduledDate && "text-gray-400",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.scheduledDate ? format(formData.scheduledDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-[#1a2234] border-[#2a3349]" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.scheduledDate}
+                      onSelect={(date) => handleChange("scheduledDate", date)}
+                      initialFocus
+                      className="text-white"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            {/* Start Date */}
-            <div className="space-y-2">
-              <Label className="text-white">Start Date *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]",
-                      !startDate && "text-gray-400",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-[#1a2234] border-[#2a3349]">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    initialFocus
-                    className="text-white"
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="grid gap-2">
+                <Label htmlFor="scheduledTime">Scheduled Time</Label>
+                <Input
+                  id="scheduledTime"
+                  type="time"
+                  value={formData.scheduledTime}
+                  onChange={(e) => handleChange("scheduledTime", e.target.value)}
+                  className="bg-[#0f172a] border-[#2a3349] text-white"
+                  required
+                />
+              </div>
             </div>
 
-            {/* Start Time */}
-            <div className="space-y-2">
-              <Label htmlFor="startTime" className="text-white">
-                Start Time *
-              </Label>
+            <div className="grid gap-2">
+              <Label htmlFor="address">Address</Label>
               <Input
-                id="startTime"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="bg-[#0f172a] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
+                id="address"
+                value={formData.address}
+                onChange={(e) => handleChange("address", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+                placeholder="Enter service address"
                 required
               />
             </div>
 
-            {/* End Time */}
-            <div className="space-y-2">
-              <Label htmlFor="endTime" className="text-white">
-                End Time *
-              </Label>
-              <Input
-                id="endTime"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="bg-[#0f172a] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
-                required
+            <div className="grid gap-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={formData.status} onValueChange={(value) => handleChange("status", value)}>
+                <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="1" className="hover:bg-[#2a3349]">
+                    Scheduled
+                  </SelectItem>
+                  <SelectItem value="2" className="hover:bg-[#2a3349]">
+                    In Progress
+                  </SelectItem>
+                  <SelectItem value="3" className="hover:bg-[#2a3349]">
+                    Completed
+                  </SelectItem>
+                  <SelectItem value="0" className="hover:bg-[#2a3349]">
+                    Cancelled
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleChange("notes", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white min-h-[80px]"
+                placeholder="Enter any additional notes"
               />
             </div>
           </div>
-
-          {/* Address */}
-          <div className="space-y-2">
-            <Label htmlFor="address" className="text-white">
-              Address *
-            </Label>
-            <Textarea
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Enter the service address"
-              className="bg-[#0f172a] border-[#2a3349] text-white focus-visible:ring-[#06b6d4] resize-none"
-              rows={3}
-              required
-            />
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-white">
-              Notes
-            </Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional notes or special instructions"
-              className="bg-[#0f172a] border-[#2a3349] text-white focus-visible:ring-[#06b6d4] resize-none"
-              rows={3}
-            />
-          </div>
-
-          <DialogFooter className="gap-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
@@ -582,8 +359,19 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
             >
               Cancel
             </Button>
-            <Button type="submit" className="bg-[#06b6d4] hover:bg-[#0891b2] text-white">
-              {appointment && appointment.id ? "Update" : "Create"}
+            <Button
+              type="submit"
+              disabled={isLoading || loadingData}
+              className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
             </Button>
           </DialogFooter>
         </form>

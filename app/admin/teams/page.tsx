@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { getApiUrl } from "@/lib/api/utils"
 
 interface Company {
   id: number
@@ -62,14 +63,20 @@ export default function TeamsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const { toast } = useToast()
 
-  const apiCall = async (url: string, options: RequestInit = {}) => {
+  const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     const token = localStorage.getItem("noah_token")
 
     if (!token) {
       throw new Error("No authentication token found")
     }
 
-    const response = await fetch(`https://localhost:44394${url}`, {
+    // Clean endpoint to avoid double /api
+    const cleanEndpoint = endpoint.startsWith("/api/") ? endpoint.substring(4) : endpoint
+    const url = `${getApiUrl()}/${cleanEndpoint}`
+
+    console.log("Making API call to:", url)
+
+    const response = await fetch(url, {
       ...options,
       headers: {
         Authorization: `Bearer ${token}`,
@@ -88,7 +95,7 @@ export default function TeamsPage() {
   const loadTeams = async () => {
     try {
       setIsLoading(true)
-      const data = await apiCall("/api/Team?PageNumber=1&PageSize=100")
+      const data = await apiCall("Team?PageNumber=1&PageSize=100")
       console.log("Teams loaded:", data)
       setTeams(data.results || [])
     } catch (error) {
@@ -106,7 +113,7 @@ export default function TeamsPage() {
 
   const loadCompanies = async () => {
     try {
-      const data = await apiCall("/api/Companies/paged?PageNumber=1&PageSize=100")
+      const data = await apiCall("Companies/paged?PageNumber=1&PageSize=100")
       console.log("Companies loaded:", data)
       setCompanies(data.result || [])
     } catch (error) {
@@ -134,7 +141,7 @@ export default function TeamsPage() {
 
   const handleAddTeam = async (data: any) => {
     try {
-      const response = await apiCall("/api/Team", {
+      const response = await apiCall("Team", {
         method: "POST",
         body: JSON.stringify(data),
       })
@@ -167,7 +174,7 @@ export default function TeamsPage() {
     if (!selectedTeam) return
 
     try {
-      await apiCall(`/api/Team/${selectedTeam.id}`, {
+      await apiCall(`Team/${selectedTeam.id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       })
@@ -203,7 +210,7 @@ export default function TeamsPage() {
     if (!teamToDelete) return
 
     try {
-      await apiCall(`/api/Team/${teamToDelete.id}`, {
+      await apiCall(`Team/${teamToDelete.id}`, {
         method: "DELETE",
       })
 

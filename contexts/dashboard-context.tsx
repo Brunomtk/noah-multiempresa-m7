@@ -1,112 +1,206 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { getDashboardStats } from "@/lib/api/dashboard"
-import { useToast } from "@/hooks/use-toast"
+import type React from "react"
+import { createContext, useContext, useReducer, useEffect } from "react"
+import {
+  getRecentActivities,
+  getDashboardChartData,
+  getDashboardCheckRecords,
+  getCompaniesCount,
+  getProfessionalsCount,
+  getCustomersCount,
+} from "@/lib/api/dashboard"
 
-interface DashboardStats {
-  companies: {
-    total: number
-    active: number
-    loading: boolean
+interface DashboardState {
+  stats: {
+    totalCompanies: number
+    totalProfessionals: number
+    totalCustomers: number
+    totalAppointments: number
+    activeAppointments: number
+    completedAppointments: number
+    pendingPayments: number
+    totalRevenue: number
   }
-  customers: {
-    total: number
-    active: number
-    loading: boolean
-  }
-  appointments: {
-    total: number
-    scheduled: number
-    completed: number
-    cancelled: number
-    loading: boolean
-  }
-  checkRecords: {
-    total: number
-    checkedIn: number
-    checkedOut: number
-    loading: boolean
-  }
-  payments: {
-    total: number
-    paid: number
-    pending: number
-    overdue: number
-    totalAmount: number
-    loading: boolean
-  }
+  recentActivities: any[]
+  chartData: any[]
+  checkRecords: any[]
+  isLoading: boolean
+  error: string | null
 }
 
 interface DashboardContextType {
-  stats: DashboardStats
-  isLoading: boolean
-  error: string | null
-  refresh: () => Promise<void>
+  state: DashboardState
+  loadDashboardData: () => Promise<void>
+  loadStats: () => Promise<void>
+  loadActivities: () => Promise<void>
+  loadChartData: (period?: string, type?: string) => Promise<void>
+  loadCheckRecords: (page?: number, pageSize?: number) => Promise<void>
+}
+
+const initialState: DashboardState = {
+  stats: {
+    totalCompanies: 0,
+    totalProfessionals: 0,
+    totalCustomers: 0,
+    totalAppointments: 0,
+    activeAppointments: 0,
+    completedAppointments: 0,
+    pendingPayments: 0,
+    totalRevenue: 0,
+  },
+  recentActivities: [],
+  chartData: [],
+  checkRecords: [],
+  isLoading: false,
+  error: null,
+}
+
+type DashboardAction =
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_ERROR"; payload: string | null }
+  | { type: "SET_STATS"; payload: any }
+  | { type: "SET_ACTIVITIES"; payload: any[] }
+  | { type: "SET_CHART_DATA"; payload: any[] }
+  | { type: "SET_CHECK_RECORDS"; payload: any[] }
+
+function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
+  switch (action.type) {
+    case "SET_LOADING":
+      return { ...state, isLoading: action.payload }
+    case "SET_ERROR":
+      return { ...state, error: action.payload, isLoading: false }
+    case "SET_STATS":
+      return { ...state, stats: action.payload }
+    case "SET_ACTIVITIES":
+      return { ...state, recentActivities: action.payload }
+    case "SET_CHART_DATA":
+      return { ...state, chartData: action.payload }
+    case "SET_CHECK_RECORDS":
+      return { ...state, checkRecords: action.payload }
+    default:
+      return state
+  }
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined)
 
-export const useDashboardContext = () => {
-  const context = useContext(DashboardContext)
-  if (!context) {
-    throw new Error("useDashboardContext must be used within a DashboardProvider")
-  }
-  return context
-}
+export function DashboardProvider({ children }: { children: React.ReactNode }) {
+  const [state, dispatch] = useReducer(dashboardReducer, initialState)
 
-interface DashboardProviderProps {
-  children: ReactNode
-}
-
-export const DashboardProvider = ({ children }: DashboardProviderProps) => {
-  const [stats, setStats] = useState<DashboardStats>({
-    companies: { total: 0, active: 0, loading: true },
-    customers: { total: 0, active: 0, loading: true },
-    appointments: { total: 0, scheduled: 0, completed: 0, cancelled: 0, loading: true },
-    checkRecords: { total: 0, checkedIn: 0, checkedOut: 0, loading: true },
-    payments: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, loading: true },
-  })
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
-
-  const fetchStats = async () => {
-    setIsLoading(true)
-    setError(null)
+  const loadStats = async () => {
     try {
-      console.log("Fetching dashboard stats...")
-      const dashboardStats = await getDashboardStats()
-      console.log("Dashboard stats received:", dashboardStats)
-      setStats(dashboardStats)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch dashboard stats"
-      console.error("Dashboard stats error:", errorMessage)
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      dispatch({ type: "SET_LOADING", payload: true })
+      dispatch({ type: "SET_ERROR", payload: null })
+
+      // Load individual counts to build stats
+      const [companiesResult, professionalsResult, customersResult] = await Promise.all([
+        getCompaniesCount(),
+        getProfessionalsCount(),
+        getCustomersCount(),
+      ])
+
+      const stats = {
+        totalCompanies: companiesResult.data || 0,
+        totalProfessionals: professionalsResult.data || 0,
+        totalCustomers: customersResult.data || 0,
+        totalAppointments: 0,
+        activeAppointments: 0,
+        completedAppointments: 0,
+        pendingPayments: 0,
+        totalRevenue: 0,
+      }
+
+      dispatch({ type: "SET_STATS", payload: stats })
+      console.log("Dashboard stats loaded:", stats)
+    } catch (error) {
+      console.error("Error loading dashboard stats:", error)
+      dispatch({ type: "SET_ERROR", payload: "Failed to load dashboard statistics" })
     } finally {
-      setIsLoading(false)
+      dispatch({ type: "SET_LOADING", payload: false })
     }
   }
 
-  const refresh = async () => {
-    await fetchStats()
+  const loadActivities = async () => {
+    try {
+      const result = await getRecentActivities(10)
+      if (result.status === 200) {
+        dispatch({ type: "SET_ACTIVITIES", payload: result.data || [] })
+        console.log("Recent activities loaded:", result.data)
+      }
+    } catch (error) {
+      console.error("Error loading recent activities:", error)
+      dispatch({ type: "SET_ACTIVITIES", payload: [] })
+    }
   }
 
+  const loadChartData = async (period = "7d", type = "appointments") => {
+    try {
+      const result = await getDashboardChartData(period, type)
+      if (result.status === 200) {
+        dispatch({ type: "SET_CHART_DATA", payload: result.data || [] })
+        console.log("Chart data loaded:", result.data)
+      }
+    } catch (error) {
+      console.error("Error loading chart data:", error)
+      dispatch({ type: "SET_CHART_DATA", payload: [] })
+    }
+  }
+
+  const loadCheckRecords = async (page = 1, pageSize = 10) => {
+    try {
+      // Ensure parameters are numbers, not objects
+      const pageNumber = typeof page === "object" ? 1 : Number(page) || 1
+      const pageSizeNumber = typeof pageSize === "object" ? 10 : Number(pageSize) || 10
+
+      console.log("Loading check records with params:", { page: pageNumber, pageSize: pageSizeNumber })
+
+      const result = await getDashboardCheckRecords(pageNumber, pageSizeNumber)
+      if (result.status === 200) {
+        dispatch({ type: "SET_CHECK_RECORDS", payload: result.data?.data || [] })
+        console.log("Check records loaded:", result.data)
+      }
+    } catch (error) {
+      console.error("Error loading check records:", error)
+      dispatch({ type: "SET_CHECK_RECORDS", payload: [] })
+    }
+  }
+
+  const loadDashboardData = async () => {
+    dispatch({ type: "SET_LOADING", payload: true })
+    dispatch({ type: "SET_ERROR", payload: null })
+
+    try {
+      await Promise.all([loadStats(), loadActivities(), loadChartData(), loadCheckRecords(1, 10)])
+    } catch (error) {
+      console.error("Error loading dashboard data:", error)
+      dispatch({ type: "SET_ERROR", payload: "Failed to load dashboard data" })
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
+    }
+  }
+
+  // Load initial data
   useEffect(() => {
-    fetchStats()
+    loadDashboardData()
   }, [])
 
-  const value: DashboardContextType = {
-    stats,
-    isLoading,
-    error,
-    refresh,
+  const contextValue: DashboardContextType = {
+    state,
+    loadDashboardData,
+    loadStats,
+    loadActivities,
+    loadChartData,
+    loadCheckRecords,
   }
 
-  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>
+  return <DashboardContext.Provider value={contextValue}>{children}</DashboardContext.Provider>
+}
+
+export function useDashboard() {
+  const context = useContext(DashboardContext)
+  if (context === undefined) {
+    throw new Error("useDashboard must be used within a DashboardProvider")
+  }
+  return context
 }
