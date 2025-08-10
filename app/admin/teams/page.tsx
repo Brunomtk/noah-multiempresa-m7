@@ -6,14 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
@@ -55,19 +47,9 @@ interface Company {
   status: number
 }
 
-interface Professional {
-  id: number
-  name: string
-  email: string
-  phone: string
-  companyId: number
-  status: string
-}
-
 export default function AdminTeamsPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
-  const [professionals, setProfessionals] = useState<Professional[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
@@ -138,19 +120,6 @@ export default function AdminTeamsPage() {
     } catch (error) {
       console.error("Error fetching companies:", error)
       setCompanies([])
-    }
-  }
-
-  const fetchProfessionals = async () => {
-    try {
-      const data = await apiCall("/Professional")
-      const professionalsArray = data.results || data.result || data.data || data || []
-      const professionals = Array.isArray(professionalsArray) ? professionalsArray : []
-      setProfessionals(professionals)
-      console.log("Professionals loaded:", professionals)
-    } catch (error) {
-      console.error("Error fetching professionals:", error)
-      setProfessionals([])
     }
   }
 
@@ -262,7 +231,6 @@ export default function AdminTeamsPage() {
   useEffect(() => {
     fetchTeams()
     fetchCompanies()
-    fetchProfessionals()
   }, [])
 
   if (loading) {
@@ -285,26 +253,10 @@ export default function AdminTeamsPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Team
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Team</DialogTitle>
-                <DialogDescription>Add a new team to the system</DialogDescription>
-              </DialogHeader>
-              <TeamModal
-                companies={companies}
-                professionals={professionals}
-                onSubmit={handleCreateTeam}
-                onCancel={() => setIsCreateModalOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Team
+          </Button>
         </div>
       </div>
 
@@ -459,46 +411,45 @@ export default function AdminTeamsPage() {
         </CardContent>
       </Card>
 
+      {/* Create Team Modal */}
+      <TeamModal
+        isOpen={isCreateModalOpen}
+        companies={companies}
+        onSubmit={handleCreateTeam}
+        onCancel={() => setIsCreateModalOpen(false)}
+      />
+
       {/* Edit Team Modal */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Team</DialogTitle>
-            <DialogDescription>Update team information</DialogDescription>
-          </DialogHeader>
-          {selectedTeam && (
-            <TeamModal
-              team={selectedTeam}
-              companies={companies}
-              professionals={professionals}
-              onSubmit={handleUpdateTeam}
-              onCancel={() => {
-                setIsEditModalOpen(false)
-                setSelectedTeam(null)
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <TeamModal
+        isOpen={isEditModalOpen}
+        team={selectedTeam}
+        companies={companies}
+        onSubmit={handleUpdateTeam}
+        onCancel={() => {
+          setIsEditModalOpen(false)
+          setSelectedTeam(null)
+        }}
+      />
 
       {/* Team Details Modal */}
-      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Team Details</DialogTitle>
-            <DialogDescription>View detailed team information</DialogDescription>
-          </DialogHeader>
-          {selectedTeam && (
-            <TeamDetailsModal
-              team={selectedTeam}
-              onClose={() => {
-                setIsDetailsModalOpen(false)
-                setSelectedTeam(null)
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <TeamDetailsModal
+        isOpen={isDetailsModalOpen}
+        team={selectedTeam}
+        onClose={() => {
+          setIsDetailsModalOpen(false)
+          setSelectedTeam(null)
+        }}
+        onEdit={(team) => {
+          setSelectedTeam(team)
+          setIsDetailsModalOpen(false)
+          setIsEditModalOpen(true)
+        }}
+        onDelete={(team) => {
+          setTeamToDelete(team)
+          setIsDetailsModalOpen(false)
+          setIsDeleteDialogOpen(true)
+        }}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

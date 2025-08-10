@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { getApiUrl } from "@/lib/api/utils"
 
 interface DashboardStats {
   companies: {
@@ -70,30 +71,160 @@ export const DashboardProvider = ({ children }: DashboardProviderProps) => {
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
+  // Helper function to get auth token
+  const getAuthToken = (): string | null => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("noah_token")
+    }
+    return null
+  }
+
+  // Helper function to create headers
+  const createHeaders = (): HeadersInit => {
+    const token = getAuthToken()
+    return {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }
+  }
+
+  // Helper function to make API calls
+  const apiCall = async (endpoint: string) => {
+    const baseUrl = getApiUrl()
+    const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: createHeaders(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return response.json()
+  }
+
   const fetchStats = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      console.log("Fetching dashboard stats...")
+      console.log("Fetching dashboard stats from API...")
 
-      // Mock data for now since we don't have the actual API endpoints
-      const mockStats: DashboardStats = {
-        companies: { total: 25, active: 23, loading: false },
-        customers: { total: 150, active: 142, loading: false },
-        appointments: { total: 89, scheduled: 45, completed: 32, cancelled: 12, loading: false },
-        checkRecords: { total: 67, checkedIn: 12, checkedOut: 55, loading: false },
-        payments: { total: 234, paid: 198, pending: 28, overdue: 8, totalAmount: 45670.5, loading: false },
+      // Fetch real data from API endpoints
+      const [companiesData, customersData, appointmentsData, checkRecordsData, paymentsData] = await Promise.allSettled(
+        [
+          apiCall("/Companies").catch(() => ({ results: [] })),
+          apiCall("/Customer").catch(() => ({ results: [] })),
+          apiCall("/Appointment").catch(() => ({ results: [] })),
+          apiCall("/CheckRecord").catch(() => ({ results: [] })),
+          apiCall("/Payment").catch(() => ({ results: [] })),
+        ],
+      )
+
+      // Process companies data
+      const companies = companiesData.status === "fulfilled" ? companiesData.value : { results: [] }
+      const companiesArray = companies.results || companies.result || companies.data || companies || []
+      const companiesTotal = Array.isArray(companiesArray) ? companiesArray.length : 0
+      const companiesActive = Array.isArray(companiesArray)
+        ? companiesArray.filter((c: any) => c.status === 1 || c.status === "Active").length
+        : 0
+
+      // Process customers data
+      const customers = customersData.status === "fulfilled" ? customersData.value : { results: [] }
+      const customersArray = customers.results || customers.result || customers.data || customers || []
+      const customersTotal = Array.isArray(customersArray) ? customersArray.length : 0
+      const customersActive = Array.isArray(customersArray)
+        ? customersArray.filter((c: any) => c.status === 1 || c.status === "Active").length
+        : 0
+
+      // Process appointments data
+      const appointments = appointmentsData.status === "fulfilled" ? appointmentsData.value : { results: [] }
+      const appointmentsArray = appointments.results || appointments.result || appointments.data || appointments || []
+      const appointmentsTotal = Array.isArray(appointmentsArray) ? appointmentsArray.length : 0
+      const appointmentsScheduled = Array.isArray(appointmentsArray)
+        ? appointmentsArray.filter((a: any) => a.status === "Scheduled" || a.status === 1).length
+        : 0
+      const appointmentsCompleted = Array.isArray(appointmentsArray)
+        ? appointmentsArray.filter((a: any) => a.status === "Completed" || a.status === 2).length
+        : 0
+      const appointmentsCancelled = Array.isArray(appointmentsArray)
+        ? appointmentsArray.filter((a: any) => a.status === "Cancelled" || a.status === 0).length
+        : 0
+
+      // Process check records data
+      const checkRecords = checkRecordsData.status === "fulfilled" ? checkRecordsData.value : { results: [] }
+      const checkRecordsArray = checkRecords.results || checkRecords.result || checkRecords.data || checkRecords || []
+      const checkRecordsTotal = Array.isArray(checkRecordsArray) ? checkRecordsArray.length : 0
+      const checkRecordsCheckedIn = Array.isArray(checkRecordsArray)
+        ? checkRecordsArray.filter((c: any) => c.checkInTime && !c.checkOutTime).length
+        : 0
+      const checkRecordsCheckedOut = Array.isArray(checkRecordsArray)
+        ? checkRecordsArray.filter((c: any) => c.checkInTime && c.checkOutTime).length
+        : 0
+
+      // Process payments data
+      const payments = paymentsData.status === "fulfilled" ? paymentsData.value : { results: [] }
+      const paymentsArray = payments.results || payments.result || payments.data || payments || []
+      const paymentsTotal = Array.isArray(paymentsArray) ? paymentsArray.length : 0
+      const paymentsPaid = Array.isArray(paymentsArray)
+        ? paymentsArray.filter((p: any) => p.status === "Paid" || p.status === 1).length
+        : 0
+      const paymentsPending = Array.isArray(paymentsArray)
+        ? paymentsArray.filter((p: any) => p.status === "Pending" || p.status === 0).length
+        : 0
+      const paymentsOverdue = Array.isArray(paymentsArray)
+        ? paymentsArray.filter((p: any) => p.status === "Overdue" || p.status === 2).length
+        : 0
+      const paymentsTotalAmount = Array.isArray(paymentsArray)
+        ? paymentsArray.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
+        : 0
+
+      const realStats: DashboardStats = {
+        companies: { total: companiesTotal, active: companiesActive, loading: false },
+        customers: { total: customersTotal, active: customersActive, loading: false },
+        appointments: {
+          total: appointmentsTotal,
+          scheduled: appointmentsScheduled,
+          completed: appointmentsCompleted,
+          cancelled: appointmentsCancelled,
+          loading: false,
+        },
+        checkRecords: {
+          total: checkRecordsTotal,
+          checkedIn: checkRecordsCheckedIn,
+          checkedOut: checkRecordsCheckedOut,
+          loading: false,
+        },
+        payments: {
+          total: paymentsTotal,
+          paid: paymentsPaid,
+          pending: paymentsPending,
+          overdue: paymentsOverdue,
+          totalAmount: paymentsTotalAmount,
+          loading: false,
+        },
       }
 
-      setStats(mockStats)
-      console.log("Dashboard stats loaded:", mockStats)
+      setStats(realStats)
+      console.log("Dashboard stats loaded from API:", realStats)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch dashboard stats"
       console.error("Dashboard stats error:", errorMessage)
       setError(errorMessage)
+
+      // Set loading to false for all stats on error
+      setStats((prev) => ({
+        companies: { ...prev.companies, loading: false },
+        customers: { ...prev.customers, loading: false },
+        appointments: { ...prev.appointments, loading: false },
+        checkRecords: { ...prev.checkRecords, loading: false },
+        payments: { ...prev.payments, loading: false },
+      }))
+
       toast({
-        title: "Error",
-        description: errorMessage,
+        title: "Warning",
+        description: "Failed to load some dashboard data. Showing available information.",
         variant: "destructive",
       })
     } finally {

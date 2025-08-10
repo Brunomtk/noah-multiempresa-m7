@@ -18,40 +18,113 @@ const createHeaders = (): HeadersInit => {
   }
 }
 
+// Helper function to make API calls
+const apiCall = async (endpoint: string) => {
+  const baseUrl = getApiUrl()
+  const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: createHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  return response.json()
+}
+
 // Get dashboard statistics
 export async function getDashboardStats(): Promise<ApiResponse<any>> {
   try {
-    const url = `${getApiUrl()}/Dashboard/stats`
-    console.log("Fetching dashboard stats from URL:", url)
+    console.log("Fetching dashboard stats from API...")
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: createHeaders(),
-    })
+    // Fetch real data from multiple endpoints
+    const [companiesData, customersData, appointmentsData, checkRecordsData, paymentsData] = await Promise.allSettled([
+      apiCall("/Companies"),
+      apiCall("/Customer"),
+      apiCall("/Appointment"),
+      apiCall("/CheckRecord"),
+      apiCall("/Payment"),
+    ])
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    // Process the results
+    const processData = (result: PromiseSettledResult<any>) => {
+      if (result.status === "fulfilled") {
+        const data = result.value
+        return data.results || data.result || data.data || data || []
+      }
+      return []
     }
 
-    const data = await response.json()
+    const companies = processData(companiesData)
+    const customers = processData(customersData)
+    const appointments = processData(appointmentsData)
+    const checkRecords = processData(checkRecordsData)
+    const payments = processData(paymentsData)
+
+    const stats = {
+      companies: {
+        total: Array.isArray(companies) ? companies.length : 0,
+        active: Array.isArray(companies)
+          ? companies.filter((c: any) => c.status === 1 || c.status === "Active").length
+          : 0,
+        loading: false,
+      },
+      customers: {
+        total: Array.isArray(customers) ? customers.length : 0,
+        active: Array.isArray(customers)
+          ? customers.filter((c: any) => c.status === 1 || c.status === "Active").length
+          : 0,
+        loading: false,
+      },
+      appointments: {
+        total: Array.isArray(appointments) ? appointments.length : 0,
+        scheduled: Array.isArray(appointments)
+          ? appointments.filter((a: any) => a.status === "Scheduled" || a.status === 1).length
+          : 0,
+        completed: Array.isArray(appointments)
+          ? appointments.filter((a: any) => a.status === "Completed" || a.status === 2).length
+          : 0,
+        cancelled: Array.isArray(appointments)
+          ? appointments.filter((a: any) => a.status === "Cancelled" || a.status === 0).length
+          : 0,
+        loading: false,
+      },
+      checkRecords: {
+        total: Array.isArray(checkRecords) ? checkRecords.length : 0,
+        checkedIn: Array.isArray(checkRecords)
+          ? checkRecords.filter((c: any) => c.checkInTime && !c.checkOutTime).length
+          : 0,
+        checkedOut: Array.isArray(checkRecords)
+          ? checkRecords.filter((c: any) => c.checkInTime && c.checkOutTime).length
+          : 0,
+        loading: false,
+      },
+      payments: {
+        total: Array.isArray(payments) ? payments.length : 0,
+        paid: Array.isArray(payments) ? payments.filter((p: any) => p.status === "Paid" || p.status === 1).length : 0,
+        pending: Array.isArray(payments)
+          ? payments.filter((p: any) => p.status === "Pending" || p.status === 0).length
+          : 0,
+        overdue: Array.isArray(payments)
+          ? payments.filter((p: any) => p.status === "Overdue" || p.status === 2).length
+          : 0,
+        totalAmount: Array.isArray(payments)
+          ? payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
+          : 0,
+        loading: false,
+      },
+    }
 
     return {
       status: 200,
-      data: data,
+      data: stats,
     }
   } catch (error) {
     console.error("Error fetching dashboard stats:", error)
-    // Return mock data if API fails
-    return {
-      status: 200,
-      data: {
-        companies: { total: 25, active: 23, loading: false },
-        customers: { total: 150, active: 142, loading: false },
-        appointments: { total: 89, scheduled: 45, completed: 32, cancelled: 12, loading: false },
-        checkRecords: { total: 67, checkedIn: 12, checkedOut: 55, loading: false },
-        payments: { total: 234, paid: 198, pending: 28, overdue: 8, totalAmount: 45670.5, loading: false },
-      },
-    }
+    throw error
   }
 }
 
@@ -164,23 +237,13 @@ export async function getDashboardCheckRecords(page = 1, pageSize = 10): Promise
 // Get companies count
 export async function getCompaniesCount(): Promise<ApiResponse<number>> {
   try {
-    const url = `${getApiUrl()}/Companies/count`
-    console.log("Fetching companies count from URL:", url)
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: createHeaders(),
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
+    const data = await apiCall("/Companies")
+    const companies = data.results || data.result || data.data || data || []
+    const count = Array.isArray(companies) ? companies.length : 0
 
     return {
       status: 200,
-      data: data.count || data.total || 0,
+      data: count,
     }
   } catch (error) {
     console.error("Error fetching companies count:", error)
@@ -194,23 +257,13 @@ export async function getCompaniesCount(): Promise<ApiResponse<number>> {
 // Get professionals count
 export async function getProfessionalsCount(): Promise<ApiResponse<number>> {
   try {
-    const url = `${getApiUrl()}/Professional/count`
-    console.log("Fetching professionals count from URL:", url)
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: createHeaders(),
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
+    const data = await apiCall("/Professional")
+    const professionals = data.results || data.result || data.data || data || []
+    const count = Array.isArray(professionals) ? professionals.length : 0
 
     return {
       status: 200,
-      data: data.count || data.total || 0,
+      data: count,
     }
   } catch (error) {
     console.error("Error fetching professionals count:", error)
@@ -224,23 +277,13 @@ export async function getProfessionalsCount(): Promise<ApiResponse<number>> {
 // Get customers count
 export async function getCustomersCount(): Promise<ApiResponse<number>> {
   try {
-    const url = `${getApiUrl()}/Customer/count`
-    console.log("Fetching customers count from URL:", url)
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: createHeaders(),
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
+    const data = await apiCall("/Customer")
+    const customers = data.results || data.result || data.data || data || []
+    const count = Array.isArray(customers) ? customers.length : 0
 
     return {
       status: 200,
-      data: data.count || data.total || 0,
+      data: count,
     }
   } catch (error) {
     console.error("Error fetching customers count:", error)
