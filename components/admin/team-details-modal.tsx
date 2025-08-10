@@ -1,149 +1,188 @@
 "use client"
 
 import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Users,
   Building2,
+  User,
   Calendar,
-  Phone,
-  Mail,
   Star,
   TrendingUp,
   Clock,
   CheckCircle,
   Edit,
   Trash2,
+  Phone,
+  Mail,
+  Award,
+  Target,
+  Activity,
 } from "lucide-react"
+
+interface TeamMember {
+  id: number
+  name: string
+  email: string
+  phone: string
+  role: string
+  avatar?: string
+  rating: number
+  completedTasks: number
+  status: "active" | "inactive" | "on-leave"
+  joinedDate: string
+}
+
+interface TeamActivity {
+  id: number
+  type: "task_completed" | "member_joined" | "performance_update" | "meeting"
+  description: string
+  timestamp: string
+  memberName?: string
+  memberAvatar?: string
+}
+
+interface TeamPerformance {
+  completionRate: number
+  averageRating: number
+  totalTasks: number
+  completedTasks: number
+  onTimeDelivery: number
+  customerSatisfaction: number
+}
 
 interface Team {
   id: number
   name: string
   description: string
   companyId: number
-  companyName?: string
+  companyName: string
   leaderId?: number
   leaderName?: string
-  membersCount?: number
+  leaderAvatar?: string
+  membersCount: number
   status: number
-  createdDate?: string
-  updatedDate?: string
+  createdDate: string
+  updatedDate: string
+  members?: TeamMember[]
+  performance?: TeamPerformance
+  recentActivities?: TeamActivity[]
 }
 
 interface TeamDetailsModalProps {
   team: Team
+  onEdit: () => void
+  onDelete: () => void
   onClose: () => void
-  onEdit?: (team: Team) => void
-  onDelete?: (team: Team) => void
 }
 
-export function TeamDetailsModal({ team, onClose, onEdit, onDelete }: TeamDetailsModalProps) {
+export function TeamDetailsModal({ team, onEdit, onDelete, onClose }: TeamDetailsModalProps) {
   const [activeTab, setActiveTab] = useState("overview")
 
-  // Mock data for team members (in real app, this would come from API)
-  const teamMembers = [
+  // Mock data for demonstration
+  const mockMembers: TeamMember[] = [
     {
       id: 1,
       name: "Maria Silva",
-      email: "maria.silva@email.com",
-      phone: "(11) 99999-1111",
+      email: "maria@example.com",
+      phone: "(11) 99999-9999",
       role: "Team Leader",
-      avatar: "",
-      status: "active",
-      joinDate: "2023-01-15",
       rating: 4.8,
       completedTasks: 45,
+      status: "active",
+      joinedDate: "2024-01-15",
     },
     {
       id: 2,
       name: "João Santos",
-      email: "joao.santos@email.com",
-      phone: "(11) 99999-2222",
+      email: "joao@example.com",
+      phone: "(11) 88888-8888",
       role: "Senior Professional",
-      avatar: "",
-      status: "active",
-      joinDate: "2023-02-20",
       rating: 4.6,
       completedTasks: 38,
+      status: "active",
+      joinedDate: "2024-02-01",
     },
     {
       id: 3,
       name: "Ana Costa",
-      email: "ana.costa@email.com",
-      phone: "(11) 99999-3333",
+      email: "ana@example.com",
+      phone: "(11) 77777-7777",
       role: "Professional",
-      avatar: "",
-      status: "active",
-      joinDate: "2023-03-10",
-      rating: 4.9,
-      completedTasks: 42,
+      rating: 4.4,
+      completedTasks: 32,
+      status: "on-leave",
+      joinedDate: "2024-02-15",
     },
   ]
 
-  // Mock performance data
-  const performanceData = {
-    completionRate: 94,
-    customerSatisfaction: 4.7,
-    onTimeDelivery: 96,
-    qualityScore: 92,
+  const mockPerformance: TeamPerformance = {
+    completionRate: 92,
+    averageRating: 4.6,
+    totalTasks: 150,
+    completedTasks: 138,
+    onTimeDelivery: 89,
+    customerSatisfaction: 94,
   }
 
-  // Mock recent activities
-  const recentActivities = [
+  const mockActivities: TeamActivity[] = [
     {
       id: 1,
       type: "task_completed",
-      description: "Completed cleaning service at Office Complex A",
-      date: "2024-01-10T14:30:00Z",
-      member: "Maria Silva",
+      description: "Completed cleaning service at Office Building A",
+      timestamp: "2024-01-10T14:30:00Z",
+      memberName: "Maria Silva",
     },
     {
       id: 2,
       type: "member_joined",
-      description: "Ana Costa joined the team",
-      date: "2024-01-09T09:15:00Z",
-      member: "Ana Costa",
+      description: "New member joined the team",
+      timestamp: "2024-01-09T09:00:00Z",
+      memberName: "Ana Costa",
     },
     {
       id: 3,
-      type: "task_completed",
-      description: "Completed deep cleaning at Retail Store B",
-      date: "2024-01-08T16:45:00Z",
-      member: "João Santos",
+      type: "performance_update",
+      description: "Team performance rating updated to 4.6/5",
+      timestamp: "2024-01-08T16:45:00Z",
+    },
+    {
+      id: 4,
+      type: "meeting",
+      description: "Weekly team meeting completed",
+      timestamp: "2024-01-08T10:00:00Z",
     },
   ]
 
-  const getStatusBadge = (status: number) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 1:
-        return <Badge className="bg-green-500">Active</Badge>
-      case 0:
-        return <Badge variant="secondary">Inactive</Badge>
+      case "active":
+        return "bg-green-500"
+      case "inactive":
+        return "bg-gray-500"
+      case "on-leave":
+        return "bg-yellow-500"
       default:
-        return <Badge variant="outline">Unknown</Badge>
+        return "bg-gray-500"
     }
   }
 
-  const getMemberStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getStatusLabel = (status: string) => {
+    switch (status) {
       case "active":
-        return (
-          <Badge variant="default" className="bg-green-500">
-            Active
-          </Badge>
-        )
+        return "Active"
       case "inactive":
-        return <Badge variant="secondary">Inactive</Badge>
-      case "on_leave":
-        return <Badge variant="outline">On Leave</Badge>
+        return "Inactive"
+      case "on-leave":
+        return "On Leave"
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return "Unknown"
     }
   }
 
@@ -152,301 +191,354 @@ export function TeamDetailsModal({ team, onClose, onEdit, onDelete }: TeamDetail
       case "task_completed":
         return <CheckCircle className="h-4 w-4 text-green-500" />
       case "member_joined":
-        return <Users className="h-4 w-4 text-blue-500" />
+        return <User className="h-4 w-4 text-blue-500" />
+      case "performance_update":
+        return <TrendingUp className="h-4 w-4 text-purple-500" />
+      case "meeting":
+        return <Users className="h-4 w-4 text-orange-500" />
       default:
-        return <Clock className="h-4 w-4 text-gray-500" />
+        return <Activity className="h-4 w-4 text-gray-500" />
     }
   }
 
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`h-4 w-4 ${i < Math.floor(rating) ? "text-yellow-400 fill-current" : "text-gray-300"}`}
+      />
+    ))
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold">{team.name}</h2>
-            {getStatusBadge(team.status)}
+    <div className="flex flex-col h-full max-h-[90vh]">
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 p-6 border-b">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <Users className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">{team.name}</h2>
+              <p className="text-muted-foreground">{team.description}</p>
+              <div className="flex items-center gap-4 mt-2">
+                <Badge variant={team.status === 1 ? "default" : "secondary"}>
+                  {team.status === 1 ? "Active" : "Inactive"}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Created {new Date(team.createdDate).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
           </div>
-          <p className="text-muted-foreground">{team.description || "No description provided"}</p>
-        </div>
-        <div className="flex gap-2">
-          {onEdit && (
-            <Button variant="outline" size="sm" onClick={() => onEdit(team)}>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onEdit}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-          )}
-          {onDelete && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onDelete(team)}
-              className="text-red-600 hover:text-red-700"
-            >
+            <Button variant="destructive" size="sm" onClick={onDelete}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
-          )}
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-4 gap-4 mt-6">
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Users className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+              <div className="text-2xl font-bold">{team.membersCount}</div>
+              <div className="text-sm text-muted-foreground">Members</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Star className="h-6 w-6 mx-auto mb-2 text-yellow-400" />
+              <div className="text-2xl font-bold">{mockPerformance.averageRating}</div>
+              <div className="text-sm text-muted-foreground">Avg Rating</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Target className="h-6 w-6 mx-auto mb-2 text-green-500" />
+              <div className="text-2xl font-bold">{mockPerformance.completionRate}%</div>
+              <div className="text-sm text-muted-foreground">Completion</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <CheckCircle className="h-6 w-6 mx-auto mb-2 text-blue-500" />
+              <div className="text-2xl font-bold">{mockPerformance.completedTasks}</div>
+              <div className="text-sm text-muted-foreground">Tasks Done</div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <Separator />
+      {/* Scrollable Content */}
+      <ScrollArea className="flex-1">
+        <div className="p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="members">Members</TabsTrigger>
+              <TabsTrigger value="performance">Performance</TabsTrigger>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+            </TabsList>
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Members</p>
-                <p className="text-2xl font-bold">{team.membersCount || teamMembers.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <TabsContent value="overview" className="space-y-6 mt-6">
+              {/* Company Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Company Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Building2 className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium">{team.companyName}</div>
+                        <div className="text-sm text-muted-foreground">Company ID: {team.companyId}</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Completion Rate</p>
-                <p className="text-2xl font-bold">{performanceData.completionRate}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Satisfaction</p>
-                <p className="text-2xl font-bold">{performanceData.customerSatisfaction}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">On-Time Delivery</p>
-                <p className="text-2xl font-bold">{performanceData.onTimeDelivery}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Information Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Company Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Company:</span>
-                  <span className="font-medium">{team.companyName || "N/A"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Team Leader:</span>
-                  <span className="font-medium">{team.leaderName || "Not assigned"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status:</span>
-                  {getStatusBadge(team.status)}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Timeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Created:</span>
-                  <span className="font-medium">
-                    {team.createdDate ? new Date(team.createdDate).toLocaleDateString() : "N/A"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Last Updated:</span>
-                  <span className="font-medium">
-                    {team.updatedDate ? new Date(team.updatedDate).toLocaleDateString() : "N/A"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Team ID:</span>
-                  <span className="font-medium">#{team.id}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="members" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-              <CardDescription>All professionals assigned to this team</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {teamMembers.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
+              {/* Team Leader */}
+              {team.leaderName && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Team Leader
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {member.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
+                        <AvatarImage src={team.leaderAvatar || "/placeholder.svg"} />
+                        <AvatarFallback>{team.leaderName.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <h4 className="font-medium">{member.name}</h4>
-                        <p className="text-sm text-muted-foreground">{member.role}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {member.email}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {member.phone}
-                          </span>
+                        <div className="font-medium">{team.leaderName}</div>
+                        <div className="text-sm text-muted-foreground">Team Leader</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Timeline */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div>
+                        <div className="font-medium">Team Created</div>
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(team.createdDate).toLocaleDateString()}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right space-y-2">
-                      {getMemberStatusBadge(member.status)}
-                      <div className="flex items-center gap-1 text-sm">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        <span>{member.rating}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <div>
+                        <div className="font-medium">Last Updated</div>
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(team.updatedDate).toLocaleDateString()}
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">{member.completedTasks} tasks completed</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="performance" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance Metrics</CardTitle>
-                <CardDescription>Key performance indicators for this team</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm">Completion Rate</span>
-                    <span className="text-sm font-medium">{performanceData.completionRate}%</span>
-                  </div>
-                  <Progress value={performanceData.completionRate} />
-                </div>
-
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm">On-Time Delivery</span>
-                    <span className="text-sm font-medium">{performanceData.onTimeDelivery}%</span>
-                  </div>
-                  <Progress value={performanceData.onTimeDelivery} />
-                </div>
-
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm">Quality Score</span>
-                    <span className="text-sm font-medium">{performanceData.qualityScore}%</span>
-                  </div>
-                  <Progress value={performanceData.qualityScore} />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer Satisfaction</CardTitle>
-                <CardDescription>Average rating from customers</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center space-y-2">
-                  <div className="text-4xl font-bold">{performanceData.customerSatisfaction}</div>
-                  <div className="flex justify-center">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`h-5 w-5 ${
-                          star <= Math.floor(performanceData.customerSatisfaction)
-                            ? "text-yellow-500 fill-current"
-                            : "text-gray-300"
-                        }`}
-                      />
+            <TabsContent value="members" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team Members ({mockMembers.length})</CardTitle>
+                  <CardDescription>All members currently assigned to this team</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {mockMembers.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <Avatar>
+                            <AvatarImage src={member.avatar || "/placeholder.svg"} />
+                            <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{member.name}</div>
+                            <div className="text-sm text-muted-foreground">{member.role}</div>
+                            <div className="flex items-center gap-4 mt-1">
+                              <div className="flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                <span className="text-xs text-muted-foreground">{member.email}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                <span className="text-xs text-muted-foreground">{member.phone}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-1">{renderStars(member.rating)}</div>
+                            <span className="text-sm font-medium">{member.rating}</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground mb-2">
+                            {member.completedTasks} tasks completed
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${getStatusColor(member.status)}`}></div>
+                            <Badge variant="outline" className="text-xs">
+                              {getStatusLabel(member.status)}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                  <p className="text-sm text-muted-foreground">Based on customer reviews</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="activity" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Latest team activities and updates</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                    {getActivityIcon(activity.type)}
-                    <div className="flex-1">
-                      <p className="text-sm">{activity.description}</p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        <span>{activity.member}</span>
-                        <span>•</span>
-                        <span>{new Date(activity.date).toLocaleString()}</span>
+            <TabsContent value="performance" className="space-y-6 mt-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Completion Rate
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span>Overall Completion</span>
+                        <span className="font-medium">{mockPerformance.completionRate}%</span>
+                      </div>
+                      <Progress value={mockPerformance.completionRate} className="h-2" />
+                      <div className="text-sm text-muted-foreground">
+                        {mockPerformance.completedTasks} of {mockPerformance.totalTasks} tasks completed
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  </CardContent>
+                </Card>
 
-      {/* Footer Actions */}
-      <div className="flex justify-end">
-        <Button onClick={onClose}>Close</Button>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      On-Time Delivery
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span>On-Time Rate</span>
+                        <span className="font-medium">{mockPerformance.onTimeDelivery}%</span>
+                      </div>
+                      <Progress value={mockPerformance.onTimeDelivery} className="h-2" />
+                      <div className="text-sm text-muted-foreground">Tasks delivered on schedule</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Star className="h-5 w-5" />
+                      Average Rating
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span>Team Rating</span>
+                        <span className="font-medium">{mockPerformance.averageRating}/5.0</span>
+                      </div>
+                      <Progress value={(mockPerformance.averageRating / 5) * 100} className="h-2" />
+                      <div className="flex items-center gap-1">{renderStars(mockPerformance.averageRating)}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Award className="h-5 w-5" />
+                      Customer Satisfaction
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span>Satisfaction Rate</span>
+                        <span className="font-medium">{mockPerformance.customerSatisfaction}%</span>
+                      </div>
+                      <Progress value={mockPerformance.customerSatisfaction} className="h-2" />
+                      <div className="text-sm text-muted-foreground">Based on customer feedback</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="activity" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Recent Activities
+                  </CardTitle>
+                  <CardDescription>Latest team activities and updates</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {mockActivities.map((activity) => (
+                      <div key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                        <div className="mt-0.5">{getActivityIcon(activity.type)}</div>
+                        <div className="flex-1">
+                          <div className="font-medium">{activity.description}</div>
+                          {activity.memberName && (
+                            <div className="text-sm text-muted-foreground">by {activity.memberName}</div>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {new Date(activity.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </ScrollArea>
+
+      {/* Fixed Footer */}
+      <div className="flex-shrink-0 p-6 border-t bg-background">
+        <div className="flex justify-end">
+          <Button onClick={onClose}>Close</Button>
+        </div>
       </div>
     </div>
   )

@@ -10,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Users, Building2, User, MapPin, Calendar, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -49,7 +49,6 @@ interface Team {
 }
 
 interface TeamModalProps {
-  isOpen: boolean
   team?: Team
   companies: Company[]
   professionals: Professional[]
@@ -57,7 +56,7 @@ interface TeamModalProps {
   onCancel: () => void
 }
 
-export function TeamModal({ isOpen, team, companies, professionals, onSubmit, onCancel }: TeamModalProps) {
+export function TeamModal({ team, companies, professionals, onSubmit, onCancel }: TeamModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -170,259 +169,268 @@ export function TeamModal({ isOpen, team, companies, professionals, onSubmit, on
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onCancel}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            {team ? "Edit Team" : "Create New Team"}
-          </DialogTitle>
-        </DialogHeader>
+    <div className="flex flex-col h-full max-h-[90vh]">
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 p-6 border-b">
+        <h2 className="text-2xl font-bold">{team ? "Edit Team" : "Create New Team"}</h2>
+        <p className="text-muted-foreground">
+          {team ? "Update the team information below" : "Fill in the information to create a new team"}
+        </p>
+      </div>
 
-        <ScrollArea className="max-h-[calc(90vh-120px)]">
-          <div className="px-6 py-4">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Basic Information
-                  </CardTitle>
-                  <CardDescription>
-                    {team ? "Update the team's basic information" : "Enter the basic information for the new team"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Team Name *</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => handleInputChange("name", e.target.value)}
-                        placeholder="Enter team name"
-                        required
-                      />
-                    </div>
+      {/* Scrollable Content */}
+      <ScrollArea className="flex-1 px-6">
+        <form onSubmit={handleSubmit} className="space-y-6 py-6">
+          {/* Basic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Basic Information
+              </CardTitle>
+              <CardDescription>
+                {team ? "Update the team's basic information" : "Enter the basic information for the new team"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Team Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    placeholder="Enter team name"
+                    required
+                  />
+                </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status *</Label>
-                      <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              Active
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="0">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                              Inactive
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => handleInputChange("description", e.target.value)}
-                      placeholder="Enter team description (optional)"
-                      rows={3}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Company Assignment */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Company Assignment
-                  </CardTitle>
-                  <CardDescription>Select which company this team belongs to</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Company *</Label>
-                    <Select value={formData.companyId} onValueChange={(value) => handleInputChange("companyId", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.length === 0 ? (
-                          <SelectItem value="no-companies" disabled>
-                            No companies available
-                          </SelectItem>
-                        ) : (
-                          companies.map((company) => (
-                            <SelectItem key={company.id} value={company.id.toString()}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{company.name}</span>
-                                <span className="text-sm text-muted-foreground">{company.cnpj}</span>
-                              </div>
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Selected Company Info */}
-                  {getSelectedCompany() && (
-                    <div className="p-3 bg-muted rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div className="flex-1">
-                          <h4 className="font-medium">{getSelectedCompany()?.name}</h4>
-                          <div className="text-sm text-muted-foreground space-y-1">
-                            <p>CNPJ: {getSelectedCompany()?.cnpj}</p>
-                            <p>Responsible: {getSelectedCompany()?.responsible}</p>
-                            <p>Email: {getSelectedCompany()?.email}</p>
-                          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status *</Label>
+                  <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          Active
                         </div>
-                        <Badge variant={getSelectedCompany()?.status === 1 ? "default" : "secondary"}>
-                          {getSelectedCompany()?.status === 1 ? "Active" : "Inactive"}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                      </SelectItem>
+                      <SelectItem value="0">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                          Inactive
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-              {/* Team Leader */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Team Leader
-                  </CardTitle>
-                  <CardDescription>Assign a team leader (optional)</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="leader">Team Leader</Label>
-                    <Select
-                      value={formData.leaderId}
-                      onValueChange={(value) => handleInputChange("leaderId", value)}
-                      disabled={!formData.companyId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            !formData.companyId
-                              ? "Select a company first"
-                              : filteredProfessionals.length === 0
-                                ? "No professionals available"
-                                : "Select a team leader"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          <span className="text-muted-foreground">No leader assigned</span>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => handleInputChange("description", e.target.value)}
+                  placeholder="Enter team description (optional)"
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Company Assignment */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Company Assignment
+              </CardTitle>
+              <CardDescription>Select which company this team belongs to</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="company">Company *</Label>
+                <Select value={formData.companyId} onValueChange={(value) => handleInputChange("companyId", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.length === 0 ? (
+                      <SelectItem value="no-companies" disabled>
+                        No companies available
+                      </SelectItem>
+                    ) : (
+                      companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id.toString()}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{company.name}</span>
+                            <span className="text-sm text-muted-foreground">{company.cnpj}</span>
+                          </div>
                         </SelectItem>
-                        {filteredProfessionals.map((professional) => (
-                          <SelectItem key={professional.id} value={professional.id.toString()}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{professional.name}</span>
-                              <span className="text-sm text-muted-foreground">{professional.email}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Selected Company Info */}
+              {getSelectedCompany() && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium">{getSelectedCompany()?.name}</h4>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>CNPJ: {getSelectedCompany()?.cnpj}</p>
+                        <p>Responsible: {getSelectedCompany()?.responsible}</p>
+                        <p>Email: {getSelectedCompany()?.email}</p>
+                      </div>
+                    </div>
+                    <Badge variant={getSelectedCompany()?.status === 1 ? "default" : "secondary"}>
+                      {getSelectedCompany()?.status === 1 ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Team Leader */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Team Leader
+              </CardTitle>
+              <CardDescription>Assign a team leader (optional)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="leader">Team Leader</Label>
+                <Select
+                  value={formData.leaderId}
+                  onValueChange={(value) => handleInputChange("leaderId", value)}
+                  disabled={!formData.companyId}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        !formData.companyId
+                          ? "Select a company first"
+                          : filteredProfessionals.length === 0
+                            ? "No professionals available"
+                            : "Select a team leader"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">No leader assigned</span>
+                    </SelectItem>
+                    {filteredProfessionals.map((professional) => (
+                      <SelectItem key={professional.id} value={professional.id.toString()}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{professional.name}</span>
+                          <span className="text-sm text-muted-foreground">{professional.email}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Selected Leader Info */}
+              {getSelectedLeader() && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium">{getSelectedLeader()?.name}</h4>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>Email: {getSelectedLeader()?.email}</p>
+                        <p>Phone: {getSelectedLeader()?.phone}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline">{getSelectedLeader()?.status}</Badge>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Team Summary */}
+          {team && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Team Summary
+                </CardTitle>
+                <CardDescription>Current team information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <div className="text-2xl font-bold">{team.membersCount || 0}</div>
+                    <div className="text-sm text-muted-foreground">Members</div>
                   </div>
 
-                  {/* Selected Leader Info */}
-                  {getSelectedLeader() && (
-                    <div className="p-3 bg-muted rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div className="flex-1">
-                          <h4 className="font-medium">{getSelectedLeader()?.name}</h4>
-                          <div className="text-sm text-muted-foreground space-y-1">
-                            <p>Email: {getSelectedLeader()?.email}</p>
-                            <p>Phone: {getSelectedLeader()?.phone}</p>
-                          </div>
-                        </div>
-                        <Badge variant="outline">{getSelectedLeader()?.status}</Badge>
-                      </div>
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <Calendar className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <div className="text-sm font-medium">Created</div>
+                    <div className="text-sm text-muted-foreground">
+                      {team.createdDate ? new Date(team.createdDate).toLocaleDateString() : "N/A"}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </div>
 
-              {/* Team Summary */}
-              {team && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Team Summary
-                    </CardTitle>
-                    <CardDescription>Current team information</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="text-center p-3 bg-muted rounded-lg">
-                        <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <div className="text-2xl font-bold">{team.membersCount || 0}</div>
-                        <div className="text-sm text-muted-foreground">Members</div>
-                      </div>
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <div className="text-sm font-medium">Status</div>
+                    <Badge variant={team.status === 1 ? "default" : "secondary"} className="mt-1">
+                      {team.status === 1 ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-                      <div className="text-center p-3 bg-muted rounded-lg">
-                        <Calendar className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <div className="text-sm font-medium">Created</div>
-                        <div className="text-sm text-muted-foreground">
-                          {team.createdDate ? new Date(team.createdDate).toLocaleDateString() : "N/A"}
-                        </div>
-                      </div>
+          <Separator />
+        </form>
+      </ScrollArea>
 
-                      <div className="text-center p-3 bg-muted rounded-lg">
-                        <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <div className="text-sm font-medium">Status</div>
-                        <Badge variant={team.status === 1 ? "default" : "secondary"} className="mt-1">
-                          {team.status === 1 ? "Active" : "Inactive"}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </form>
-          </div>
-        </ScrollArea>
-
-        {/* Fixed Footer with Action Buttons */}
-        <div className="px-6 py-4 border-t bg-background">
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting} onClick={handleSubmit}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {team ? "Updating..." : "Creating..."}
-                </>
-              ) : (
-                <>{team ? "Update Team" : "Create Team"}</>
-              )}
-            </Button>
-          </div>
+      {/* Fixed Footer */}
+      <div className="flex-shrink-0 p-6 border-t bg-background">
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            onClick={(e) => {
+              const form = document.querySelector("form") as HTMLFormElement
+              if (form) {
+                form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))
+              }
+            }}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {team ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              <>{team ? "Update Team" : "Create Team"}</>
+            )}
+          </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
