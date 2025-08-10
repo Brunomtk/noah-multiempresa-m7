@@ -2,7 +2,6 @@
 
 import { useCallback } from "react"
 import { useInternalFeedbackContext } from "@/contexts/internal-feedback-context"
-import type { InternalFeedbackStatus, InternalFeedbackPriority } from "@/types/internal-feedback"
 
 export function useInternalFeedback() {
   const context = useInternalFeedbackContext()
@@ -18,13 +17,13 @@ export function useInternalFeedback() {
   }, [])
 
   // Helper function to get status styles
-  const getStatusStyles = useCallback((status: InternalFeedbackStatus) => {
+  const getStatusStyles = useCallback((status: number) => {
     switch (status) {
-      case "pending":
+      case 0:
         return "border-yellow-500 text-yellow-500"
-      case "resolved":
+      case 2:
         return "border-green-500 text-green-500"
-      case "in_progress":
+      case 1:
         return "border-blue-500 text-blue-500"
       default:
         return "border-gray-500 text-gray-500"
@@ -32,13 +31,13 @@ export function useInternalFeedback() {
   }, [])
 
   // Helper function to get priority styles
-  const getPriorityStyles = useCallback((priority: InternalFeedbackPriority) => {
+  const getPriorityStyles = useCallback((priority: number) => {
     switch (priority) {
-      case "low":
+      case 0:
         return "border-green-500 text-green-500"
-      case "medium":
+      case 1:
         return "border-yellow-500 text-yellow-500"
-      case "high":
+      case 2:
         return "border-red-500 text-red-500"
       default:
         return "border-gray-500 text-gray-500"
@@ -46,30 +45,30 @@ export function useInternalFeedback() {
   }, [])
 
   // Helper function to get status label
-  const getStatusLabel = useCallback((status: InternalFeedbackStatus) => {
+  const getStatusLabel = useCallback((status: number) => {
     switch (status) {
-      case "pending":
+      case 0:
         return "Pending"
-      case "resolved":
+      case 2:
         return "Resolved"
-      case "in_progress":
+      case 1:
         return "In Progress"
       default:
-        return status
+        return "Unknown"
     }
   }, [])
 
   // Helper function to get priority label
-  const getPriorityLabel = useCallback((priority: InternalFeedbackPriority) => {
+  const getPriorityLabel = useCallback((priority: number) => {
     switch (priority) {
-      case "low":
+      case 0:
         return "Low"
-      case "medium":
+      case 1:
         return "Medium"
-      case "high":
+      case 2:
         return "High"
       default:
-        return priority
+        return "Unknown"
     }
   }, [])
 

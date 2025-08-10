@@ -1,30 +1,28 @@
 export interface InternalFeedback {
-  id: number | string
+  id: number
   title: string
   professionalId: number
-  professional?: string
   teamId: number
-  team?: string
   category: string
   status: number // 0=pending, 1=in_progress, 2=resolved
   date: string
   description: string
   priority: number // 0=low, 1=medium, 2=high
   assignedToId: number
-  assignedTo?: string
   comments: InternalFeedbackComment[]
-  createdAt?: string
-  updatedAt?: string
-  createdDate?: string
-  updatedDate?: string
+  createdDate: string
+  updatedDate: string
 }
 
 export interface InternalFeedbackComment {
-  id: string | number
+  id: number
+  internalFeedbackId: number
   authorId: number
   author: string
   date: string
   text: string
+  createdDate: string
+  updatedDate: string
 }
 
 export interface InternalFeedbackCreateRequest {
@@ -33,10 +31,10 @@ export interface InternalFeedbackCreateRequest {
   teamId: number
   category: string
   status: number
+  date: string
   description: string
   priority: number
   assignedToId: number
-  date: string
 }
 
 export interface InternalFeedbackUpdateRequest {
@@ -45,10 +43,10 @@ export interface InternalFeedbackUpdateRequest {
   teamId: number
   category: string
   status: number
+  date: string
   description: string
   priority: number
   assignedToId: number
-  date: string
 }
 
 export interface InternalFeedbackFilters {
@@ -76,15 +74,12 @@ export interface InternalFeedbackPagedResponse {
 export interface InternalFeedbackFormData {
   title: string
   professionalId: string | number
-  professional?: string
   teamId: string | number
-  team?: string
   category: string
   status: string | number
   description: string
   priority: string | number
   assignedToId: string | number
-  assignedTo?: string
 }
 
 // Status enum

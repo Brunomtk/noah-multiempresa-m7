@@ -16,28 +16,11 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-
-type FeedbackType = {
-  id: string
-  title: string
-  professional: string
-  team: string
-  category: string
-  status: string
-  date: string
-  description: string
-  priority: string
-  assignedTo: string
-  comments: Array<{
-    author: string
-    date: string
-    text: string
-  }>
-}
+import type { InternalFeedback } from "@/types/internal-feedback"
 
 interface InternalFeedbackDetailsModalProps {
   children: React.ReactNode
-  feedback: FeedbackType
+  feedback: InternalFeedback
 }
 
 export function InternalFeedbackDetailsModal({ children, feedback }: InternalFeedbackDetailsModalProps) {
@@ -77,7 +60,7 @@ export function InternalFeedbackDetailsModal({ children, feedback }: InternalFee
             </div>
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Date Submitted</h3>
-              <p className="text-white">{feedback.date}</p>
+              <p className="text-white">{new Date(feedback.date).toLocaleDateString()}</p>
             </div>
           </div>
 
@@ -89,11 +72,11 @@ export function InternalFeedbackDetailsModal({ children, feedback }: InternalFee
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Professional</h3>
-              <p className="text-white">{feedback.professional}</p>
+              <p className="text-white">Professional #{feedback.professionalId}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Team</h3>
-              <p className="text-white">{feedback.team}</p>
+              <p className="text-white">Team #{feedback.teamId}</p>
             </div>
           </div>
 
@@ -111,7 +94,7 @@ export function InternalFeedbackDetailsModal({ children, feedback }: InternalFee
                   feedback.status,
                 )}`}
               >
-                {feedback.status}
+                {getStatusLabel(feedback.status)}
               </span>
             </div>
             <div>
@@ -121,14 +104,14 @@ export function InternalFeedbackDetailsModal({ children, feedback }: InternalFee
                   feedback.priority,
                 )}`}
               >
-                {feedback.priority}
+                {getPriorityLabel(feedback.priority)}
               </span>
             </div>
           </div>
 
           <div>
             <h3 className="text-sm font-medium text-muted-foreground">Assigned To</h3>
-            <p className="text-white">{feedback.assignedTo}</p>
+            <p className="text-white">User #{feedback.assignedToId}</p>
           </div>
 
           <div>
@@ -142,11 +125,13 @@ export function InternalFeedbackDetailsModal({ children, feedback }: InternalFee
             <h3 className="text-sm font-medium text-muted-foreground mb-2">Comments</h3>
             {feedback.comments.length > 0 ? (
               <div className="space-y-3">
-                {feedback.comments.map((comment, index) => (
-                  <div key={index} className="p-3 bg-[#0f172a] rounded-md border border-[#2a3349]">
+                {feedback.comments.map((comment) => (
+                  <div key={comment.id} className="p-3 bg-[#0f172a] rounded-md border border-[#2a3349]">
                     <div className="flex justify-between items-center mb-1">
                       <span className="font-medium text-white">{comment.author}</span>
-                      <span className="text-xs text-muted-foreground">{comment.date}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(comment.date).toLocaleDateString()}
+                      </span>
                     </div>
                     <p className="text-muted-foreground">{comment.text}</p>
                   </div>
@@ -195,13 +180,13 @@ export function InternalFeedbackDetailsModal({ children, feedback }: InternalFee
 }
 
 // Helper function to get status styles
-function getStatusStyles(status: string) {
+function getStatusStyles(status: number) {
   switch (status) {
-    case "Pending":
+    case 0:
       return "border-yellow-500 text-yellow-500"
-    case "Resolved":
+    case 2:
       return "border-green-500 text-green-500"
-    case "In Progress":
+    case 1:
       return "border-blue-500 text-blue-500"
     default:
       return "border-gray-500 text-gray-500"
@@ -209,15 +194,43 @@ function getStatusStyles(status: string) {
 }
 
 // Helper function to get priority styles
-function getPriorityStyles(priority: string) {
+function getPriorityStyles(priority: number) {
   switch (priority) {
-    case "Low":
+    case 0:
       return "border-green-500 text-green-500"
-    case "Medium":
+    case 1:
       return "border-yellow-500 text-yellow-500"
-    case "High":
+    case 2:
       return "border-red-500 text-red-500"
     default:
       return "border-gray-500 text-gray-500"
+  }
+}
+
+// Helper function to get status label
+function getStatusLabel(status: number) {
+  switch (status) {
+    case 0:
+      return "Pending"
+    case 2:
+      return "Resolved"
+    case 1:
+      return "In Progress"
+    default:
+      return "Unknown"
+  }
+}
+
+// Helper function to get priority label
+function getPriorityLabel(priority: number) {
+  switch (priority) {
+    case 0:
+      return "Low"
+    case 1:
+      return "Medium"
+    case 2:
+      return "High"
+    default:
+      return "Unknown"
   }
 }

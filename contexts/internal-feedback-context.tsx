@@ -2,25 +2,8 @@
 
 import type { ReactNode } from "react"
 import { createContext, useContext, useState, useCallback, useEffect } from "react"
-import type {
-  InternalFeedback,
-  InternalFeedbackFormData,
-  InternalFeedbackFilters,
-  InternalFeedbackComment,
-} from "@/types/internal-feedback"
-import {
-  getInternalFeedback,
-  getInternalFeedbackById,
-  createInternalFeedback,
-  updateInternalFeedback,
-  deleteInternalFeedback,
-  addCommentToInternalFeedback,
-  getInternalFeedbackByProfessional,
-  getInternalFeedbackByTeam,
-  getInternalFeedbackByCategory,
-  getInternalFeedbackByStatus,
-  getInternalFeedbackByPriority,
-} from "@/lib/api/internal-feedback"
+import type { InternalFeedback, InternalFeedbackFormData, InternalFeedbackFilters } from "@/types/internal-feedback"
+import { internalFeedbackApi } from "@/lib/api/internal-feedback"
 import { useToast } from "@/hooks/use-toast"
 
 interface InternalFeedbackContextType {
@@ -31,14 +14,11 @@ interface InternalFeedbackContextType {
   setFilters: (filters: InternalFeedbackFilters) => void
   resetFilters: () => void
   fetchFeedbacks: () => Promise<void>
-  fetchFeedbackById: (id: string) => Promise<InternalFeedback | null>
+  fetchFeedbackById: (id: number) => Promise<InternalFeedback | null>
   addFeedback: (data: InternalFeedbackFormData) => Promise<InternalFeedback>
-  updateFeedback: (id: string, data: Partial<InternalFeedbackFormData>) => Promise<InternalFeedback>
-  deleteFeedback: (id: string) => Promise<void>
-  addComment: (
-    feedbackId: string,
-    comment: Omit<InternalFeedbackComment, "id" | "date">,
-  ) => Promise<InternalFeedbackComment>
+  updateFeedback: (id: number, data: Partial<InternalFeedbackFormData>) => Promise<InternalFeedback>
+  deleteFeedback: (id: number) => Promise<void>
+  addComment: (feedbackId: number, comment: { authorId: number; author: string; text: string }) => Promise<any>
   fetchFeedbacksByProfessional: (professionalId: string) => Promise<InternalFeedback[]>
   fetchFeedbacksByTeam: (teamId: string) => Promise<InternalFeedback[]>
   fetchFeedbacksByCategory: (category: string) => Promise<InternalFeedback[]>
@@ -61,8 +41,13 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getInternalFeedback(filters)
-      setFeedbacks(data)
+      const { data, error } = await internalFeedbackApi.getRecords(filters)
+      if (error) {
+        throw new Error(error)
+      }
+      if (data) {
+        setFeedbacks(data.data || [])
+      }
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to fetch internal feedback"))
       toast({
@@ -76,12 +61,15 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
   }, [filters, toast])
 
   const fetchFeedbackById = useCallback(
-    async (id: string) => {
+    async (id: number) => {
       setIsLoading(true)
       setError(null)
       try {
-        const feedback = await getInternalFeedbackById(id)
-        return feedback
+        const { data, error } = await internalFeedbackApi.getById(id)
+        if (error) {
+          throw new Error(error)
+        }
+        return data || null
       } catch (err) {
         setError(err instanceof Error ? err : new Error(`Failed to fetch internal feedback with ID ${id}`))
         toast({
@@ -102,13 +90,30 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
       setIsLoading(true)
       setError(null)
       try {
-        const newFeedback = await createInternalFeedback(data)
-        setFeedbacks((prev) => [newFeedback, ...prev])
-        toast({
-          title: "Success",
-          description: "Internal feedback has been added successfully.",
-        })
-        return newFeedback
+        const createData = {
+          title: data.title,
+          professionalId: Number(data.professionalId),
+          teamId: Number(data.teamId),
+          category: data.category,
+          status: Number(data.status),
+          date: new Date().toISOString(),
+          description: data.description,
+          priority: Number(data.priority),
+          assignedToId: Number(data.assignedToId),
+        }
+        const { data: newFeedback, error } = await internalFeedbackApi.create(createData)
+        if (error) {
+          throw new Error(error)
+        }
+        if (newFeedback) {
+          setFeedbacks((prev) => [newFeedback, ...prev])
+          toast({
+            title: "Success",
+            description: "Internal feedback has been added successfully.",
+          })
+          return newFeedback
+        }
+        throw new Error("No data returned")
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Failed to add internal feedback"))
         toast({
@@ -125,17 +130,34 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
   )
 
   const updateFeedback = useCallback(
-    async (id: string, data: Partial<InternalFeedbackFormData>) => {
+    async (id: number, data: Partial<InternalFeedbackFormData>) => {
       setIsLoading(true)
       setError(null)
       try {
-        const updatedFeedback = await updateInternalFeedback(id, data)
-        setFeedbacks((prev) => prev.map((feedback) => (feedback.id === id ? updatedFeedback : feedback)))
-        toast({
-          title: "Success",
-          description: "Internal feedback has been updated successfully.",
-        })
-        return updatedFeedback
+        const updateData = {
+          title: data.title || "",
+          professionalId: Number(data.professionalId) || 0,
+          teamId: Number(data.teamId) || 0,
+          category: data.category || "",
+          status: Number(data.status) || 0,
+          date: new Date().toISOString(),
+          description: data.description || "",
+          priority: Number(data.priority) || 0,
+          assignedToId: Number(data.assignedToId) || 0,
+        }
+        const { data: updatedFeedback, error } = await internalFeedbackApi.update(id, updateData)
+        if (error) {
+          throw new Error(error)
+        }
+        if (updatedFeedback) {
+          setFeedbacks((prev) => prev.map((feedback) => (feedback.id === id ? updatedFeedback : feedback)))
+          toast({
+            title: "Success",
+            description: "Internal feedback has been updated successfully.",
+          })
+          return updatedFeedback
+        }
+        throw new Error("No data returned")
       } catch (err) {
         setError(err instanceof Error ? err : new Error(`Failed to update internal feedback with ID ${id}`))
         toast({
@@ -152,11 +174,14 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
   )
 
   const deleteFeedback = useCallback(
-    async (id: string) => {
+    async (id: number) => {
       setIsLoading(true)
       setError(null)
       try {
-        await deleteInternalFeedback(id)
+        const { error } = await internalFeedbackApi.delete(id)
+        if (error) {
+          throw new Error(error)
+        }
         setFeedbacks((prev) => prev.filter((feedback) => feedback.id !== id))
         toast({
           title: "Success",
@@ -178,23 +203,14 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
   )
 
   const addComment = useCallback(
-    async (feedbackId: string, comment: Omit<InternalFeedbackComment, "id" | "date">) => {
+    async (feedbackId: number, comment: { authorId: number; author: string; text: string }) => {
       setIsLoading(true)
       setError(null)
       try {
-        const newComment = await addCommentToInternalFeedback(feedbackId, comment)
-        setFeedbacks((prev) =>
-          prev.map((feedback) => {
-            if (feedback.id === feedbackId) {
-              return {
-                ...feedback,
-                comments: [...feedback.comments, newComment],
-                updatedAt: new Date().toISOString(),
-              }
-            }
-            return feedback
-          }),
-        )
+        const { data: newComment, error } = await internalFeedbackApi.addComment(feedbackId, comment)
+        if (error) {
+          throw new Error(error)
+        }
         toast({
           title: "Success",
           description: "Comment has been added successfully.",
@@ -222,8 +238,11 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getInternalFeedbackByProfessional(professionalId)
-        return data
+        const { data, error } = await internalFeedbackApi.getRecords({ professionalId: Number(professionalId) })
+        if (error) {
+          throw new Error(error)
+        }
+        return data?.data || []
       } catch (err) {
         setError(
           err instanceof Error
@@ -248,8 +267,11 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getInternalFeedbackByTeam(teamId)
-        return data
+        const { data, error } = await internalFeedbackApi.getRecords({ teamId: Number(teamId) })
+        if (error) {
+          throw new Error(error)
+        }
+        return data?.data || []
       } catch (err) {
         setError(err instanceof Error ? err : new Error(`Failed to fetch internal feedback for team ${teamId}`))
         toast({
@@ -270,8 +292,11 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getInternalFeedbackByCategory(category)
-        return data
+        const { data, error } = await internalFeedbackApi.getRecords({ category })
+        if (error) {
+          throw new Error(error)
+        }
+        return data?.data || []
       } catch (err) {
         setError(err instanceof Error ? err : new Error(`Failed to fetch internal feedback for category ${category}`))
         toast({
@@ -292,8 +317,11 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getInternalFeedbackByStatus(status)
-        return data
+        const { data, error } = await internalFeedbackApi.getRecords({ status: Number(status) })
+        if (error) {
+          throw new Error(error)
+        }
+        return data?.data || []
       } catch (err) {
         setError(err instanceof Error ? err : new Error(`Failed to fetch internal feedback for status ${status}`))
         toast({
@@ -314,8 +342,11 @@ export function InternalFeedbackProvider({ children }: { children: ReactNode }) 
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getInternalFeedbackByPriority(priority)
-        return data
+        const { data, error } = await internalFeedbackApi.getRecords({ priority: Number(priority) })
+        if (error) {
+          throw new Error(error)
+        }
+        return data?.data || []
       } catch (err) {
         setError(err instanceof Error ? err : new Error(`Failed to fetch internal feedback for priority ${priority}`))
         toast({
