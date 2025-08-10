@@ -2,7 +2,7 @@ import type { ApiResponse, LoginCredentials, AuthUser, User, RegisterUserData, P
 import type { AuthResponse } from "@/types/auth"
 
 // Base URL da API
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://206.189.191.51:5000/api"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://206.189.191.51:5001/api"
 
 // Função para obter o header de autenticação
 export const getAuthHeader = (): Record<string, string> => {
