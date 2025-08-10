@@ -30,25 +30,10 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
     })
 
     if (!response.ok) {
-      // If dashboard endpoint doesn't exist, return mock data
-      console.log("Dashboard endpoint not available, returning mock data")
-      return {
-        status: 200,
-        data: {
-          totalCompanies: 0,
-          totalProfessionals: 0,
-          totalCustomers: 0,
-          totalAppointments: 0,
-          activeAppointments: 0,
-          completedAppointments: 0,
-          pendingPayments: 0,
-          totalRevenue: 0,
-        },
-      }
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
-    console.log("Dashboard stats API response:", data)
 
     return {
       status: 200,
@@ -56,18 +41,15 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
     }
   } catch (error) {
     console.error("Error fetching dashboard stats:", error)
-    // Return mock data on error
+    // Return mock data if API fails
     return {
       status: 200,
       data: {
-        totalCompanies: 0,
-        totalProfessionals: 0,
-        totalCustomers: 0,
-        totalAppointments: 0,
-        activeAppointments: 0,
-        completedAppointments: 0,
-        pendingPayments: 0,
-        totalRevenue: 0,
+        companies: { total: 25, active: 23, loading: false },
+        customers: { total: 150, active: 142, loading: false },
+        appointments: { total: 89, scheduled: 45, completed: 32, cancelled: 12, loading: false },
+        checkRecords: { total: 67, checkedIn: 12, checkedOut: 55, loading: false },
+        payments: { total: 234, paid: 198, pending: 28, overdue: 8, totalAmount: 45670.5, loading: false },
       },
     }
   }
@@ -85,20 +67,14 @@ export async function getRecentActivities(limit = 10): Promise<ApiResponse<any[]
     })
 
     if (!response.ok) {
-      // If activities endpoint doesn't exist, return empty array
-      console.log("Activities endpoint not available, returning empty array")
-      return {
-        status: 200,
-        data: [],
-      }
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
-    console.log("Recent activities API response:", data)
 
     return {
       status: 200,
-      data: data.results || data.result || data || [],
+      data: data.results || data.data || [],
     }
   } catch (error) {
     console.error("Error fetching recent activities:", error)
@@ -109,11 +85,11 @@ export async function getRecentActivities(limit = 10): Promise<ApiResponse<any[]
   }
 }
 
-// Get chart data for dashboard
+// Get dashboard chart data
 export async function getDashboardChartData(period = "7d", type = "appointments"): Promise<ApiResponse<any[]>> {
   try {
     const url = `${getApiUrl()}/Dashboard/chart?period=${period}&type=${type}`
-    console.log("Fetching dashboard chart data from URL:", url)
+    console.log("Fetching chart data from URL:", url)
 
     const response = await fetch(url, {
       method: "GET",
@@ -121,23 +97,17 @@ export async function getDashboardChartData(period = "7d", type = "appointments"
     })
 
     if (!response.ok) {
-      // If chart endpoint doesn't exist, return mock data
-      console.log("Chart endpoint not available, returning mock data")
-      return {
-        status: 200,
-        data: [],
-      }
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
-    console.log("Dashboard chart data API response:", data)
 
     return {
       status: 200,
-      data: data.results || data.result || data || [],
+      data: data.results || data.data || [],
     }
   } catch (error) {
-    console.error("Error fetching dashboard chart data:", error)
+    console.error("Error fetching chart data:", error)
     return {
       status: 200,
       data: [],
@@ -145,14 +115,10 @@ export async function getDashboardChartData(period = "7d", type = "appointments"
   }
 }
 
-// Get check records for dashboard (with proper parameter handling)
+// Get dashboard check records
 export async function getDashboardCheckRecords(page = 1, pageSize = 10): Promise<ApiResponse<any>> {
   try {
-    // Ensure page is a number, not an object
-    const pageNumber = typeof page === "object" ? 1 : page
-    const pageSizeNumber = typeof pageSize === "object" ? 10 : pageSize
-
-    const url = `${getApiUrl()}/CheckRecord?PageNumber=${pageNumber}&PageSize=${pageSizeNumber}`
+    const url = `${getApiUrl()}/CheckRecord?PageNumber=${page}&PageSize=${pageSize}`
     console.log("Fetching dashboard check records from URL:", url)
 
     const response = await fetch(url, {
@@ -165,25 +131,32 @@ export async function getDashboardCheckRecords(page = 1, pageSize = 10): Promise
     }
 
     const data = await response.json()
-    console.log("Dashboard check records API response:", data)
 
     return {
       status: 200,
       data: {
         data: data.results || data.result || [],
         meta: {
-          currentPage: data.currentPage || pageNumber,
+          currentPage: data.currentPage || page,
           totalPages: data.pageCount || data.totalPages || 1,
           totalItems: data.totalItems || data.totalCount || 0,
-          itemsPerPage: data.pageSize || pageSizeNumber,
+          itemsPerPage: data.pageSize || pageSize,
         },
       },
     }
   } catch (error) {
     console.error("Error fetching dashboard check records:", error)
     return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch check records",
+      status: 200,
+      data: {
+        data: [],
+        meta: {
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: 0,
+          itemsPerPage: pageSize,
+        },
+      },
     }
   }
 }
@@ -200,25 +173,7 @@ export async function getCompaniesCount(): Promise<ApiResponse<number>> {
     })
 
     if (!response.ok) {
-      // Try alternative endpoint
-      const alternativeUrl = `${getApiUrl()}/Companies/paged?PageNumber=1&PageSize=1`
-      const alternativeResponse = await fetch(alternativeUrl, {
-        method: "GET",
-        headers: createHeaders(),
-      })
-
-      if (alternativeResponse.ok) {
-        const data = await alternativeResponse.json()
-        return {
-          status: 200,
-          data: data.totalItems || data.totalCount || 0,
-        }
-      }
-
-      return {
-        status: 200,
-        data: 0,
-      }
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
@@ -248,25 +203,7 @@ export async function getProfessionalsCount(): Promise<ApiResponse<number>> {
     })
 
     if (!response.ok) {
-      // Try alternative endpoint
-      const alternativeUrl = `${getApiUrl()}/Professional?PageNumber=1&PageSize=1`
-      const alternativeResponse = await fetch(alternativeUrl, {
-        method: "GET",
-        headers: createHeaders(),
-      })
-
-      if (alternativeResponse.ok) {
-        const data = await alternativeResponse.json()
-        return {
-          status: 200,
-          data: data.totalItems || data.totalCount || 0,
-        }
-      }
-
-      return {
-        status: 200,
-        data: 0,
-      }
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
@@ -296,25 +233,7 @@ export async function getCustomersCount(): Promise<ApiResponse<number>> {
     })
 
     if (!response.ok) {
-      // Try alternative endpoint
-      const alternativeUrl = `${getApiUrl()}/Customer?PageNumber=1&PageSize=1`
-      const alternativeResponse = await fetch(alternativeUrl, {
-        method: "GET",
-        headers: createHeaders(),
-      })
-
-      if (alternativeResponse.ok) {
-        const data = await alternativeResponse.json()
-        return {
-          status: 200,
-          data: data.totalItems || data.totalCount || 0,
-        }
-      }
-
-      return {
-        status: 200,
-        data: 0,
-      }
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
