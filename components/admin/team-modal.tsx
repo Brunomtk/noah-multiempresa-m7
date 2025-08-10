@@ -28,30 +28,35 @@ interface Company {
 
 interface Leader {
   id: number
+  userId: number
   name: string
   email: string
   phone: string
-  status: string
+  region: string
+  status: number
   createdDate: string
+  updatedDate: string
 }
 
 interface Team {
   id?: number
   name: string
+  region: string
   description: string
-  companyId: number
-  companyName?: string
-  leaderId?: number
-  leaderName?: string
-  membersCount?: number
+  rating?: number
+  completedServices?: number
   status: number
+  companyId: number
+  company?: any
+  leaderId?: number
+  leader?: any
   createdDate?: string
   updatedDate?: string
 }
 
 interface TeamModalProps {
   isOpen: boolean
-  team?: Team
+  team?: Team | null
   companies: Company[]
   onSubmit: (data: any) => void
   onCancel: () => void
@@ -60,6 +65,7 @@ interface TeamModalProps {
 export function TeamModal({ isOpen, team, companies, onSubmit, onCancel }: TeamModalProps) {
   const [formData, setFormData] = useState({
     name: "",
+    region: "",
     description: "",
     companyId: "",
     leaderId: "",
@@ -137,6 +143,7 @@ export function TeamModal({ isOpen, team, companies, onSubmit, onCancel }: TeamM
     if (team) {
       setFormData({
         name: team.name || "",
+        region: team.region || "",
         description: team.description || "",
         companyId: team.companyId?.toString() || "",
         leaderId: team.leaderId?.toString() || "",
@@ -145,6 +152,7 @@ export function TeamModal({ isOpen, team, companies, onSubmit, onCancel }: TeamM
     } else {
       setFormData({
         name: "",
+        region: "",
         description: "",
         companyId: "",
         leaderId: "",
@@ -187,6 +195,7 @@ export function TeamModal({ isOpen, team, companies, onSubmit, onCancel }: TeamM
     try {
       const teamData = {
         name: formData.name.trim(),
+        region: formData.region.trim(),
         description: formData.description.trim(),
         companyId: Number.parseInt(formData.companyId),
         leaderId: formData.leaderId ? Number.parseInt(formData.leaderId) : null,
@@ -252,27 +261,37 @@ export function TeamModal({ isOpen, team, companies, onSubmit, onCancel }: TeamM
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="status">Status *</Label>
-                      <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              Active
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="0">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                              Inactive
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="region">Region</Label>
+                      <Input
+                        id="region"
+                        value={formData.region}
+                        onChange={(e) => handleInputChange("region", e.target.value)}
+                        placeholder="Enter region"
+                      />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status *</Label>
+                    <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            Active
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="0">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                            Inactive
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -399,9 +418,10 @@ export function TeamModal({ isOpen, team, companies, onSubmit, onCancel }: TeamM
                           <div className="text-sm text-muted-foreground space-y-1">
                             <p>Email: {getSelectedLeader()?.email}</p>
                             <p>Phone: {getSelectedLeader()?.phone}</p>
+                            <p>Region: {getSelectedLeader()?.region}</p>
                           </div>
                         </div>
-                        <Badge variant="outline">{getSelectedLeader()?.status}</Badge>
+                        <Badge variant="outline">{getSelectedLeader()?.status === 1 ? "Active" : "Inactive"}</Badge>
                       </div>
                     </div>
                   )}
@@ -422,16 +442,14 @@ export function TeamModal({ isOpen, team, companies, onSubmit, onCancel }: TeamM
                     <div className="grid gap-4 md:grid-cols-3">
                       <div className="text-center p-3 bg-muted rounded-lg">
                         <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <div className="text-2xl font-bold">{team.membersCount || 0}</div>
-                        <div className="text-sm text-muted-foreground">Members</div>
+                        <div className="text-2xl font-bold">{team.rating?.toFixed(1) || "0.0"}</div>
+                        <div className="text-sm text-muted-foreground">Rating</div>
                       </div>
 
                       <div className="text-center p-3 bg-muted rounded-lg">
                         <Calendar className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <div className="text-sm font-medium">Created</div>
-                        <div className="text-sm text-muted-foreground">
-                          {team.createdDate ? new Date(team.createdDate).toLocaleDateString() : "N/A"}
-                        </div>
+                        <div className="text-2xl font-bold">{team.completedServices || 0}</div>
+                        <div className="text-sm text-muted-foreground">Services</div>
                       </div>
 
                       <div className="text-center p-3 bg-muted rounded-lg">

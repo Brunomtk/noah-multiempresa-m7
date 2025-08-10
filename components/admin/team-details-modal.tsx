@@ -22,20 +22,46 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  MapPin,
+  Phone,
+  User,
 } from "lucide-react"
 
 interface Team {
   id: number
   name: string
+  region: string
   description: string
-  companyId: number
-  companyName?: string
-  leaderId?: number
-  leaderName?: string
-  membersCount?: number
+  rating: number
+  completedServices: number
   status: number
-  createdDate?: string
-  updatedDate?: string
+  companyId: number
+  company?: {
+    id: number
+    name: string
+    cnpj: string
+    responsible: string
+    email: string
+    phone: string
+    planId: number
+    status: number
+    createdDate: string
+    updatedDate: string
+  }
+  leaderId?: number
+  leader?: {
+    id: number
+    userId: number
+    name: string
+    email: string
+    phone: string
+    region: string
+    status: number
+    createdDate: string
+    updatedDate: string
+  }
+  createdDate: string
+  updatedDate: string
 }
 
 interface TeamDetailsModalProps {
@@ -51,7 +77,7 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
 
   if (!team) return null
 
-  // Mock data for demonstration
+  // Mock data for demonstration - in real app this would come from API
   const mockMembers = [
     {
       id: 1,
@@ -62,6 +88,7 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
       rating: 4.8,
       completedTasks: 45,
       avatar: "/placeholder-user.jpg",
+      status: "active",
     },
     {
       id: 2,
@@ -72,6 +99,7 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
       rating: 4.9,
       completedTasks: 32,
       avatar: "/placeholder-user.jpg",
+      status: "active",
     },
     {
       id: 3,
@@ -82,6 +110,7 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
       rating: 4.6,
       completedTasks: 38,
       avatar: "/placeholder-user.jpg",
+      status: "active",
     },
   ]
 
@@ -107,6 +136,13 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
       timestamp: "2024-01-08T09:00:00Z",
       user: "Maria Santos",
     },
+    {
+      id: 4,
+      type: "rating_updated",
+      description: "Team rating updated to 4.7 stars",
+      timestamp: "2024-01-07T16:20:00Z",
+      user: "System",
+    },
   ]
 
   const getActivityIcon = (type: string) => {
@@ -117,6 +153,8 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
         return <Users className="h-4 w-4 text-blue-500" />
       case "task_assigned":
         return <AlertCircle className="h-4 w-4 text-orange-500" />
+      case "rating_updated":
+        return <Star className="h-4 w-4 text-yellow-500" />
       default:
         return <Clock className="h-4 w-4 text-gray-500" />
     }
@@ -131,6 +169,14 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
     ))
   }
 
+  const getStatusBadge = (status: number) => {
+    return (
+      <Badge variant={status === 1 ? "default" : "secondary"} className="bg-green-500">
+        {status === 1 ? "Active" : "Inactive"}
+      </Badge>
+    )
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] p-0">
@@ -143,6 +189,15 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
               <div>
                 <DialogTitle className="text-xl">{team.name}</DialogTitle>
                 <p className="text-sm text-muted-foreground">{team.description}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  {team.region && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {team.region}
+                    </div>
+                  )}
+                  {getStatusBadge(team.status)}
+                </div>
               </div>
             </div>
             <div className="flex gap-2">
@@ -167,7 +222,7 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-500" />
                     <div>
-                      <p className="text-2xl font-bold">{team.membersCount || mockMembers.length}</p>
+                      <p className="text-2xl font-bold">{mockMembers.length}</p>
                       <p className="text-sm text-muted-foreground">Members</p>
                     </div>
                   </div>
@@ -177,10 +232,10 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-green-500" />
+                    <Star className="h-5 w-5 text-yellow-500" />
                     <div>
-                      <p className="text-2xl font-bold">4.7</p>
-                      <p className="text-sm text-muted-foreground">Avg Rating</p>
+                      <p className="text-2xl font-bold">{team.rating.toFixed(1)}</p>
+                      <p className="text-sm text-muted-foreground">Rating</p>
                     </div>
                   </div>
                 </CardContent>
@@ -189,10 +244,10 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-purple-500" />
+                    <CheckCircle className="h-5 w-5 text-green-500" />
                     <div>
-                      <p className="text-2xl font-bold">115</p>
-                      <p className="text-sm text-muted-foreground">Tasks Done</p>
+                      <p className="text-2xl font-bold">{team.completedServices}</p>
+                      <p className="text-sm text-muted-foreground">Services</p>
                     </div>
                   </div>
                 </CardContent>
@@ -201,9 +256,11 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
-                    <Badge variant={team.status === 1 ? "default" : "secondary"}>
-                      {team.status === 1 ? "Active" : "Inactive"}
-                    </Badge>
+                    <TrendingUp className="h-5 w-5 text-purple-500" />
+                    <div>
+                      <p className="text-2xl font-bold">95%</p>
+                      <p className="text-sm text-muted-foreground">Efficiency</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -231,24 +288,96 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
                     <CardContent className="space-y-4">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Company:</span>
-                        <span className="font-medium">{team.companyName || "N/A"}</span>
+                        <span className="font-medium">{team.company?.name || "N/A"}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Leader:</span>
-                        <span className="font-medium">{team.leaderName || "Not assigned"}</span>
+                        <span className="font-medium">{team.leader?.name || "Not assigned"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Region:</span>
+                        <span className="font-medium">{team.region || "N/A"}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Members:</span>
-                        <span className="font-medium">{team.membersCount || mockMembers.length}</span>
+                        <span className="font-medium">{mockMembers.length}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Status:</span>
-                        <Badge variant={team.status === 1 ? "default" : "secondary"}>
-                          {team.status === 1 ? "Active" : "Inactive"}
-                        </Badge>
+                        {getStatusBadge(team.status)}
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Company Details */}
+                  {team.company && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Building2 className="h-5 w-5" />
+                          Company Details
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Name:</span>
+                          <span className="font-medium">{team.company.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">CNPJ:</span>
+                          <span className="font-medium">{team.company.cnpj}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Responsible:</span>
+                          <span className="font-medium">{team.company.responsible}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">{team.company.email}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Phone:</span>
+                          <span className="font-medium">{team.company.phone}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Leader Details */}
+                  {team.leader && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <User className="h-5 w-5" />
+                          Team Leader
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Name:</span>
+                          <span className="font-medium">{team.leader.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">{team.leader.email}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Phone:</span>
+                          <span className="font-medium">{team.leader.phone}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Region:</span>
+                          <span className="font-medium">{team.leader.region}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Status:</span>
+                          <Badge variant={team.leader.status === 1 ? "default" : "secondary"}>
+                            {team.leader.status === 1 ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Timeline */}
                   <Card>
@@ -307,15 +436,27 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
                             <div>
                               <h4 className="font-medium">{member.name}</h4>
                               <p className="text-sm text-muted-foreground">{member.role}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Mail className="h-3 w-3" />
-                                <span className="text-xs">{member.email}</span>
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+                                <span className="flex items-center gap-1">
+                                  <Mail className="h-3 w-3" />
+                                  {member.email}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {member.phone}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="flex items-center gap-1 mb-1">{renderStars(member.rating)}</div>
-                            <p className="text-sm text-muted-foreground">{member.completedTasks} tasks</p>
+                          <div className="text-right space-y-2">
+                            <Badge variant={member.status === "active" ? "default" : "secondary"}>
+                              {member.status === "active" ? "Active" : "Inactive"}
+                            </Badge>
+                            <div className="flex items-center gap-1 text-sm">
+                              <Star className="h-4 w-4 text-yellow-500" />
+                              <span>{member.rating}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{member.completedTasks} tasks completed</p>
                           </div>
                         </div>
                       ))}
@@ -329,6 +470,7 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
                   <Card>
                     <CardHeader>
                       <CardTitle>Performance Metrics</CardTitle>
+                      <CardDescription>Key performance indicators for this team</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                       <div>
@@ -352,21 +494,32 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
                         </div>
                         <Progress value={95} className="h-2" />
                       </div>
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm">Quality Score</span>
+                          <span className="text-sm font-medium">90%</span>
+                        </div>
+                        <Progress value={90} className="h-2" />
+                      </div>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader>
                       <CardTitle>Monthly Stats</CardTitle>
+                      <CardDescription>Performance data for this month</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tasks Completed:</span>
-                        <span className="font-medium">45</span>
+                        <span className="text-muted-foreground">Services Completed:</span>
+                        <span className="font-medium">{team.completedServices}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Average Rating:</span>
-                        <span className="font-medium">4.7/5.0</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">{team.rating.toFixed(1)}</span>
+                          <Star className="h-4 w-4 text-yellow-500" />
+                        </div>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Total Hours:</span>
@@ -374,7 +527,11 @@ export function TeamDetailsModal({ isOpen, team, onClose, onEdit, onDelete }: Te
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Efficiency:</span>
-                        <span className="font-medium">92%</span>
+                        <span className="font-medium">95%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Team Size:</span>
+                        <span className="font-medium">{mockMembers.length} members</span>
                       </div>
                     </CardContent>
                   </Card>

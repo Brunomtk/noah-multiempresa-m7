@@ -41,12 +41,11 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
     console.log("Fetching dashboard stats from API...")
 
     // Fetch real data from multiple endpoints
-    const [companiesData, customersData, appointmentsData, checkRecordsData, paymentsData] = await Promise.allSettled([
+    const [companiesData, customersData, appointmentsData, checkRecordsData] = await Promise.allSettled([
       apiCall("/Companies"),
       apiCall("/Customer"),
       apiCall("/Appointment"),
       apiCall("/CheckRecord"),
-      apiCall("/Payment"),
     ])
 
     // Process the results
@@ -62,7 +61,6 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
     const customers = processData(customersData)
     const appointments = processData(appointmentsData)
     const checkRecords = processData(checkRecordsData)
-    const payments = processData(paymentsData)
 
     const stats = {
       companies: {
@@ -102,18 +100,13 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
           : 0,
         loading: false,
       },
+      // Remove payments section since the API doesn't exist
       payments: {
-        total: Array.isArray(payments) ? payments.length : 0,
-        paid: Array.isArray(payments) ? payments.filter((p: any) => p.status === "Paid" || p.status === 1).length : 0,
-        pending: Array.isArray(payments)
-          ? payments.filter((p: any) => p.status === "Pending" || p.status === 0).length
-          : 0,
-        overdue: Array.isArray(payments)
-          ? payments.filter((p: any) => p.status === "Overdue" || p.status === 2).length
-          : 0,
-        totalAmount: Array.isArray(payments)
-          ? payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
-          : 0,
+        total: 0,
+        paid: 0,
+        pending: 0,
+        overdue: 0,
+        totalAmount: 0,
         loading: false,
       },
     }

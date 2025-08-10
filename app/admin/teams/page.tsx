@@ -26,13 +26,36 @@ import { getApiUrl } from "@/lib/api/utils"
 interface Team {
   id: number
   name: string
+  region: string
   description: string
-  companyId: number
-  companyName: string
-  leaderId?: number
-  leaderName?: string
-  membersCount: number
+  rating: number
+  completedServices: number
   status: number
+  companyId: number
+  company?: {
+    id: number
+    name: string
+    cnpj: string
+    responsible: string
+    email: string
+    phone: string
+    planId: number
+    status: number
+    createdDate: string
+    updatedDate: string
+  }
+  leaderId?: number
+  leader?: {
+    id: number
+    userId: number
+    name: string
+    email: string
+    phone: string
+    region: string
+    status: number
+    createdDate: string
+    updatedDate: string
+  }
   createdDate: string
   updatedDate: string
 }
@@ -87,16 +110,12 @@ export default function AdminTeamsPage() {
   const fetchTeams = async () => {
     try {
       setLoading(true)
-      const data = await apiCall("/Team")
+      const data = await apiCall("/Team/paged")
 
-      // Handle different response formats
-      const teamsArray = data.results || data.result || data.data || data || []
-
-      // Ensure we have an array
-      const teams = Array.isArray(teamsArray) ? teamsArray : []
-
-      setTeams(teams)
-      console.log("Teams loaded:", teams)
+      // Handle the paged response format
+      const teamsArray = data.results || []
+      setTeams(teamsArray)
+      console.log("Teams loaded:", teamsArray)
     } catch (error) {
       console.error("Error fetching teams:", error)
       toast({
@@ -123,16 +142,21 @@ export default function AdminTeamsPage() {
     }
   }
 
-  const handleCreateTeam = async (teamData: Omit<Team, "id" | "createdDate" | "updatedDate">) => {
+  const handleCreateTeam = async (teamData: any) => {
     try {
+      const payload = {
+        name: teamData.name,
+        leaderId: teamData.leaderId || null,
+        region: teamData.region || "",
+        description: teamData.description,
+        companyId: teamData.companyId,
+      }
+
+      console.log("Creating team with payload:", payload)
+
       await apiCall("/Team", {
         method: "POST",
-        body: JSON.stringify({
-          ...teamData,
-          status: 1,
-          createdDate: new Date().toISOString(),
-          updatedDate: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       })
 
       toast({
@@ -152,17 +176,31 @@ export default function AdminTeamsPage() {
     }
   }
 
-  const handleUpdateTeam = async (teamData: Partial<Team>) => {
+  const handleUpdateTeam = async (teamData: any) => {
     if (!selectedTeam) return
 
     try {
+      const payload = {
+        id: selectedTeam.id,
+        createdDate: selectedTeam.createdDate,
+        updatedDate: new Date().toISOString(),
+        name: teamData.name,
+        region: teamData.region || selectedTeam.region,
+        description: teamData.description,
+        rating: selectedTeam.rating,
+        completedServices: selectedTeam.completedServices,
+        status: teamData.status,
+        companyId: teamData.companyId,
+        company: selectedTeam.company,
+        leaderId: teamData.leaderId || null,
+        leader: selectedTeam.leader,
+      }
+
+      console.log("Updating team with payload:", payload)
+
       await apiCall(`/Team/${selectedTeam.id}`, {
         method: "PUT",
-        body: JSON.stringify({
-          ...selectedTeam,
-          ...teamData,
-          updatedDate: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       })
 
       toast({
@@ -224,8 +262,8 @@ export default function AdminTeamsPage() {
     (team) =>
       team.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.leaderName?.toLowerCase().includes(searchTerm.toLowerCase()),
+      team.company?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.leader?.name?.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   useEffect(() => {
@@ -294,11 +332,13 @@ export default function AdminTeamsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg Rating</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{teams.reduce((sum, team) => sum + (team.membersCount || 0), 0)}</div>
+            <div className="text-2xl font-bold">
+              {teams.length > 0 ? (teams.reduce((sum, team) => sum + team.rating, 0) / teams.length).toFixed(1) : "0.0"}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -330,7 +370,8 @@ export default function AdminTeamsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Leader</TableHead>
-                  <TableHead>Members</TableHead>
+                  <TableHead>Region</TableHead>
+                  <TableHead>Rating</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -339,7 +380,7 @@ export default function AdminTeamsPage() {
               <TableBody>
                 {filteredTeams.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? "No teams found matching your search." : "No teams found."}
                     </TableCell>
                   </TableRow>
@@ -354,10 +395,14 @@ export default function AdminTeamsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{team.companyName || "N/A"}</TableCell>
-                      <TableCell>{team.leaderName || "No leader assigned"}</TableCell>
+                      <TableCell>{team.company?.name || "N/A"}</TableCell>
+                      <TableCell>{team.leader?.name || "No leader assigned"}</TableCell>
+                      <TableCell>{team.region || "N/A"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{team.membersCount || 0} members</Badge>
+                        <div className="flex items-center gap-1">
+                          <span>{team.rating.toFixed(1)}</span>
+                          <span className="text-yellow-500">★</span>
+                        </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(team.status)}</TableCell>
                       <TableCell>
