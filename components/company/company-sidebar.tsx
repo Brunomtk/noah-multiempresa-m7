@@ -5,7 +5,22 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LayoutDashboard, Calendar, Users, UserCheck, MapPin, ChevronLeft, ChevronRight, Bell, XCircle, CreditCard, Package, User, CheckSquare, MessageSquare } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  UserCheck,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
+  XCircle,
+  CreditCard,
+  Package,
+  User,
+  CheckSquare,
+  MessageSquare,
+} from "lucide-react"
 import { NoahLogo } from "@/components/noah-logo"
 import { useCompanySidebar } from "./company-sidebar-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -104,7 +119,7 @@ export function CompanySidebar() {
         {!collapsed && (
           <Link href="/company/dashboard" className="flex items-center space-x-2">
             <NoahLogo className="h-8 w-8" />
-            <span className="text-xl font-bold text-white">Noah</span>
+            <span className="text-xl font-bold text-white">Maids Flow</span>
           </Link>
         )}
         {collapsed && (
