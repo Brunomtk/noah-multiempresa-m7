@@ -36,6 +36,8 @@ export async function getTeams(
       url += `&search=${encodeURIComponent(search)}`
     }
 
+    console.log("Fetching teams from URL:", url)
+
     const response = await fetch(url, {
       method: "GET",
       headers: createHeaders(),
@@ -46,6 +48,7 @@ export async function getTeams(
     }
 
     const data = await response.json()
+    console.log("Teams API response:", data)
 
     return {
       status: 200,
@@ -71,7 +74,10 @@ export async function getTeams(
 // Get team by ID
 export async function getTeamById(id: string): Promise<ApiResponse<Team>> {
   try {
-    const response = await fetch(`${getApiUrl()}/Team/${id}`, {
+    const url = `${getApiUrl()}/Team/${id}`
+    console.log("Fetching team by ID from URL:", url)
+
+    const response = await fetch(url, {
       method: "GET",
       headers: createHeaders(),
     })
@@ -98,7 +104,10 @@ export async function getTeamById(id: string): Promise<ApiResponse<Team>> {
 // Create new team
 export async function createTeam(data: CreateTeamRequest): Promise<ApiResponse<Team>> {
   try {
-    const response = await fetch(`${getApiUrl()}/Team`, {
+    const url = `${getApiUrl()}/Team`
+    console.log("Creating team at URL:", url)
+
+    const response = await fetch(url, {
       method: "POST",
       headers: createHeaders(),
       body: JSON.stringify(data),
@@ -127,7 +136,10 @@ export async function createTeam(data: CreateTeamRequest): Promise<ApiResponse<T
 // Update team
 export async function updateTeam(id: string, data: UpdateTeamRequest): Promise<ApiResponse<Team>> {
   try {
-    const response = await fetch(`${getApiUrl()}/Team/${id}`, {
+    const url = `${getApiUrl()}/Team/${id}`
+    console.log("Updating team at URL:", url)
+
+    const response = await fetch(url, {
       method: "PUT",
       headers: createHeaders(),
       body: JSON.stringify(data),
@@ -157,7 +169,10 @@ export async function updateTeam(id: string, data: UpdateTeamRequest): Promise<A
 // Delete team
 export async function deleteTeam(id: string): Promise<ApiResponse<void>> {
   try {
-    const response = await fetch(`${getApiUrl()}/Team/${id}`, {
+    const url = `${getApiUrl()}/Team/${id}`
+    console.log("Deleting team at URL:", url)
+
+    const response = await fetch(url, {
       method: "DELETE",
       headers: createHeaders(),
     })

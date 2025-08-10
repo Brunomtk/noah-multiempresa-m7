@@ -139,7 +139,13 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
 
   // Função para fazer chamadas à API
   const apiCall = async (endpoint: string) => {
-    const response = await fetch(`${getApiUrl()}${endpoint}`, {
+    // Remove /api prefix if it exists in endpoint to avoid duplication
+    const cleanEndpoint = endpoint.startsWith("/api") ? endpoint.substring(4) : endpoint
+    const url = `${getApiUrl()}${cleanEndpoint}`
+
+    console.log("Making API call to:", url)
+
+    const response = await fetch(url, {
       method: "GET",
       headers: createHeaders(),
     })
@@ -155,7 +161,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
   const loadCompanies = async () => {
     try {
       setLoadingCompanies(true)
-      const data = await apiCall("/api/Companies")
+      const data = await apiCall("/Companies")
       console.log("Companies response:", data)
       setCompanies(Array.isArray(data) ? data : [])
     } catch (error) {
@@ -170,7 +176,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
   const loadCustomers = async () => {
     try {
       setLoadingCustomers(true)
-      const data = await apiCall("/api/Customer")
+      const data = await apiCall("/Customer")
       console.log("Customers response:", data)
       setCustomers(data.results || [])
     } catch (error) {
@@ -185,7 +191,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
   const loadTeams = async () => {
     try {
       setLoadingTeams(true)
-      const data = await apiCall("/api/Team?page=1&pageSize=100&status=all")
+      const data = await apiCall("/Team?page=1&pageSize=100&status=all")
       console.log("Teams response:", data)
       setTeams(data.results || [])
     } catch (error) {
@@ -200,7 +206,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
   const loadProfessionals = async () => {
     try {
       setLoadingProfessionals(true)
-      const data = await apiCall("/api/Professional")
+      const data = await apiCall("/Professional")
       console.log("Professionals response:", data)
       setProfessionals(Array.isArray(data) ? data : [])
     } catch (error) {
