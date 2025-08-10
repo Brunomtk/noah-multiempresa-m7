@@ -1,347 +1,228 @@
-import type { ApiResponse, CheckRecord } from "@/types"
-import { fetchApi } from "./utils"
+import { apiRequest } from "./utils"
+import type { CheckRecord } from "@/types/check-record"
 
-export interface CheckRecordFilters {
-  professionalId?: string
-  customerId?: string
-  companyId?: string
-  teamId?: string
-  status?: number
-  startDate?: string
-  endDate?: string
-  pageNumber?: number
-  pageSize?: number
-}
-
-export interface CheckInData {
-  professionalId: string
-  customerId: string
-  companyId: string
-  teamId?: string
-  appointmentId?: string
-  address: string
-  serviceType: string
-  notes?: string
-  checkInPhoto?: string
-  location?: {
-    latitude: number
-    longitude: number
-  }
-}
-
-export interface CheckOutData {
-  checkRecordId: string
-  checkOutPhoto?: string
-  notes?: string
-  materialsUsed?: Array<{
-    materialId: string
-    quantity: number
-  }>
-  location?: {
-    latitude: number
-    longitude: number
-  }
-}
-
-// Get check records with filters
-export async function getCheckRecords(filters: CheckRecordFilters = {}): Promise<ApiResponse<CheckRecord[]>> {
+// Helper to get user ID from token
+function getUserIdFromToken(): string {
   try {
-    const params = new URLSearchParams()
+    const token = localStorage.getItem("noah_token")
+    if (!token) return "1"
 
-    if (filters.professionalId) params.append("professionalId", filters.professionalId)
-    if (filters.customerId) params.append("customerId", filters.customerId)
-    if (filters.companyId) params.append("companyId", filters.companyId)
-    if (filters.teamId) params.append("teamId", filters.teamId)
-    if (filters.status !== undefined) params.append("status", filters.status.toString())
-    if (filters.startDate) params.append("startDate", filters.startDate)
-    if (filters.endDate) params.append("endDate", filters.endDate)
-    if (filters.pageNumber) params.append("PageNumber", filters.pageNumber.toString())
-    if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    return payload.UserId || payload.userId || "1"
+  } catch {
+    return "1"
+  }
+}
 
-    const queryString = params.toString()
-    const endpoint = queryString ? `/CheckRecord?${queryString}` : "/CheckRecord"
+// Helper to get company ID from token
+function getCompanyIdFromToken(): string {
+  try {
+    const token = localStorage.getItem("noah_token")
+    if (!token) return "1"
 
-    const response = await fetchApi<{
-      results?: CheckRecord[]
-      result?: CheckRecord[]
-      data?: CheckRecord[]
-      totalItems?: number
-      totalCount?: number
-      pageCount?: number
-      totalPages?: number
-      currentPage?: number
-      pageSize?: number
-    }>(endpoint)
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    return payload.CompanyId || payload.companyId || "1"
+  } catch {
+    return "1"
+  }
+}
 
-    return {
-      status: 200,
-      data: response.results || response.result || response.data || [],
-      meta: {
-        totalItems: response.totalItems || response.totalCount || 0,
-        totalPages: response.pageCount || response.totalPages || 1,
-        currentPage: response.currentPage || filters.pageNumber || 1,
-        pageSize: response.pageSize || filters.pageSize || 10,
-      },
-    }
+// Get all check records
+export async function getCheckRecords(): Promise<CheckRecord[]> {
+  try {
+    const companyId = getCompanyIdFromToken()
+    const response = await apiRequest<CheckRecord[]>(`/CheckRecords?CompanyId=${companyId}`)
+    return Array.isArray(response) ? response : []
   } catch (error) {
     console.error("Error fetching check records:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch check records",
-      data: [],
-    }
+    return []
   }
 }
 
-// Get single check record by ID
-export async function getCheckRecord(id: string): Promise<ApiResponse<CheckRecord>> {
+// Get check records by professional ID
+export async function getCheckRecordsByProfessional(professionalId: number): Promise<CheckRecord[]> {
   try {
-    const response = await fetchApi<CheckRecord>(`/CheckRecord/${id}`)
-    return {
-      status: 200,
-      data: response,
-    }
+    const response = await apiRequest<CheckRecord[]>(`/CheckRecords/professional/${professionalId}`)
+    return Array.isArray(response) ? response : []
+  } catch (error) {
+    console.error("Error fetching professional check records:", error)
+    return []
+  }
+}
+
+// Get check record by ID
+export async function getCheckRecordById(id: number): Promise<CheckRecord | null> {
+  try {
+    const response = await apiRequest<CheckRecord>(`/CheckRecords/${id}`)
+    return response || null
   } catch (error) {
     console.error("Error fetching check record:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch check record",
-    }
+    return null
   }
 }
 
-// Perform check-in
-export async function performCheckIn(data: CheckInData): Promise<ApiResponse<CheckRecord>> {
+// Create check-in record
+export async function createCheckIn(data: {
+  professionalId: number
+  appointmentId?: number
+  location: {
+    latitude: number
+    longitude: number
+    address?: string
+  }
+  photo?: string
+  notes?: string
+}): Promise<CheckRecord | null> {
   try {
-    const response = await fetchApi<CheckRecord>("/CheckRecord/checkin", {
+    const companyId = getCompanyIdFromToken()
+    const checkInData = {
+      professionalId: data.professionalId,
+      appointmentId: data.appointmentId,
+      companyId: Number.parseInt(companyId),
+      checkInTime: new Date().toISOString(),
+      checkInLocation: data.location,
+      checkInPhoto: data.photo,
+      notes: data.notes,
+      status: 1, // Checked In
+    }
+
+    const response = await apiRequest<CheckRecord>("/CheckRecords/check-in", {
       method: "POST",
-      body: JSON.stringify({
-        professionalId: data.professionalId,
-        customerId: data.customerId,
-        companyId: data.companyId,
-        teamId: data.teamId,
-        appointmentId: data.appointmentId,
-        address: data.address,
-        serviceType: data.serviceType,
-        notes: data.notes,
-        checkInPhoto: data.checkInPhoto,
-        checkInTime: new Date().toISOString(),
-        status: 1, // Checked in
-        location: data.location,
-      }),
+      body: JSON.stringify(checkInData),
     })
 
-    return {
-      status: 200,
-      data: response,
-    }
+    return response || null
   } catch (error) {
-    console.error("Error performing check-in:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to perform check-in",
-    }
+    console.error("Error creating check-in:", error)
+    return null
   }
 }
 
-// Perform check-out
-export async function performCheckOut(data: CheckOutData): Promise<ApiResponse<CheckRecord>> {
+// Create check-out record
+export async function createCheckOut(data: {
+  checkRecordId: number
+  location: {
+    latitude: number
+    longitude: number
+    address?: string
+  }
+  photo?: string
+  notes?: string
+  workSummary?: string
+}): Promise<CheckRecord | null> {
   try {
-    const response = await fetchApi<CheckRecord>(`/CheckRecord/${data.checkRecordId}/checkout`, {
+    const checkOutData = {
+      checkOutTime: new Date().toISOString(),
+      checkOutLocation: data.location,
+      checkOutPhoto: data.photo,
+      notes: data.notes,
+      workSummary: data.workSummary,
+      status: 2, // Checked Out
+    }
+
+    const response = await apiRequest<CheckRecord>(`/CheckRecords/${data.checkRecordId}/check-out`, {
       method: "PUT",
-      body: JSON.stringify({
-        checkOutPhoto: data.checkOutPhoto,
-        notes: data.notes,
-        materialsUsed: data.materialsUsed,
-        checkOutTime: new Date().toISOString(),
-        status: 2, // Completed
-        location: data.location,
-      }),
+      body: JSON.stringify(checkOutData),
     })
 
-    return {
-      status: 200,
-      data: response,
-    }
+    return response || null
   } catch (error) {
-    console.error("Error performing check-out:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to perform check-out",
-    }
+    console.error("Error creating check-out:", error)
+    return null
   }
 }
 
 // Update check record
-export async function updateCheckRecord(id: string, data: Partial<CheckRecord>): Promise<ApiResponse<CheckRecord>> {
+export async function updateCheckRecord(id: number, data: Partial<CheckRecord>): Promise<CheckRecord | null> {
   try {
-    const response = await fetchApi<CheckRecord>(`/CheckRecord/${id}`, {
+    const response = await apiRequest<CheckRecord>(`/CheckRecords/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     })
 
-    return {
-      status: 200,
-      data: response,
-    }
+    return response || null
   } catch (error) {
     console.error("Error updating check record:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to update check record",
-    }
+    return null
   }
 }
 
 // Delete check record
-export async function deleteCheckRecord(id: string): Promise<ApiResponse<boolean>> {
+export async function deleteCheckRecord(id: number): Promise<boolean> {
   try {
-    await fetchApi(`/CheckRecord/${id}`, {
+    await apiRequest(`/CheckRecords/${id}`, {
       method: "DELETE",
     })
-
-    return {
-      status: 200,
-      data: true,
-    }
+    return true
   } catch (error) {
     console.error("Error deleting check record:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to delete check record",
-    }
+    return false
   }
 }
 
-// Helper functions for getting related data
-export async function getProfessionals(companyId?: string): Promise<ApiResponse<any[]>> {
+// Get active check-in for professional
+export async function getActiveCheckIn(professionalId: number): Promise<CheckRecord | null> {
   try {
-    const endpoint = companyId ? `/Professional?companyId=${companyId}` : "/Professional"
-    const response = await fetchApi<{
-      results?: any[]
-      result?: any[]
-      data?: any[]
-    }>(endpoint)
-
-    return {
-      status: 200,
-      data: response.results || response.result || response.data || [],
-    }
+    const response = await apiRequest<CheckRecord>(`/CheckRecords/active/${professionalId}`)
+    return response || null
   } catch (error) {
-    console.error("Error fetching professionals:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch professionals",
-      data: [],
-    }
+    console.error("Error fetching active check-in:", error)
+    return null
   }
 }
 
-export async function getCompanies(): Promise<ApiResponse<any[]>> {
+// Get check records by date range
+export async function getCheckRecordsByDateRange(
+  startDate: string,
+  endDate: string,
+  professionalId?: number,
+): Promise<CheckRecord[]> {
   try {
-    const response = await fetchApi<{
-      results?: any[]
-      result?: any[]
-      data?: any[]
-    }>("/Companies")
+    let endpoint = `/CheckRecords/date-range?startDate=${startDate}&endDate=${endDate}`
+    if (professionalId) {
+      endpoint += `&professionalId=${professionalId}`
+    }
 
-    return {
-      status: 200,
-      data: response.results || response.result || response.data || [],
-    }
+    const response = await apiRequest<CheckRecord[]>(endpoint)
+    return Array.isArray(response) ? response : []
   } catch (error) {
-    console.error("Error fetching companies:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch companies",
-      data: [],
-    }
+    console.error("Error fetching check records by date range:", error)
+    return []
   }
 }
 
-export async function getCustomers(companyId?: string): Promise<ApiResponse<any[]>> {
+// Get check records statistics
+export async function getCheckRecordsStats(professionalId?: number): Promise<{
+  totalRecords: number
+  totalHours: number
+  averageHoursPerDay: number
+  completedAppointments: number
+  pendingCheckOuts: number
+}> {
   try {
-    const endpoint = companyId ? `/Customer?companyId=${companyId}` : "/Customer"
-    const response = await fetchApi<{
-      results?: any[]
-      result?: any[]
-      data?: any[]
-    }>(endpoint)
-
-    return {
-      status: 200,
-      data: response.results || response.result || response.data || [],
+    let endpoint = "/CheckRecords/stats"
+    if (professionalId) {
+      endpoint += `?professionalId=${professionalId}`
     }
+
+    const response = await apiRequest<any>(endpoint)
+    return (
+      response || {
+        totalRecords: 0,
+        totalHours: 0,
+        averageHoursPerDay: 0,
+        completedAppointments: 0,
+        pendingCheckOuts: 0,
+      }
+    )
   } catch (error) {
-    console.error("Error fetching customers:", error)
+    console.error("Error fetching check records stats:", error)
     return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch customers",
-      data: [],
-    }
-  }
-}
-
-export async function getTeams(companyId?: string): Promise<ApiResponse<any[]>> {
-  try {
-    const endpoint = companyId ? `/Team?companyId=${companyId}` : "/Team"
-    const response = await fetchApi<{
-      results?: any[]
-      result?: any[]
-      data?: any[]
-    }>(endpoint)
-
-    return {
-      status: 200,
-      data: response.results || response.result || response.data || [],
-    }
-  } catch (error) {
-    console.error("Error fetching teams:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch teams",
-      data: [],
-    }
-  }
-}
-
-export async function getAppointments(
-  filters: {
-    companyId?: string
-    professionalId?: string
-    customerId?: string
-    startDate?: string
-    endDate?: string
-  } = {},
-): Promise<ApiResponse<any[]>> {
-  try {
-    const params = new URLSearchParams()
-
-    if (filters.companyId) params.append("companyId", filters.companyId)
-    if (filters.professionalId) params.append("professionalId", filters.professionalId)
-    if (filters.customerId) params.append("customerId", filters.customerId)
-    if (filters.startDate) params.append("startDate", filters.startDate)
-    if (filters.endDate) params.append("endDate", filters.endDate)
-
-    const queryString = params.toString()
-    const endpoint = queryString ? `/Appointment?${queryString}` : "/Appointment"
-
-    const response = await fetchApi<{
-      results?: any[]
-      result?: any[]
-      data?: any[]
-    }>(endpoint)
-
-    return {
-      status: 200,
-      data: response.results || response.result || response.data || [],
-    }
-  } catch (error) {
-    console.error("Error fetching appointments:", error)
-    return {
-      status: 500,
-      error: error instanceof Error ? error.message : "Failed to fetch appointments",
-      data: [],
+      totalRecords: 0,
+      totalHours: 0,
+      averageHoursPerDay: 0,
+      completedAppointments: 0,
+      pendingCheckOuts: 0,
     }
   }
 }

@@ -169,3 +169,6 @@ export function useCompanyAppointments() {
   }
   return context
 }
+
+// Export the context for direct access
+export { CompanyAppointmentsContext }

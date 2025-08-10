@@ -40,6 +40,16 @@ export async function getProfessionalNotifications(): Promise<Notification[]> {
   }
 }
 
+export async function getProfessionalNotificationById(id: number): Promise<Notification | null> {
+  try {
+    const response = await apiRequest(`/Notifications/${id}`)
+    return response || null
+  } catch (error) {
+    console.error("Error fetching notification by ID:", error)
+    return null
+  }
+}
+
 export async function getProfessionalUnreadNotificationsCount(): Promise<number> {
   try {
     const userId = getUserIdFromToken()
@@ -48,6 +58,66 @@ export async function getProfessionalUnreadNotificationsCount(): Promise<number>
   } catch (error) {
     console.error("Error fetching unread count:", error)
     return 0
+  }
+}
+
+export async function markProfessionalNotificationAsRead(id: number): Promise<boolean> {
+  try {
+    await apiRequest(`/Notifications/${id}/read`, { method: "POST" })
+    return true
+  } catch (error) {
+    console.error("Error marking notification as read:", error)
+    return false
+  }
+}
+
+export async function sendProfessionalNotificationResponse(id: number, response: string): Promise<boolean> {
+  try {
+    await apiRequest(`/Notifications/${id}/response`, {
+      method: "POST",
+      body: JSON.stringify({ response }),
+    })
+    return true
+  } catch (error) {
+    console.error("Error sending notification response:", error)
+    return false
+  }
+}
+
+export async function markAllProfessionalNotificationsAsRead(): Promise<boolean> {
+  try {
+    const userId = getUserIdFromToken()
+    await apiRequest(`/Notifications/user/${userId}/mark-all-read`, { method: "POST" })
+    return true
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error)
+    return false
+  }
+}
+
+export async function getProfessionalNotificationsByPriority(
+  priority: "high" | "medium" | "low",
+): Promise<Notification[]> {
+  try {
+    const notifications = await getProfessionalNotifications()
+    const priorityMap = { high: 3, medium: 2, low: 1 }
+    const priorityValue = priorityMap[priority]
+    return notifications.filter((n) => n.type === priorityValue)
+  } catch (error) {
+    console.error("Error fetching notifications by priority:", error)
+    return []
+  }
+}
+
+export async function getProfessionalRecentNotifications(limit = 10): Promise<Notification[]> {
+  try {
+    const notifications = await getProfessionalNotifications()
+    return notifications
+      .sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime())
+      .slice(0, limit)
+  } catch (error) {
+    console.error("Error fetching recent notifications:", error)
+    return []
   }
 }
 

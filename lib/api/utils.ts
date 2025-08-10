@@ -4,6 +4,12 @@ export const apiDelay = (ms: number) => new Promise((resolve) => setTimeout(reso
 // URL base da API
 const API_BASE_URL = "https://206.189.191.51:5001/api"
 
+// Export API_URL for compatibility
+export const API_URL = API_BASE_URL
+
+// Export delay function for compatibility
+export const delay = apiDelay
+
 // Função para obter o token de autenticação
 function getAuthToken(): string | null {
   if (typeof window === "undefined") return null
@@ -123,7 +129,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 
 // Utility function to get API base URL
 export function getApiUrl(): string {
-  return "https://206.189.191.51:5001/api"
+  return API_BASE_URL
 }
 
 // Utility function to get user data from localStorage

@@ -3,10 +3,7 @@ import { fetchApi } from "./utils"
 
 // Helper to parse JWT from localStorage
 function getToken(): string {
-  const t =
-    localStorage.getItem("noah_token") ||
-    localStorage.getItem("authToken") ||
-    localStorage.getItem("token")
+  const t = localStorage.getItem("noah_token") || localStorage.getItem("authToken") || localStorage.getItem("token")
   if (!t) throw new Error("No authentication token found")
   return t
 }
@@ -130,4 +127,94 @@ export async function getCompanyUnreadNotificationsCount(): Promise<number> {
   const userId = getUserIdFromToken()
   const data = await fetchApi<number>(`/Notifications/user/${userId}/unread-count`)
   return typeof data === "number" ? data : 0
+}
+
+// Send notification to professionals
+export async function sendCompanyNotificationToProfessionals(data: {
+  title: string
+  message: string
+  professionalIds: number[]
+  type?: number
+}): Promise<Notification[]> {
+  try {
+    const companyId = getCompanyIdFromToken()
+    const response = await fetchApi<Notification[]>(`/Notifications/send-to-professionals`, {
+      method: "POST",
+      body: JSON.stringify({
+        ...data,
+        companyId: Number.parseInt(companyId),
+        type: data.type || 1,
+      }),
+    })
+    return Array.isArray(response) ? response : []
+  } catch (error) {
+    console.error("Error sending notifications to professionals:", error)
+    return []
+  }
+}
+
+// Broadcast notification to all company members
+export async function broadcastCompanyNotification(data: {
+  title: string
+  message: string
+  type?: number
+}): Promise<Notification> {
+  try {
+    const companyId = getCompanyIdFromToken()
+    const response = await fetchApi<Notification>(`/Notifications/broadcast`, {
+      method: "POST",
+      body: JSON.stringify({
+        ...data,
+        companyId: Number.parseInt(companyId),
+        type: data.type || 1,
+        isBroadcast: true,
+      }),
+    })
+    return response
+  } catch (error) {
+    console.error("Error broadcasting notification:", error)
+    throw error
+  }
+}
+
+// Get company notification statistics
+export async function getCompanyNotificationStats(): Promise<{
+  total: number
+  unread: number
+  read: number
+  important: number
+  thisWeek: number
+  thisMonth: number
+}> {
+  try {
+    const notifications = await getCompanyNotifications()
+    const unreadCount = await getCompanyUnreadNotificationsCount()
+
+    const now = new Date()
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    const thisWeek = notifications.filter((n) => new Date(n.createdDate) >= oneWeekAgo).length
+    const thisMonth = notifications.filter((n) => new Date(n.createdDate) >= oneMonthAgo).length
+    const important = notifications.filter((n) => n.type === 2 || n.type === 3).length
+
+    return {
+      total: notifications.length,
+      unread: unreadCount,
+      read: notifications.length - unreadCount,
+      important,
+      thisWeek,
+      thisMonth,
+    }
+  } catch (error) {
+    console.error("Error getting notification stats:", error)
+    return {
+      total: 0,
+      unread: 0,
+      read: 0,
+      important: 0,
+      thisWeek: 0,
+      thisMonth: 0,
+    }
+  }
 }
