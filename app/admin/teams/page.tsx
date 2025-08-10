@@ -1,14 +1,20 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Eye, Edit, Trash2, Users } from "lucide-react"
-import { TeamModal } from "@/components/admin/team-modal"
-import { TeamDetailsModal } from "@/components/admin/team-details-modal"
-import { useToast } from "@/hooks/use-toast"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,45 +25,74 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Users, Building2, RefreshCw } from "lucide-react"
+import { TeamModal } from "@/components/admin/team-modal"
+import { TeamDetailsModal } from "@/components/admin/team-details-modal"
+import { useToast } from "@/hooks/use-toast"
 import { getApiUrl } from "@/lib/api/utils"
 
-export default function TeamsPage() {
-  const [teams, setTeams] = useState<any[]>([])
-  const [companies, setCompanies] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+interface Team {
+  id: number
+  name: string
+  description: string
+  companyId: number
+  companyName: string
+  leaderId?: number
+  leaderName?: string
+  membersCount: number
+  status: number
+  createdDate: string
+  updatedDate: string
+}
+
+interface Company {
+  id: number
+  name: string
+  cnpj: string
+  responsible: string
+  email: string
+  phone: string
+  status: number
+}
+
+interface Professional {
+  id: number
+  name: string
+  email: string
+  phone: string
+  companyId: number
+  status: string
+}
+
+export default function AdminTeamsPage() {
+  const [teams, setTeams] = useState<Team[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [selectedTeam, setSelectedTeam] = useState<any>(null)
-  const [teamToDelete, setTeamToDelete] = useState<any>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [companyFilter, setCompanyFilter] = useState("all")
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null)
   const { toast } = useToast()
 
-  // Helper function to make API calls with authentication
-  const apiCall = async (url: string, options: RequestInit = {}) => {
-    const token = localStorage.getItem("noah_token")
+  // Helper function to make API calls
+  const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+    const baseUrl = getApiUrl()
+    const url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`
 
-    if (!token) {
-      throw new Error("No authentication token found")
+    const token = localStorage.getItem("noah_token")
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
     }
 
-    // Clean up URL to avoid double /api/api/
-    const cleanUrl = url.startsWith("/api/") ? url.substring(4) : url
-    const fullUrl = `${getApiUrl()}${cleanUrl}`
-
-    console.log("Making API call to:", fullUrl)
-
-    const response = await fetch(fullUrl, {
+    const response = await fetch(url, {
       ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+      headers,
     })
 
     if (!response.ok) {
@@ -67,47 +102,21 @@ export default function TeamsPage() {
     return response.json()
   }
 
-  useEffect(() => {
-    loadTeams()
-    loadCompanies()
-  }, [])
-
-  const loadTeams = async () => {
+  const fetchTeams = async () => {
     try {
-      setIsLoading(true)
-      console.log("Loading teams...")
+      setLoading(true)
+      const data = await apiCall("/Team")
 
-      // Try multiple endpoints for teams
-      const endpoints = [
-        "/Team?PageNumber=1&PageSize=100",
-        "/Teams?PageNumber=1&PageSize=100",
-        "/api/Team?PageNumber=1&PageSize=100",
-        "/api/Teams?PageNumber=1&PageSize=100",
-      ]
+      // Handle different response formats
+      const teamsArray = data.results || data.result || data.data || data || []
 
-      let data = null
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`Trying endpoint: ${endpoint}`)
-          data = await apiCall(endpoint)
-          console.log(`Success with endpoint: ${endpoint}`, data)
-          break
-        } catch (error) {
-          console.log(`Failed endpoint: ${endpoint}`, error)
-          continue
-        }
-      }
+      // Ensure we have an array
+      const teams = Array.isArray(teamsArray) ? teamsArray : []
 
-      if (data) {
-        const teamsData = data.results || data.result || data.data || []
-        console.log("Teams loaded:", teamsData)
-        setTeams(teamsData)
-      } else {
-        console.warn("No teams data received from any endpoint")
-        setTeams([])
-      }
+      setTeams(teams)
+      console.log("Teams loaded:", teams)
     } catch (error) {
-      console.error("Error loading teams:", error)
+      console.error("Error fetching teams:", error)
       toast({
         title: "Error",
         description: "Failed to load teams",
@@ -115,86 +124,86 @@ export default function TeamsPage() {
       })
       setTeams([])
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const loadCompanies = async () => {
+  const fetchCompanies = async () => {
     try {
-      console.log("Loading companies...")
-
-      // Try multiple endpoints for companies
-      const endpoints = [
-        "/Companies/paged?PageNumber=1&PageSize=100",
-        "/Company?PageNumber=1&PageSize=100",
-        "/api/Companies/paged?PageNumber=1&PageSize=100",
-        "/api/Company?PageNumber=1&PageSize=100",
-      ]
-
-      let data = null
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`Trying companies endpoint: ${endpoint}`)
-          data = await apiCall(endpoint)
-          console.log(`Success with companies endpoint: ${endpoint}`, data)
-          break
-        } catch (error) {
-          console.log(`Failed companies endpoint: ${endpoint}`, error)
-          continue
-        }
-      }
-
-      if (data) {
-        const companiesData = data.result || data.results || data.data || []
-        console.log("Companies loaded:", companiesData)
-        setCompanies(companiesData)
-      } else {
-        console.warn("No companies data received from any endpoint")
-        setCompanies([])
-      }
+      const data = await apiCall("/Companies")
+      const companiesArray = data.results || data.result || data.data || data || []
+      const companies = Array.isArray(companiesArray) ? companiesArray : []
+      setCompanies(companies)
+      console.log("Companies loaded:", companies)
     } catch (error) {
-      console.error("Error loading companies:", error)
+      console.error("Error fetching companies:", error)
       setCompanies([])
     }
   }
 
-  const handleAddTeam = async (data: any) => {
+  const fetchProfessionals = async () => {
     try {
-      console.log("Adding team:", data)
-      const newTeam = await apiCall("/Team", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
-      setTeams([...teams, newTeam])
-      setIsModalOpen(false)
-      toast({
-        title: "Team added successfully",
-        description: `Team ${data.name} has been created.`,
-      })
+      const data = await apiCall("/Professional")
+      const professionalsArray = data.results || data.result || data.data || data || []
+      const professionals = Array.isArray(professionalsArray) ? professionalsArray : []
+      setProfessionals(professionals)
+      console.log("Professionals loaded:", professionals)
     } catch (error) {
-      console.error("Error adding team:", error)
+      console.error("Error fetching professionals:", error)
+      setProfessionals([])
+    }
+  }
+
+  const handleCreateTeam = async (teamData: Omit<Team, "id" | "createdDate" | "updatedDate">) => {
+    try {
+      await apiCall("/Team", {
+        method: "POST",
+        body: JSON.stringify({
+          ...teamData,
+          status: 1,
+          createdDate: new Date().toISOString(),
+          updatedDate: new Date().toISOString(),
+        }),
+      })
+
+      toast({
+        title: "Success",
+        description: "Team created successfully",
+      })
+
+      setIsCreateModalOpen(false)
+      fetchTeams()
+    } catch (error) {
+      console.error("Error creating team:", error)
       toast({
         title: "Error",
-        description: "Failed to add team",
+        description: "Failed to create team",
         variant: "destructive",
       })
     }
   }
 
-  const handleEditTeam = async (data: any) => {
+  const handleUpdateTeam = async (teamData: Partial<Team>) => {
+    if (!selectedTeam) return
+
     try {
-      console.log("Editing team:", selectedTeam.id, data)
-      const updatedTeam = await apiCall(`/Team/${selectedTeam.id}`, {
+      await apiCall(`/Team/${selectedTeam.id}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...selectedTeam,
+          ...teamData,
+          updatedDate: new Date().toISOString(),
+        }),
       })
-      setTeams(teams.map((team) => (team.id === selectedTeam.id ? updatedTeam : team)))
-      setSelectedTeam(null)
-      setIsModalOpen(false)
+
       toast({
-        title: "Team updated successfully",
-        description: `Team ${data.name} has been updated.`,
+        title: "Success",
+        description: "Team updated successfully",
       })
+
+      setIsEditModalOpen(false)
+      setSelectedTeam(null)
+      fetchTeams()
     } catch (error) {
       console.error("Error updating team:", error)
       toast({
@@ -206,321 +215,309 @@ export default function TeamsPage() {
   }
 
   const handleDeleteTeam = async () => {
-    if (teamToDelete) {
-      try {
-        console.log("Deleting team:", teamToDelete.id)
-        await apiCall(`/Team/${teamToDelete.id}`, {
-          method: "DELETE",
-        })
-        setTeams(teams.filter((team) => team.id !== teamToDelete.id))
-        toast({
-          title: "Team deleted successfully",
-          description: `Team ${teamToDelete.name} has been removed.`,
-          variant: "destructive",
-        })
-        setTeamToDelete(null)
-      } catch (error) {
-        console.error("Error deleting team:", error)
-        toast({
-          title: "Error",
-          description: "Failed to delete team",
-          variant: "destructive",
-        })
-      }
+    if (!teamToDelete) return
+
+    try {
+      await apiCall(`/Team/${teamToDelete.id}`, {
+        method: "DELETE",
+      })
+
+      toast({
+        title: "Success",
+        description: "Team deleted successfully",
+      })
+
+      setIsDeleteDialogOpen(false)
+      setTeamToDelete(null)
+      fetchTeams()
+    } catch (error) {
+      console.error("Error deleting team:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete team",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleViewDetails = (team: any) => {
-    setSelectedTeam(team)
-    setIsDetailsModalOpen(true)
-  }
-
-  const handleEdit = (team: any) => {
-    setSelectedTeam(team)
-    setIsModalOpen(true)
-  }
-
-  const filteredTeams = teams.filter((team) => {
-    const matchesSearch = (team.name || "").toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || team.status === statusFilter
-    const matchesCompany = companyFilter === "all" || team.companyId?.toString() === companyFilter
-    return matchesSearch && matchesStatus && matchesCompany
-  })
-
-  const getStatusBadge = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "active":
-        return { label: "Active", className: "border-green-500 text-green-500" }
-      case "inactive":
-        return { label: "Inactive", className: "border-red-500 text-red-500" }
+  const getStatusBadge = (status: number) => {
+    switch (status) {
+      case 1:
+        return <Badge className="bg-green-500">Active</Badge>
+      case 0:
+        return <Badge variant="secondary">Inactive</Badge>
       default:
-        return { label: status || "Unknown", className: "border-gray-500 text-gray-500" }
+        return <Badge variant="outline">Unknown</Badge>
     }
   }
 
-  const getCompanyName = (companyId: number) => {
-    const company = companies.find((c) => c.id === companyId)
-    return company?.name || company?.companyName || "Unknown Company"
-  }
+  const filteredTeams = teams.filter(
+    (team) =>
+      team.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.leaderName?.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-  if (isLoading) {
+  useEffect(() => {
+    fetchTeams()
+    fetchCompanies()
+    fetchProfessionals()
+  }, [])
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-white">Loading teams...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     )
   }
 
   return (
-    <TooltipProvider>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">Teams Management</h1>
-            <p className="text-gray-400">Manage teams and their members across all companies in the system.</p>
-          </div>
-          <Button
-            className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
-            onClick={() => {
-              setSelectedTeam(null)
-              setIsModalOpen(true)
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Team
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Teams Management</h1>
+          <p className="text-gray-600">Manage teams and their members</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={fetchTeams} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
+          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Team
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Create New Team</DialogTitle>
+                <DialogDescription>Add a new team to the system</DialogDescription>
+              </DialogHeader>
+              <TeamModal
+                companies={companies}
+                professionals={professionals}
+                onSubmit={handleCreateTeam}
+                onCancel={() => setIsCreateModalOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
-
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search teams..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-full md:w-[300px] bg-[#1a2234] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
-            />
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] bg-[#1a2234] border-[#2a3349] text-white">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                <SelectItem value="all" className="hover:bg-[#2a3349]">
-                  All Statuses
-                </SelectItem>
-                <SelectItem value="active" className="hover:bg-[#2a3349]">
-                  Active
-                </SelectItem>
-                <SelectItem value="inactive" className="hover:bg-[#2a3349]">
-                  Inactive
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={companyFilter} onValueChange={setCompanyFilter}>
-              <SelectTrigger className="w-[180px] bg-[#1a2234] border-[#2a3349] text-white">
-                <SelectValue placeholder="Filter by company" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                <SelectItem value="all" className="hover:bg-[#2a3349]">
-                  All Companies
-                </SelectItem>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id.toString()} className="hover:bg-[#2a3349]">
-                    {company.name || company.companyName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="rounded-md border border-[#2a3349] overflow-hidden">
-          <Table>
-            <TableHeader className="bg-[#1a2234]">
-              <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
-                <TableHead className="text-white">Team</TableHead>
-                <TableHead className="text-white">Company</TableHead>
-                <TableHead className="text-white">Members</TableHead>
-                <TableHead className="text-white">Leader</TableHead>
-                <TableHead className="text-white">Status</TableHead>
-                <TableHead className="text-white">Created</TableHead>
-                <TableHead className="text-white text-center">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTeams.map((team) => (
-                <TableRow key={team.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
-                  <TableCell className="font-medium text-white">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8 border border-[#2a3349]">
-                        <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
-                          {(team.name || "")
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div>{team.name}</div>
-                        <div className="text-xs text-gray-400">{team.description}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-white">{getCompanyName(team.companyId)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4 text-gray-400" />
-                      <span className="text-white">{team.memberCount || 0}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-white">{team.leaderName || "Not assigned"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={getStatusBadge(team.status).className}>
-                      {getStatusBadge(team.status).label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-gray-400">
-                    {team.createdDate ? new Date(team.createdDate).toLocaleDateString() : "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewDetails(team)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View Details</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(team)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Edit</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setTeamToDelete(team)}
-                            className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-400">
-            Showing <span className="font-medium text-white">{filteredTeams.length}</span> of{" "}
-            <span className="font-medium text-white">{teams.length}</span> teams
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] bg-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white"
-            >
-              1
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
-            >
-              2
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] hover:text-white bg-transparent"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-
-        <TeamModal
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false)
-            setSelectedTeam(null)
-          }}
-          onSubmit={selectedTeam ? handleEditTeam : handleAddTeam}
-          team={selectedTeam}
-        />
-
-        <TeamDetailsModal
-          isOpen={isDetailsModalOpen}
-          onClose={() => {
-            setIsDetailsModalOpen(false)
-            setSelectedTeam(null)
-          }}
-          team={selectedTeam}
-          onEdit={handleEdit}
-          onDelete={setTeamToDelete}
-        />
-
-        <AlertDialog open={!!teamToDelete} onOpenChange={() => setTeamToDelete(null)}>
-          <AlertDialogContent className="bg-[#1a2234] border-[#2a3349] text-white">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-400">
-                This action cannot be undone. This will permanently delete the team
-                <span className="font-semibold text-white block mt-1">{teamToDelete?.name}</span>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-transparent border-[#2a3349] text-white hover:bg-[#2a3349]">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteTeam} className="bg-red-600 hover:bg-red-700 text-white border-0">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
-    </TooltipProvider>
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Teams</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{teams.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Teams</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{teams.filter((t) => t.status === 1).length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Companies</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{companies.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{teams.reduce((sum, team) => sum + (team.membersCount || 0), 0)}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Teams</CardTitle>
+          <CardDescription>Manage and organize teams</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search teams..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
+
+          {/* Teams Table */}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Leader</TableHead>
+                  <TableHead>Members</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTeams.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      {searchTerm ? "No teams found matching your search." : "No teams found."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTeams.map((team) => (
+                    <TableRow key={team.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{team.name}</div>
+                          {team.description && (
+                            <div className="text-sm text-muted-foreground truncate max-w-xs">{team.description}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{team.companyName || "N/A"}</TableCell>
+                      <TableCell>{team.leaderName || "No leader assigned"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{team.membersCount || 0} members</Badge>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(team.status)}</TableCell>
+                      <TableCell>
+                        {team.createdDate ? new Date(team.createdDate).toLocaleDateString() : "N/A"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedTeam(team)
+                                setIsDetailsModalOpen(true)
+                              }}
+                            >
+                              <Users className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedTeam(team)
+                                setIsEditModalOpen(true)
+                              }}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setTeamToDelete(team)
+                                setIsDeleteDialogOpen(true)
+                              }}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit Team Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Team</DialogTitle>
+            <DialogDescription>Update team information</DialogDescription>
+          </DialogHeader>
+          {selectedTeam && (
+            <TeamModal
+              team={selectedTeam}
+              companies={companies}
+              professionals={professionals}
+              onSubmit={handleUpdateTeam}
+              onCancel={() => {
+                setIsEditModalOpen(false)
+                setSelectedTeam(null)
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Team Details Modal */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Team Details</DialogTitle>
+            <DialogDescription>View detailed team information</DialogDescription>
+          </DialogHeader>
+          {selectedTeam && (
+            <TeamDetailsModal
+              team={selectedTeam}
+              onClose={() => {
+                setIsDetailsModalOpen(false)
+                setSelectedTeam(null)
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the team "{teamToDelete?.name}" and remove all
+              associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTeamToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTeam} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
