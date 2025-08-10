@@ -1,6 +1,5 @@
 import type { CheckRecord } from "@/types/check-record"
-
-const API_BASE_URL = "https://localhost:44394"
+import { getApiUrl } from "./utils"
 
 // Helper function to make API calls with authentication
 const apiCall = async (url: string, options: RequestInit = {}) => {
@@ -10,7 +9,7 @@ const apiCall = async (url: string, options: RequestInit = {}) => {
     throw new Error("No authentication token found")
   }
 
-  const response = await fetch(`${API_BASE_URL}${url}`, {
+  const response = await fetch(`${getApiUrl()}${url}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -67,9 +66,9 @@ export const getCheckRecords = async (filters?: CheckRecordFilters): Promise<Che
     if (!params.has("PageSize")) params.append("PageSize", "100")
 
     const queryString = params.toString()
-    const url = `/api/CheckRecord${queryString ? `?${queryString}` : ""}`
+    const url = `/CheckRecord${queryString ? `?${queryString}` : ""}`
 
-    console.log("Fetching check records from:", url)
+    console.log("Fetching check records from:", `${getApiUrl()}${url}`)
     const data = await apiCall(url)
     console.log("Check records response:", data)
 
@@ -84,7 +83,7 @@ export const getCheckRecords = async (filters?: CheckRecordFilters): Promise<Che
 export const getCheckRecordById = async (id: string): Promise<CheckRecord> => {
   try {
     console.log("Fetching check record by ID:", id)
-    const data = await apiCall(`/api/CheckRecord/${id}`)
+    const data = await apiCall(`/CheckRecord/${id}`)
     console.log("Check record response:", data)
     return data
   } catch (error) {
@@ -99,7 +98,7 @@ export const createCheckRecord = async (
 ): Promise<CheckRecord> => {
   try {
     console.log("Creating check record:", data)
-    const response = await apiCall("/api/CheckRecord", {
+    const response = await apiCall("/CheckRecord", {
       method: "POST",
       body: JSON.stringify({
         professionalId: data.professionalId,
@@ -127,7 +126,7 @@ export const createCheckRecord = async (
 export const updateCheckRecord = async (id: string, data: Partial<CheckRecord>): Promise<CheckRecord> => {
   try {
     console.log("Updating check record:", id, data)
-    const response = await apiCall(`/api/CheckRecord/${id}`, {
+    const response = await apiCall(`/CheckRecord/${id}`, {
       method: "PUT",
       body: JSON.stringify({
         professionalId: data.professionalId,
@@ -158,7 +157,7 @@ export const updateCheckRecord = async (id: string, data: Partial<CheckRecord>):
 export const deleteCheckRecord = async (id: string): Promise<void> => {
   try {
     console.log("Deleting check record:", id)
-    await apiCall(`/api/CheckRecord/${id}`, {
+    await apiCall(`/CheckRecord/${id}`, {
       method: "DELETE",
     })
     console.log("Check record deleted successfully")
@@ -174,7 +173,7 @@ export const performCheckIn = async (
 ): Promise<CheckRecord> => {
   try {
     console.log("Performing check-in:", data)
-    const response = await apiCall("/api/CheckRecord/check-in", {
+    const response = await apiCall("/CheckRecord/check-in", {
       method: "POST",
       body: JSON.stringify({
         professionalId: data.professionalId,
@@ -202,7 +201,7 @@ export const performCheckIn = async (
 export const performCheckOut = async (id: string): Promise<CheckRecord> => {
   try {
     console.log("Performing check-out for record:", id)
-    const response = await apiCall(`/api/CheckRecord/check-out/${id}`, {
+    const response = await apiCall(`/CheckRecord/check-out/${id}`, {
       method: "POST",
       body: "",
     })
@@ -220,15 +219,15 @@ export const getProfessionals = async (companyId?: number): Promise<any[]> => {
     console.log("Fetching professionals...")
 
     const endpoints = [
-      `/api/Professional?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/api/Professionals?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/api/Professional?page=1&pageSize=100",
-      "/api/Professionals?page=1&pageSize=100",
+      `/Professional?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/Professionals?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/Professional?page=1&pageSize=100",
+      "/Professionals?page=1&pageSize=100",
     ]
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`)
+        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
         const data = await apiCall(endpoint)
         console.log("Professionals response:", data)
 
@@ -256,11 +255,11 @@ export const getCompanies = async (): Promise<any[]> => {
   try {
     console.log("Fetching companies...")
 
-    const endpoints = ["/api/Companies?page=1&pageSize=100", "/api/Company?page=1&pageSize=100"]
+    const endpoints = ["/Companies?page=1&pageSize=100", "/Company?page=1&pageSize=100"]
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`)
+        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
         const data = await apiCall(endpoint)
         console.log("Companies response:", data)
 
@@ -289,15 +288,15 @@ export const getCustomers = async (companyId?: number): Promise<any[]> => {
     console.log("Fetching customers for company:", companyId)
 
     const endpoints = [
-      `/api/Customers?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/api/Customer?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/api/Customers?page=1&pageSize=100",
-      "/api/Customer?page=1&pageSize=100",
+      `/Customers?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/Customer?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/Customers?page=1&pageSize=100",
+      "/Customer?page=1&pageSize=100",
     ]
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`)
+        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
         const data = await apiCall(endpoint)
         console.log("Customers response:", data)
 
@@ -326,15 +325,15 @@ export const getTeams = async (companyId?: number): Promise<any[]> => {
     console.log("Fetching teams for company:", companyId)
 
     const endpoints = [
-      `/api/Teams?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/api/Team?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/api/Teams?page=1&pageSize=100",
-      "/api/Team?page=1&pageSize=100",
+      `/Teams?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/Team?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/Teams?page=1&pageSize=100",
+      "/Team?page=1&pageSize=100",
     ]
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`)
+        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
         const data = await apiCall(endpoint)
         console.log("Teams response:", data)
 
@@ -363,15 +362,15 @@ export const getAppointments = async (companyId?: number): Promise<any[]> => {
     console.log("Fetching appointments for company:", companyId)
 
     const endpoints = [
-      `/api/Appointments?CompanyId=${companyId}&page=1&pageSize=100`,
-      `/api/Appointment?CompanyId=${companyId}&page=1&pageSize=100`,
-      "/api/Appointments?page=1&pageSize=100",
-      "/api/Appointment?page=1&pageSize=100",
+      `/Appointments?CompanyId=${companyId}&page=1&pageSize=100`,
+      `/Appointment?CompanyId=${companyId}&page=1&pageSize=100`,
+      "/Appointments?page=1&pageSize=100",
+      "/Appointment?page=1&pageSize=100",
     ]
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`)
+        console.log(`Trying endpoint: ${getApiUrl()}${endpoint}`)
         const data = await apiCall(endpoint)
         console.log("Appointments response:", data)
 
