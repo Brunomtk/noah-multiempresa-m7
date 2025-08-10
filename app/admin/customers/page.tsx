@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, Eye, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, RefreshCw } from "lucide-react"
 import { CustomerModal } from "@/components/admin/customer-modal"
 import { CustomerDetailsModal } from "@/components/admin/customer-details-modal"
 import { useCustomers } from "@/hooks/use-customers"
@@ -24,7 +24,7 @@ import { useCompanies } from "@/hooks/use-companies"
 import type { Customer } from "@/types/customer"
 
 export default function CustomersPage() {
-  const { state, setFilters, deleteCustomer } = useCustomers()
+  const { state, setFilters, deleteCustomer, fetchCustomers } = useCustomers()
   const { companies, fetchCompanies } = useCompanies()
 
   const [modalOpen, setModalOpen] = useState(false)
@@ -48,7 +48,7 @@ export default function CustomersPage() {
       setFilters({
         search: searchTerm,
         status: statusFilter,
-        companyId: companyFilter === "all" ? "" : companyFilter,
+        companyId: companyFilter === "all" ? undefined : Number(companyFilter),
       })
     }, 500)
 
@@ -92,6 +92,10 @@ export default function CustomersPage() {
     setSelectedCustomer(null)
   }
 
+  const handleRefresh = () => {
+    fetchCustomers()
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -99,16 +103,26 @@ export default function CustomersPage() {
           <h1 className="text-3xl font-bold text-white">Customers</h1>
           <p className="text-gray-400">Manage system customers</p>
         </div>
-        <Button
-          onClick={() => {
-            setSelectedCustomer(null)
-            setModalOpen(true)
-          }}
-          className="bg-[#06b6d4] hover:bg-[#0891b2]"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Customer
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleRefresh}
+            variant="outline"
+            className="bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button
+            onClick={() => {
+              setSelectedCustomer(null)
+              setModalOpen(true)
+            }}
+            className="bg-[#06b6d4] hover:bg-[#0891b2]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Customer
+          </Button>
+        </div>
       </div>
 
       <Card className="bg-[#1a2234] border-[#2a3349]">
@@ -162,6 +176,7 @@ export default function CustomersPage() {
                 <TableHead className="text-gray-300">Name</TableHead>
                 <TableHead className="text-gray-300">Document</TableHead>
                 <TableHead className="text-gray-300">Email</TableHead>
+                <TableHead className="text-gray-300">Phone</TableHead>
                 <TableHead className="text-gray-300">Company</TableHead>
                 <TableHead className="text-gray-300">Status</TableHead>
                 <TableHead className="text-gray-300">Created at</TableHead>
@@ -171,13 +186,19 @@ export default function CustomersPage() {
             <TableBody>
               {state.loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-400">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-400">
                     Loading customers...
+                  </TableCell>
+                </TableRow>
+              ) : state.error ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-red-400">
+                    Error: {state.error}
                   </TableCell>
                 </TableRow>
               ) : state.customers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-400">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-400">
                     No customers found
                   </TableCell>
                 </TableRow>
@@ -187,10 +208,11 @@ export default function CustomersPage() {
                     <TableCell className="text-white font-medium">{customer.name}</TableCell>
                     <TableCell className="text-gray-300">{customer.document}</TableCell>
                     <TableCell className="text-gray-300">{customer.email}</TableCell>
+                    <TableCell className="text-gray-300">{customer.phone || "N/A"}</TableCell>
                     <TableCell className="text-gray-300">{customer.company?.name || "N/A"}</TableCell>
                     <TableCell>
                       <Badge variant={customer.status === 1 ? "default" : "secondary"}>
-                        {customer.status === 1 ? "Ativo" : "Inativo"}
+                        {customer.status === 1 ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-gray-300">{formatDate(customer.createdDate)}</TableCell>

@@ -12,10 +12,20 @@ export interface Customer {
   company?: {
     id: number
     name: string
+    cnpj: string
+    responsible: string
+    email: string
+    phone: string
+    planId: number
+    status: number
+    plan?: any
+    users?: any
+    createdDate: string
+    updatedDate: string
   }
   status: number
   createdDate: string
-  updatedDate?: string
+  updatedDate: string
 }
 
 export interface CreateCustomerRequest {
@@ -44,11 +54,11 @@ export interface UpdateCustomerRequest {
 }
 
 export interface CustomerFilters {
+  search?: string
   name?: string
   document?: string
-  email?: string
   companyId?: number
-  status?: number
+  status?: number | string
   pageNumber?: number
   pageSize?: number
 }

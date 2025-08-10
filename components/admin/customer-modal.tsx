@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useCustomers } from "@/hooks/use-customers"
 import { useCompanies } from "@/hooks/use-companies"
@@ -19,7 +20,7 @@ interface CustomerModalProps {
 
 export function CustomerModal({ open, onOpenChange, customer }: CustomerModalProps) {
   const { createCustomer, updateCustomer, state } = useCustomers()
-  const { companies } = useCompanies()
+  const { companies, fetchCompanies } = useCompanies()
 
   const [formData, setFormData] = useState({
     name: "",
@@ -27,9 +28,19 @@ export function CustomerModal({ open, onOpenChange, customer }: CustomerModalPro
     document: "",
     phone: "",
     address: "",
-    companyId: "",
+    city: "",
+    state: "",
+    observations: "",
+    companyId: 0,
     status: 1,
   })
+
+  // Load companies when modal opens
+  useEffect(() => {
+    if (open) {
+      fetchCompanies()
+    }
+  }, [open, fetchCompanies])
 
   useEffect(() => {
     if (customer) {
@@ -39,6 +50,9 @@ export function CustomerModal({ open, onOpenChange, customer }: CustomerModalPro
         document: customer.document,
         phone: customer.phone || "",
         address: customer.address || "",
+        city: customer.city || "",
+        state: customer.state || "",
+        observations: customer.observations || "",
         companyId: customer.companyId,
         status: customer.status,
       })
@@ -49,7 +63,10 @@ export function CustomerModal({ open, onOpenChange, customer }: CustomerModalPro
         document: "",
         phone: "",
         address: "",
-        companyId: "",
+        city: "",
+        state: "",
+        observations: "",
+        companyId: 0,
         status: 1,
       })
     }
@@ -59,17 +76,10 @@ export function CustomerModal({ open, onOpenChange, customer }: CustomerModalPro
     e.preventDefault()
 
     try {
-      const selectedCompany = companies.find((c) => c.id === formData.companyId)
-
-      const customerData = {
-        ...formData,
-        company: selectedCompany || null,
-      }
-
       if (customer) {
-        await updateCustomer(customer.id, customerData)
+        await updateCustomer(customer.id, formData)
       } else {
-        await createCustomer(customerData)
+        await createCustomer(formData)
       }
 
       onOpenChange(false)
@@ -84,62 +94,88 @@ export function CustomerModal({ open, onOpenChange, customer }: CustomerModalPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-md">
+      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white">{customer ? "Edit Customer" : "New Customer"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-gray-300">
-              Name
-            </Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-              className="bg-[#0f172a] border-[#2a3349] text-white"
-              required
-            />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-gray-300">
+                Name *
+              </Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-gray-300">
-              Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleChange("email", e.target.value)}
-              className="bg-[#0f172a] border-[#2a3349] text-white"
-              required
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-gray-300">
+                Email *
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleChange("email", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="document" className="text-gray-300">
-              Document
-            </Label>
-            <Input
-              id="document"
-              value={formData.document}
-              onChange={(e) => handleChange("document", e.target.value)}
-              className="bg-[#0f172a] border-[#2a3349] text-white"
-              required
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="document" className="text-gray-300">
+                Document *
+              </Label>
+              <Input
+                id="document"
+                value={formData.document}
+                onChange={(e) => handleChange("document", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="text-gray-300">
-              Phone
-            </Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              className="bg-[#0f172a] border-[#2a3349] text-white"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-gray-300">
+                Phone
+              </Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => handleChange("phone", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="city" className="text-gray-300">
+                City
+              </Label>
+              <Input
+                id="city"
+                value={formData.city}
+                onChange={(e) => handleChange("city", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="state" className="text-gray-300">
+                State
+              </Label>
+              <Input
+                id="state"
+                value={formData.state}
+                onChange={(e) => handleChange("state", e.target.value)}
+                className="bg-[#0f172a] border-[#2a3349] text-white"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -156,16 +192,16 @@ export function CustomerModal({ open, onOpenChange, customer }: CustomerModalPro
 
           <div className="space-y-2">
             <Label htmlFor="companyId" className="text-gray-300">
-              Company
+              Company *
             </Label>
             <select
               id="companyId"
               value={formData.companyId}
-              onChange={(e) => handleChange("companyId", e.target.value)}
+              onChange={(e) => handleChange("companyId", Number(e.target.value))}
               className="flex h-10 w-full rounded-md border border-[#2a3349] bg-[#0f172a] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               required
             >
-              <option value="">Select a company</option>
+              <option value={0}>Select a company</option>
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>
                   {company.name}
@@ -175,19 +211,34 @@ export function CustomerModal({ open, onOpenChange, customer }: CustomerModalPro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="status" className="text-gray-300">
-              Status
+            <Label htmlFor="observations" className="text-gray-300">
+              Observations
             </Label>
-            <select
-              id="status"
-              value={formData.status}
-              onChange={(e) => handleChange("status", Number(e.target.value))}
-              className="flex h-10 w-full rounded-md border border-[#2a3349] bg-[#0f172a] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value={1}>Active</option>
-              <option value={0}>Inactive</option>
-            </select>
+            <Textarea
+              id="observations"
+              value={formData.observations}
+              onChange={(e) => handleChange("observations", e.target.value)}
+              className="bg-[#0f172a] border-[#2a3349] text-white"
+              rows={3}
+            />
           </div>
+
+          {customer && (
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-gray-300">
+                Status
+              </Label>
+              <select
+                id="status"
+                value={formData.status}
+                onChange={(e) => handleChange("status", Number(e.target.value))}
+                className="flex h-10 w-full rounded-md border border-[#2a3349] bg-[#0f172a] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value={1}>Active</option>
+                <option value={0}>Inactive</option>
+              </select>
+            </div>
+          )}
 
           <DialogFooter>
             <Button

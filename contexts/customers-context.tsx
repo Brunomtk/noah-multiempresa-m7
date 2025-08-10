@@ -4,58 +4,7 @@ import type React from "react"
 import { createContext, useContext, useReducer, useCallback, useEffect } from "react"
 import { toast } from "sonner"
 import type { Customer, CustomerFilters } from "@/types/customer"
-
-// Mock API functions - replace with actual API calls
-const mockCustomers: Customer[] = [
-  {
-    id: "1",
-    name: "João Silva",
-    email: "joao@email.com",
-    document: "123.456.789-00",
-    phone: "(11) 99999-9999",
-    address: "Rua das Flores, 123",
-    status: 1,
-    companyId: "1",
-    company: {
-      id: "1",
-      name: "Empresa ABC",
-      document: "12.345.678/0001-90",
-      email: "contato@empresaabc.com",
-      phone: "(11) 3333-3333",
-      address: "Av. Principal, 456",
-      status: 1,
-      planId: "1",
-      createdDate: "2024-01-01T00:00:00Z",
-      updatedDate: "2024-01-01T00:00:00Z",
-    },
-    createdDate: "2024-01-01T00:00:00Z",
-    updatedDate: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "2",
-    name: "Maria Santos",
-    email: "maria@email.com",
-    document: "987.654.321-00",
-    phone: "(11) 88888-8888",
-    address: "Rua das Palmeiras, 789",
-    status: 1,
-    companyId: "2",
-    company: {
-      id: "2",
-      name: "Empresa XYZ",
-      document: "98.765.432/0001-10",
-      email: "contato@empresaxyz.com",
-      phone: "(11) 4444-4444",
-      address: "Rua Secundária, 321",
-      status: 1,
-      planId: "2",
-      createdDate: "2024-01-01T00:00:00Z",
-      updatedDate: "2024-01-01T00:00:00Z",
-    },
-    createdDate: "2024-01-01T00:00:00Z",
-    updatedDate: "2024-01-01T00:00:00Z",
-  },
-]
+import { customersApi } from "@/lib/api/customers"
 
 interface CustomersState {
   customers: Customer[]
@@ -73,14 +22,14 @@ type CustomersAction =
   | { type: "SET_SELECTED_CUSTOMER"; payload: Customer | null }
   | { type: "ADD_CUSTOMER"; payload: Customer }
   | { type: "UPDATE_CUSTOMER"; payload: Customer }
-  | { type: "DELETE_CUSTOMER"; payload: string }
+  | { type: "DELETE_CUSTOMER"; payload: number }
 
 interface CustomersContextType {
   state: CustomersState
   fetchCustomers: () => Promise<void>
   createCustomer: (data: Omit<Customer, "id" | "createdDate" | "updatedDate">) => Promise<void>
-  updateCustomer: (id: string, data: Partial<Customer>) => Promise<void>
-  deleteCustomer: (id: string) => Promise<void>
+  updateCustomer: (id: number, data: Partial<Customer>) => Promise<void>
+  deleteCustomer: (id: number) => Promise<void>
   setFilters: (filters: Partial<CustomerFilters>) => void
   setSelectedCustomer: (customer: Customer | null) => void
 }
@@ -94,7 +43,9 @@ const initialState: CustomersState = {
   filters: {
     search: "",
     status: "all",
-    companyId: "",
+    companyId: undefined,
+    pageNumber: 1,
+    pageSize: 10,
   },
   selectedCustomer: null,
 }
@@ -135,31 +86,16 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
     try {
       dispatch({ type: "SET_LOADING", payload: true })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const filters = { ...state.filters }
 
-      let filteredCustomers = [...mockCustomers]
-
-      // Apply filters
+      // Handle search filter - map to name if provided
       if (state.filters.search) {
-        const searchLower = state.filters.search.toLowerCase()
-        filteredCustomers = filteredCustomers.filter(
-          (customer) =>
-            customer.name.toLowerCase().includes(searchLower) ||
-            customer.email.toLowerCase().includes(searchLower) ||
-            customer.document.includes(searchLower),
-        )
+        filters.name = state.filters.search
+        delete filters.search
       }
 
-      if (state.filters.status !== "all") {
-        filteredCustomers = filteredCustomers.filter((customer) => customer.status.toString() === state.filters.status)
-      }
-
-      if (state.filters.companyId) {
-        filteredCustomers = filteredCustomers.filter((customer) => customer.companyId === state.filters.companyId)
-      }
-
-      dispatch({ type: "SET_CUSTOMERS", payload: filteredCustomers })
+      const response = await customersApi.getAll(filters)
+      dispatch({ type: "SET_CUSTOMERS", payload: response.results || [] })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to fetch customers"
       dispatch({ type: "SET_ERROR", payload: message })
@@ -171,16 +107,19 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
     try {
       dispatch({ type: "SET_LOADING", payload: true })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const newCustomer: Customer = {
-        ...data,
-        id: Date.now().toString(),
-        createdDate: new Date().toISOString(),
-        updatedDate: new Date().toISOString(),
+      const createData = {
+        name: data.name,
+        document: data.document,
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        observations: data.observations,
+        companyId: data.companyId,
       }
 
+      const newCustomer = await customersApi.create(createData)
       dispatch({ type: "ADD_CUSTOMER", payload: newCustomer })
       toast.success("Customer created successfully")
     } catch (error) {
@@ -194,24 +133,29 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const updateCustomerAction = useCallback(
-    async (id: string, data: Partial<Customer>) => {
+    async (id: number, data: Partial<Customer>) => {
       try {
         dispatch({ type: "SET_LOADING", payload: true })
-
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000))
 
         const existingCustomer = state.customers.find((c) => c.id === id)
         if (!existingCustomer) {
           throw new Error("Customer not found")
         }
 
-        const updatedCustomer: Customer = {
-          ...existingCustomer,
-          ...data,
-          updatedDate: new Date().toISOString(),
+        const updateData = {
+          id: id,
+          name: data.name || existingCustomer.name,
+          document: data.document || existingCustomer.document,
+          email: data.email || existingCustomer.email,
+          phone: data.phone || existingCustomer.phone,
+          address: data.address || existingCustomer.address,
+          city: data.city || existingCustomer.city,
+          state: data.state || existingCustomer.state,
+          observations: data.observations || existingCustomer.observations,
+          status: data.status !== undefined ? data.status : existingCustomer.status,
         }
 
+        const updatedCustomer = await customersApi.update(updateData)
         dispatch({ type: "UPDATE_CUSTOMER", payload: updatedCustomer })
         toast.success("Customer updated successfully")
       } catch (error) {
@@ -226,13 +170,11 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
     [state.customers],
   )
 
-  const deleteCustomerAction = useCallback(async (id: string) => {
+  const deleteCustomerAction = useCallback(async (id: number) => {
     try {
       dispatch({ type: "SET_LOADING", payload: true })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
+      await customersApi.delete(id)
       dispatch({ type: "DELETE_CUSTOMER", payload: id })
       toast.success("Customer deleted successfully")
     } catch (error) {

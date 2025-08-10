@@ -3,7 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Mail, Phone, MapPin, Building, Calendar, FileText } from "lucide-react"
+import { User, Mail, Phone, MapPin, Building, Calendar, FileText, MessageSquare } from "lucide-react"
 import type { Customer } from "@/types/customer"
 
 interface CustomerDetailsModalProps {
@@ -27,7 +27,7 @@ export function CustomerDetailsModal({ open, onOpenChange, customer }: CustomerD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-2xl">
+      <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <User className="h-5 w-5" />
@@ -36,13 +36,13 @@ export function CustomerDetailsModal({ open, onOpenChange, customer }: CustomerD
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Informações Básicas */}
+          {/* Basic Information */}
           <Card className="bg-[#0f172a] border-[#2a3349]">
             <CardHeader>
               <CardTitle className="text-white text-lg">Basic Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-gray-400">
                     <User className="h-4 w-4" />
@@ -74,6 +74,22 @@ export function CustomerDetailsModal({ open, onOpenChange, customer }: CustomerD
                   </div>
                   <p className="text-white">{customer.phone || "Not provided"}</p>
                 </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-sm">City</span>
+                  </div>
+                  <p className="text-white">{customer.city || "Not provided"}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-sm">State</span>
+                  </div>
+                  <p className="text-white">{customer.state || "Not provided"}</p>
+                </div>
               </div>
 
               {customer.address && (
@@ -83,6 +99,16 @@ export function CustomerDetailsModal({ open, onOpenChange, customer }: CustomerD
                     <span className="text-sm">Address</span>
                   </div>
                   <p className="text-white">{customer.address}</p>
+                </div>
+              )}
+
+              {customer.observations && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <MessageSquare className="h-4 w-4" />
+                    <span className="text-sm">Observations</span>
+                  </div>
+                  <p className="text-white">{customer.observations}</p>
                 </div>
               )}
 
@@ -97,17 +123,17 @@ export function CustomerDetailsModal({ open, onOpenChange, customer }: CustomerD
             </CardContent>
           </Card>
 
-          {/* Informações da Empresa */}
+          {/* Company Information */}
           {customer.company && (
             <Card className="bg-[#0f172a] border-[#2a3349]">
               <CardHeader>
                 <CardTitle className="text-white text-lg flex items-center gap-2">
                   <Building className="h-5 w-5" />
-                  Company
+                  Company Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-gray-400">
                       <Building className="h-4 w-4" />
@@ -121,7 +147,15 @@ export function CustomerDetailsModal({ open, onOpenChange, customer }: CustomerD
                       <FileText className="h-4 w-4" />
                       <span className="text-sm">CNPJ</span>
                     </div>
-                    <p className="text-white">{customer.company.document}</p>
+                    <p className="text-white">{customer.company.cnpj}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <User className="h-4 w-4" />
+                      <span className="text-sm">Responsible</span>
+                    </div>
+                    <p className="text-white">{customer.company.responsible}</p>
                   </div>
 
                   <div className="space-y-2">
@@ -139,22 +173,21 @@ export function CustomerDetailsModal({ open, onOpenChange, customer }: CustomerD
                     </div>
                     <p className="text-white">{customer.company.phone}</p>
                   </div>
-                </div>
 
-                {customer.company.address && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span className="text-sm">Company Address</span>
+                      <span className="text-sm">Company Status</span>
                     </div>
-                    <p className="text-white">{customer.company.address}</p>
+                    <Badge variant={customer.company.status === 1 ? "default" : "secondary"}>
+                      {customer.company.status === 1 ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Informações de Sistema */}
+          {/* System Information */}
           <Card className="bg-[#0f172a] border-[#2a3349]">
             <CardHeader>
               <CardTitle className="text-white text-lg flex items-center gap-2">
