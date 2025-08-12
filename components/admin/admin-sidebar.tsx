@@ -118,7 +118,7 @@ export function AdminSidebar() {
         ) : (
           <Link href="/admin/dashboard" className="flex items-center space-x-2">
             <NoahLogo className="h-8 w-8" />
-            <span className="text-xl font-bold text-white">Noah Admin</span>
+            <span className="text-xl font-bold text-white">Maids Flow Admin</span>
           </Link>
         )}
         <Button

@@ -45,6 +45,7 @@ export function ReviewModal({ isOpen, onClose, onSubmit, review, mode }: ReviewM
     serviceType: "",
     status: 1,
     response: "",
+    responseDate: null,
   })
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -153,6 +154,7 @@ export function ReviewModal({ isOpen, onClose, onSubmit, review, mode }: ReviewM
         serviceType: review.serviceType,
         status: review.status,
         response: review.response || "",
+        responseDate: review.response ? new Date(review.responseDate).toISOString() : null,
       })
     } else if (mode === "create") {
       setFormData({
@@ -171,6 +173,7 @@ export function ReviewModal({ isOpen, onClose, onSubmit, review, mode }: ReviewM
         serviceType: "",
         status: 1,
         response: "",
+        responseDate: null,
       })
     }
   }, [review, mode])
@@ -246,17 +249,22 @@ export function ReviewModal({ isOpen, onClose, onSubmit, review, mode }: ReviewM
 
     try {
       const submitData = {
-        customerId: Number.parseInt(formData.customerId),
-        professionalId: Number.parseInt(formData.professionalId),
-        companyId: Number.parseInt(formData.companyId),
-        teamId: formData.teamId ? Number.parseInt(formData.teamId) : null,
-        appointmentId: formData.appointmentId ? Number.parseInt(formData.appointmentId) : null,
+        customerId: formData.customerId,
+        customerName: formData.customerName,
+        professionalId: formData.professionalId,
+        professionalName: formData.professionalName,
+        teamId: formData.teamId || "",
+        teamName: formData.teamName,
+        companyId: formData.companyId,
+        companyName: formData.companyName,
+        appointmentId: formData.appointmentId || "",
         rating: formData.rating,
         comment: formData.comment,
         date: new Date(formData.date).toISOString(),
         serviceType: formData.serviceType,
         status: formData.status,
-        response: formData.response || null,
+        response: formData.response || "",
+        responseDate: formData.response ? new Date().toISOString() : null,
       }
 
       console.log("Submitting review data:", submitData)

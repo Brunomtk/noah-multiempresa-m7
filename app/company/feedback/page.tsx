@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,121 +8,160 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Search, MessageSquare, AlertTriangle, CheckCircle, Calendar } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { fetchApi } from "@/lib/api/utils"
+import type { InternalFeedback } from "@/types/internal-feedback"
 
-// Mock data for feedback
-const mockFeedback = [
-  {
-    id: 1,
-    professional: "Maria Santos",
-    professionalAvatar: "/placeholder.svg?height=40&width=40&query=MS",
-    date: "2023-05-15",
-    client: "Acme Corporation",
-    address: "123 Main St, Suite 500",
-    type: "issue",
-    message: "Client was not present at the scheduled time. Had to wait 20 minutes.",
-    status: "resolved",
-  },
-  {
-    id: 2,
-    professional: "João Silva",
-    professionalAvatar: "/placeholder.svg?height=40&width=40&query=JS",
-    date: "2023-05-14",
-    client: "John Smith",
-    address: "456 Oak Ave",
-    type: "material",
-    message: "Running low on cleaning supplies. Need more glass cleaner and microfiber cloths.",
-    status: "pending",
-  },
-  {
-    id: 3,
-    professional: "Ana Oliveira",
-    professionalAvatar: "/placeholder.svg?height=40&width=40&query=AO",
-    date: "2023-05-13",
-    client: "Tech Solutions Inc",
-    address: "789 Business Blvd, Floor 2",
-    type: "issue",
-    message: "Difficult to access some areas due to furniture arrangement. Suggested rearrangement for next visit.",
-    status: "resolved",
-  },
-  {
-    id: 4,
-    professional: "Carlos Pereira",
-    professionalAvatar: "/placeholder.svg?height=40&width=40&query=CP",
-    date: "2023-05-12",
-    client: "Sarah Johnson",
-    address: "321 Pine St",
-    type: "suggestion",
-    message: "Client requested specific eco-friendly products for future cleanings.",
-    status: "pending",
-  },
-  {
-    id: 5,
-    professional: "Fernanda Lima",
-    professionalAvatar: "/placeholder.svg?height=40&width=40&query=FL",
-    date: "2023-05-10",
-    client: "Acme Corporation",
-    address: "123 Main St, Suite 500",
-    type: "issue",
-    message: "Security system was activated and required additional time to coordinate entry.",
-    status: "resolved",
-  },
-]
+interface Professional {
+  id: number
+  name: string
+  companyId: number
+}
+
+interface Team {
+  id: number
+  name: string
+  companyId: number
+}
 
 export default function FeedbackPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [feedbacks, setFeedbacks] = useState<InternalFeedback[]>([])
+  const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { user } = useAuth()
+  const { toast } = useToast()
 
-  const filteredFeedback = mockFeedback.filter((feedback) => {
+  const loadData = async () => {
+    if (!user?.companyId) return
+
+    setIsLoading(true)
+    try {
+      // Load professionals for this company
+      const profResponse = await fetchApi<{ results: Professional[] }>(
+        `/Professional/paged?CompanyId=${user.companyId}&PageSize=100`,
+      )
+      setProfessionals(Array.isArray(profResponse) ? profResponse : profResponse?.results || [])
+
+      // Load teams for this company
+      const teamResponse = await fetchApi<{ results: Team[] }>(`/Team/paged?CompanyId=${user.companyId}&PageSize=100`)
+      setTeams(Array.isArray(teamResponse) ? teamResponse : teamResponse?.results || [])
+
+      // Load feedback (filtered by professionals and teams from this company)
+      const feedbackResponse = await fetchApi<{ data: InternalFeedback[] }>(`/InternalFeedback/paged?PageSize=100`)
+      const allFeedback = Array.isArray(feedbackResponse) ? feedbackResponse : feedbackResponse?.data || []
+
+      // Filter feedback to only show items from company professionals/teams
+      const companyProfIds = professionals.map((p) => p.id)
+      const companyTeamIds = teams.map((t) => t.id)
+      const companyFeedback = allFeedback.filter(
+        (f) => companyProfIds.includes(f.professionalId) || companyTeamIds.includes(f.teamId),
+      )
+
+      setFeedbacks(companyFeedback)
+    } catch (error) {
+      console.error("Error loading feedback data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load feedback data. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [user?.companyId])
+
+  const getProfessionalName = (professionalId: number) => {
+    const professional = professionals.find((p) => p.id === professionalId)
+    return professional?.name || `Professional ${professionalId}`
+  }
+
+  const getTeamName = (teamId: number) => {
+    const team = teams.find((t) => t.id === teamId)
+    return team?.name || `Team ${teamId}`
+  }
+
+  const filteredFeedback = feedbacks.filter((feedback) => {
+    const professionalName = getProfessionalName(feedback.professionalId)
+    const teamName = getTeamName(feedback.teamId)
+
     const matchesSearch =
-      feedback.professional.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      feedback.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      feedback.message.toLowerCase().includes(searchTerm.toLowerCase())
+      professionalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      feedback.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      feedback.description.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesType = typeFilter === "all" || feedback.type === typeFilter
-    const matchesStatus = statusFilter === "all" || feedback.status === statusFilter
+    const matchesType = typeFilter === "all" || feedback.category.toLowerCase() === typeFilter.toLowerCase()
+    const matchesStatus = statusFilter === "all" || getStatusString(feedback.status) === statusFilter
 
     return matchesSearch && matchesType && matchesStatus
   })
 
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case "issue":
+  const getStatusString = (status: number) => {
+    switch (status) {
+      case 0:
+        return "pending"
+      case 1:
+        return "in_progress"
+      case 2:
+        return "resolved"
+      default:
+        return "pending"
+    }
+  }
+
+  const getPriorityString = (priority: number) => {
+    switch (priority) {
+      case 0:
+        return "Low"
+      case 1:
+        return "Medium"
+      case 2:
+        return "High"
+      default:
+        return "Medium"
+    }
+  }
+
+  const getTypeIcon = (category: string) => {
+    switch (category.toLowerCase()) {
+      case "equipment":
         return <AlertTriangle className="h-4 w-4 text-amber-500" />
-      case "material":
+      case "scheduling":
         return <MessageSquare className="h-4 w-4 text-blue-500" />
-      case "suggestion":
-        return <MessageSquare className="h-4 w-4 text-green-500" />
       default:
         return <MessageSquare className="h-4 w-4 text-gray-500" />
     }
   }
 
-  const getTypeLabel = (type) => {
-    switch (type) {
-      case "issue":
-        return "Issue"
-      case "material":
-        return "Material Request"
-      case "suggestion":
-        return "Suggestion"
-      default:
-        return type
-    }
-  }
-
-  const getTypeColor = (type) => {
-    switch (type) {
-      case "issue":
+  const getTypeColor = (category: string) => {
+    switch (category.toLowerCase()) {
+      case "equipment":
         return "bg-amber-500/20 text-amber-500 border-amber-500"
-      case "material":
+      case "scheduling":
         return "bg-blue-500/20 text-blue-500 border-blue-500"
-      case "suggestion":
-        return "bg-green-500/20 text-green-500 border-green-500"
+      case "safety":
+        return "bg-red-500/20 text-red-500 border-red-500"
       default:
         return "bg-gray-500/20 text-gray-500 border-gray-500"
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading feedback data...</div>
+      </div>
+    )
   }
 
   return (
@@ -146,7 +185,7 @@ export default function FeedbackPage() {
                   <MessageSquare className="h-5 w-5 text-[#06b6d4]" />
                 </div>
               </div>
-              <span className="text-3xl font-bold text-white">{mockFeedback.length}</span>
+              <span className="text-3xl font-bold text-white">{feedbacks.length}</span>
             </div>
           </CardContent>
         </Card>
@@ -162,9 +201,7 @@ export default function FeedbackPage() {
                   <AlertTriangle className="h-5 w-5 text-amber-500" />
                 </div>
               </div>
-              <span className="text-3xl font-bold text-white">
-                {mockFeedback.filter((f) => f.status === "pending").length}
-              </span>
+              <span className="text-3xl font-bold text-white">{feedbacks.filter((f) => f.status === 0).length}</span>
             </div>
           </CardContent>
         </Card>
@@ -180,9 +217,7 @@ export default function FeedbackPage() {
                   <CheckCircle className="h-5 w-5 text-green-500" />
                 </div>
               </div>
-              <span className="text-3xl font-bold text-white">
-                {mockFeedback.filter((f) => f.status === "resolved").length}
-              </span>
+              <span className="text-3xl font-bold text-white">{feedbacks.filter((f) => f.status === 2).length}</span>
             </div>
           </CardContent>
         </Card>
@@ -207,9 +242,10 @@ export default function FeedbackPage() {
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="issue">Issues</SelectItem>
-                  <SelectItem value="material">Material Requests</SelectItem>
-                  <SelectItem value="suggestion">Suggestions</SelectItem>
+                  <SelectItem value="equipment">Equipment</SelectItem>
+                  <SelectItem value="scheduling">Scheduling</SelectItem>
+                  <SelectItem value="safety">Safety</SelectItem>
+                  <SelectItem value="training">Training</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -219,6 +255,7 @@ export default function FeedbackPage() {
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="resolved">Resolved</SelectItem>
                 </SelectContent>
               </Select>
@@ -230,10 +267,11 @@ export default function FeedbackPage() {
             <TableHeader>
               <TableRow className="border-[#2a3349] hover:bg-[#2a3349]">
                 <TableHead className="text-gray-400">Professional</TableHead>
+                <TableHead className="text-gray-400">Team</TableHead>
                 <TableHead className="text-gray-400">Date</TableHead>
-                <TableHead className="text-gray-400">Client</TableHead>
-                <TableHead className="text-gray-400">Type</TableHead>
-                <TableHead className="text-gray-400 w-1/3">Feedback</TableHead>
+                <TableHead className="text-gray-400">Category</TableHead>
+                <TableHead className="text-gray-400 w-1/3">Title</TableHead>
+                <TableHead className="text-gray-400">Priority</TableHead>
                 <TableHead className="text-gray-400">Status</TableHead>
                 <TableHead className="text-gray-400">Actions</TableHead>
               </TableRow>
@@ -245,20 +283,17 @@ export default function FeedbackPage() {
                     <TableCell className="font-medium text-white">
                       <div className="flex items-center gap-2">
                         <Avatar>
-                          <AvatarImage
-                            src={feedback.professionalAvatar || "/placeholder.svg"}
-                            alt={feedback.professional}
-                          />
                           <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
-                            {feedback.professional
+                            {getProfessionalName(feedback.professionalId)
                               .split(" ")
                               .map((n) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>
-                        {feedback.professional}
+                        {getProfessionalName(feedback.professionalId)}
                       </div>
                     </TableCell>
+                    <TableCell className="text-gray-400">{getTeamName(feedback.teamId)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-gray-400">
                         <Calendar className="h-3 w-3 text-gray-500" />
@@ -266,31 +301,44 @@ export default function FeedbackPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-gray-400">
-                        <div>{feedback.client}</div>
-                        <div className="text-xs text-gray-500">{feedback.address}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getTypeColor(feedback.type)}>
+                      <Badge className={getTypeColor(feedback.category)}>
                         <div className="flex items-center gap-1">
-                          {getTypeIcon(feedback.type)}
-                          {getTypeLabel(feedback.type)}
+                          {getTypeIcon(feedback.category)}
+                          {feedback.category}
                         </div>
                       </Badge>
                     </TableCell>
                     <TableCell className="text-gray-400">
-                      <div className="line-clamp-2">{feedback.message}</div>
+                      <div className="line-clamp-2">{feedback.title}</div>
                     </TableCell>
                     <TableCell>
                       <Badge
                         className={
-                          feedback.status === "resolved"
-                            ? "bg-green-500/20 text-green-500 border-green-500"
-                            : "bg-amber-500/20 text-amber-500 border-amber-500"
+                          feedback.priority === 2
+                            ? "bg-red-500/20 text-red-500 border-red-500"
+                            : feedback.priority === 1
+                              ? "bg-amber-500/20 text-amber-500 border-amber-500"
+                              : "bg-green-500/20 text-green-500 border-green-500"
                         }
                       >
-                        {feedback.status === "resolved" ? "Resolved" : "Pending"}
+                        {getPriorityString(feedback.priority)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          feedback.status === 2
+                            ? "bg-green-500/20 text-green-500 border-green-500"
+                            : feedback.status === 1
+                              ? "bg-blue-500/20 text-blue-500 border-blue-500"
+                              : "bg-amber-500/20 text-amber-500 border-amber-500"
+                        }
+                      >
+                        {getStatusString(feedback.status) === "pending"
+                          ? "Pending"
+                          : getStatusString(feedback.status) === "in_progress"
+                            ? "In Progress"
+                            : "Resolved"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -298,17 +346,17 @@ export default function FeedbackPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349]"
+                          className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
                         >
                           View
                         </Button>
-                        {feedback.status === "pending" && (
+                        {feedback.status !== 2 && (
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349]"
+                            className="h-8 border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
                           >
-                            Resolve
+                            Update
                           </Button>
                         )}
                       </div>
@@ -317,7 +365,7 @@ export default function FeedbackPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6 text-gray-400">
+                  <TableCell colSpan={8} className="text-center py-6 text-gray-400">
                     No feedback found matching your search criteria
                   </TableCell>
                 </TableRow>

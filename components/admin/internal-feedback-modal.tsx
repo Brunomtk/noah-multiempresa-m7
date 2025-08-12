@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -44,11 +44,7 @@ interface InternalFeedbackModalProps {
   onSuccess?: () => void
 }
 
-export function InternalFeedbackModal({
-  children,
-  feedback,
-  onSuccess,
-}: InternalFeedbackModalProps) {
+export function InternalFeedbackModal({ children, feedback, onSuccess }: InternalFeedbackModalProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
@@ -70,29 +66,25 @@ export function InternalFeedbackModal({
   })
 
   const getUserDisplayName = (user: User) =>
-    user.firstName && user.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user.name || `User ${user.id}`
+    user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.name || `User ${user.id}`
 
   const loadData = async () => {
     setDataLoading(true)
     try {
       // Professionals
-      const profRes = await fetchApi<Professional[]>("/Professional")
-      setProfessionals(Array.isArray(profRes) ? profRes : [])
+      const profRes = await fetchApi<any>("/Professional")
+      const profArray = Array.isArray(profRes) ? profRes : profRes?.results || profRes?.data || []
+      setProfessionals(profArray)
 
-      // Teams (try both endpoints)
-      let teamRes
-      try {
-        teamRes = await fetchApi<Team[]>("/Team")
-      } catch {
-        teamRes = await fetchApi<Team[]>("/Teams")
-      }
-      setTeams(Array.isArray(teamRes) ? teamRes : [])
+      // Teams - handle paginated response
+      const teamRes = await fetchApi<any>("/Team")
+      const teamArray = Array.isArray(teamRes) ? teamRes : teamRes?.results || teamRes?.data || []
+      setTeams(teamArray)
 
       // Users
-      const userRes = await fetchApi<User[]>("/Users")
-      setUsers(Array.isArray(userRes) ? userRes : [])
+      const userRes = await fetchApi<any>("/Users")
+      const userArray = Array.isArray(userRes) ? userRes : userRes?.results || userRes?.data || []
+      setUsers(userArray)
     } catch (err) {
       console.error("Error loading data:", err)
       toast({
@@ -100,6 +92,9 @@ export function InternalFeedbackModal({
         description: "Failed to load dropdown data. Some fields may be empty.",
         variant: "destructive",
       })
+      setProfessionals([])
+      setTeams([])
+      setUsers([])
     } finally {
       setDataLoading(false)
     }
@@ -219,9 +214,7 @@ export function InternalFeedbackModal({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="professionalId">
-                    Professional * ({professionals.length} loaded)
-                  </Label>
+                  <Label htmlFor="professionalId">Professional * ({professionals.length} loaded)</Label>
                   <Select
                     value={formData.professionalId}
                     onValueChange={(v) => setFormData({ ...formData, professionalId: v })}
@@ -294,10 +287,7 @@ export function InternalFeedbackModal({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(v) => setFormData({ ...formData, status: v })}
-                  >
+                  <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
                     <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
@@ -313,10 +303,7 @@ export function InternalFeedbackModal({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority</Label>
-                  <Select
-                    value={formData.priority}
-                    onValueChange={(v) => setFormData({ ...formData, priority: v })}
-                  >
+                  <Select value={formData.priority} onValueChange={(v) => setFormData({ ...formData, priority: v })}>
                     <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
@@ -328,9 +315,7 @@ export function InternalFeedbackModal({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="assignedToId">
-                    Assigned To * ({users.length} loaded)
-                  </Label>
+                  <Label htmlFor="assignedToId">Assigned To * ({users.length} loaded)</Label>
                   <Select
                     value={formData.assignedToId}
                     onValueChange={(v) => setFormData({ ...formData, assignedToId: v })}

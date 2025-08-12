@@ -1,10 +1,12 @@
 "use client"
 
 import { useCompanyPaymentsContext } from "@/contexts/company-payments-context"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 
 export function useCompanyPayments() {
   const context = useCompanyPaymentsContext()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
 
   // Format date for display
   const formatDate = useCallback((dateString?: string) => {
@@ -100,8 +102,33 @@ export function useCompanyPayments() {
     return dueDate < today
   }, [])
 
+  // Filter payments based on search term and status
+  const filteredPayments = context.payments.filter((payment) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      payment.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.planName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesStatus = statusFilter === "all" || payment.status.toString() === statusFilter
+
+    return matchesSearch && matchesStatus
+  })
+
+  const refreshPayments = useCallback(() => {
+    context.fetchPayments()
+  }, [context])
+
   return {
     ...context,
+    payments: filteredPayments,
+    loading: context.isLoading,
+    error: context.error,
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    refreshPayments,
     formatDate,
     formatCurrency,
     getStatusColor,

@@ -16,12 +16,23 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePaymentsContext } from "@/contexts/payments-context"
 import type { Payment, PaymentFormData } from "@/types/payment"
+import { fetchApi } from "@/lib/api/utils"
 
 interface PaymentModalProps {
   isOpen: boolean
   onClose: () => void
   mode: "create" | "edit"
   payment?: Payment | null
+}
+
+interface Company {
+  id: number
+  name: string
+}
+
+interface Plan {
+  id: number
+  name: string
 }
 
 const INITIAL_FORM_DATA: PaymentFormData = {
@@ -39,6 +50,34 @@ export function PaymentModal({ isOpen, onClose, mode, payment }: PaymentModalPro
   const { addPayment, editPayment } = usePaymentsContext()
   const [formData, setFormData] = useState<PaymentFormData>(INITIAL_FORM_DATA)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  const loadDropdownData = async () => {
+    setIsLoading(true)
+    try {
+      // Load companies
+      const companiesRes = await fetchApi<{ result: Company[] }>("/Companies/paged")
+      setCompanies(companiesRes?.result || [])
+
+      // Load plans
+      const plansRes = await fetchApi<{ results: Plan[] }>("/Plan/paged")
+      setPlans(plansRes?.results || [])
+    } catch (error) {
+      console.error("Error loading dropdown data:", error)
+      setCompanies([])
+      setPlans([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      loadDropdownData()
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (mode === "edit" && payment) {
@@ -96,24 +135,42 @@ export function PaymentModal({ isOpen, onClose, mode, payment }: PaymentModalPro
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="companyId">Company ID</Label>
-              <Input
-                id="companyId"
-                type="number"
-                value={formData.companyId}
-                onChange={(e) => handleInputChange("companyId", Number(e.target.value))}
-                required
-              />
+              <Label htmlFor="companyId">Company * ({companies.length} loaded)</Label>
+              <Select
+                value={formData.companyId.toString()}
+                onValueChange={(v) => handleInputChange("companyId", Number(v))}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id.toString()}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="planId">Plan ID</Label>
-              <Input
-                id="planId"
-                type="number"
-                value={formData.planId}
-                onChange={(e) => handleInputChange("planId", Number(e.target.value))}
-                required
-              />
+              <Label htmlFor="planId">Plan * ({plans.length} loaded)</Label>
+              <Select
+                value={formData.planId.toString()}
+                onValueChange={(v) => handleInputChange("planId", Number(v))}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id.toString()}>
+                      {plan.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

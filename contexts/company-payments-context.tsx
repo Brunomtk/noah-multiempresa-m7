@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { Payment, PaymentFormData, PaymentFilters } from "@/types/payment"
 import { toast } from "@/hooks/use-toast"
+import * as paymentsApi from "@/lib/api/payments"
 
 interface CompanyPaymentsContextType {
   payments: Payment[]
@@ -50,47 +51,6 @@ interface CompanyPaymentsContextType {
 
 const CompanyPaymentsContext = createContext<CompanyPaymentsContextType | undefined>(undefined)
 
-// Mock data for payments
-const mockPayments: Payment[] = [
-  {
-    id: 1,
-    amount: 299.99,
-    dueDate: "2025-02-15",
-    paymentDate: "2025-02-10",
-    status: 1, // Paid
-    method: 0, // Credit Card
-    reference: "REF-PAG-001",
-    planId: 2,
-    companyId: 1,
-    createdDate: "2025-01-15T10:00:00Z",
-    updatedDate: "2025-02-10T14:30:00Z",
-  },
-  {
-    id: 2,
-    amount: 299.99,
-    dueDate: "2025-03-15",
-    status: 0, // Pending
-    method: 3, // PIX
-    reference: "REF-PAG-002",
-    planId: 2,
-    companyId: 1,
-    createdDate: "2025-02-15T10:00:00Z",
-    updatedDate: "2025-02-15T10:00:00Z",
-  },
-  {
-    id: 3,
-    amount: 199.99,
-    dueDate: "2025-01-15",
-    status: 2, // Overdue
-    method: 2, // Bank Transfer
-    reference: "REF-PAG-003",
-    planId: 1,
-    companyId: 1,
-    createdDate: "2024-12-15T10:00:00Z",
-    updatedDate: "2024-12-15T10:00:00Z",
-  },
-]
-
 export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId: number }> = ({
   children,
   companyId,
@@ -116,12 +76,14 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      const filterParams = {
+        companyId,
+        pageSize: 100,
+        ...newFilters,
+      }
 
-      // Filter mock data by companyId
-      const companyPayments = mockPayments.filter((p) => p.companyId === companyId)
-      setPayments(companyPayments)
+      const response = await paymentsApi.getPayments(filterParams)
+      setPayments(response.results || [])
 
       if (newFilters) {
         setFilters({ ...newFilters, companyId })
@@ -131,8 +93,8 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao buscar pagamentos: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to fetch payments: ${(err as Error).message}`,
         variant: "destructive",
       })
     } finally {
@@ -146,16 +108,13 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      const payment = mockPayments.find((p) => p.id === id && p.companyId === companyId)
+      const payment = await paymentsApi.getPaymentById(id)
       return payment || null
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao buscar pagamento: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to fetch payment: ${(err as Error).message}`,
         variant: "destructive",
       })
       return null
@@ -170,31 +129,25 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      const newPayment: Payment = {
-        id: Date.now(), // Mock ID
+      const newPayment = await paymentsApi.createPayment({
         ...paymentData,
         companyId,
-        createdDate: new Date().toISOString(),
-        updatedDate: new Date().toISOString(),
-      }
+      })
 
       setPayments((prev) => [newPayment, ...prev])
       await fetchPaymentStatistics()
 
       toast({
-        title: "Sucesso",
-        description: "Pagamento criado com sucesso",
+        title: "Success",
+        description: "Payment created successfully",
       })
 
       return newPayment
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao criar pagamento: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to create payment: ${(err as Error).message}`,
         variant: "destructive",
       })
       throw err
@@ -209,34 +162,22 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 600))
+      const updatedPayment = await paymentsApi.updatePayment(id, paymentData)
 
-      const updatedPayment = payments.find((p) => p.id === id)
-      if (!updatedPayment) {
-        throw new Error("Pagamento não encontrado")
-      }
-
-      const newPayment = { ...updatedPayment, ...paymentData, updatedDate: new Date().toISOString() }
-      setPayments((prev) => prev.map((payment) => (payment.id === id ? newPayment : payment)))
-
-      if (selectedPayment?.id === id) {
-        setSelectedPayment(newPayment)
-      }
-
+      setPayments((prev) => prev.map((p) => (p.id === id ? updatedPayment : p)))
       await fetchPaymentStatistics()
 
       toast({
-        title: "Sucesso",
-        description: "Pagamento atualizado com sucesso",
+        title: "Success",
+        description: "Payment updated successfully",
       })
 
-      return newPayment
+      return updatedPayment
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao atualizar pagamento: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to update payment: ${(err as Error).message}`,
         variant: "destructive",
       })
       throw err
@@ -251,40 +192,25 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 400))
+      const updatedPayment = await paymentsApi.updatePaymentStatus(id, {
+        status: 1,
+        paymentDate: paymentDate || new Date().toISOString(),
+      })
 
-      const updatedPayment = payments.find((p) => p.id === id)
-      if (!updatedPayment) {
-        throw new Error("Pagamento não encontrado")
-      }
-
-      const newPayment = {
-        ...updatedPayment,
-        status: 1 as const,
-        paymentDate: paymentDate || new Date().toISOString().split("T")[0],
-        updatedDate: new Date().toISOString(),
-      }
-
-      setPayments((prev) => prev.map((payment) => (payment.id === id ? newPayment : payment)))
-
-      if (selectedPayment?.id === id) {
-        setSelectedPayment(newPayment)
-      }
-
+      setPayments((prev) => prev.map((p) => (p.id === id ? updatedPayment : p)))
       await fetchPaymentStatistics()
 
       toast({
-        title: "Sucesso",
-        description: "Pagamento marcado como pago",
+        title: "Success",
+        description: "Payment marked as paid",
       })
 
-      return newPayment
+      return updatedPayment
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao atualizar status do pagamento: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to mark payment as paid: ${(err as Error).message}`,
         variant: "destructive",
       })
       throw err
@@ -299,39 +225,24 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 400))
+      const updatedPayment = await paymentsApi.updatePaymentStatus(id, {
+        status: 2,
+      })
 
-      const updatedPayment = payments.find((p) => p.id === id)
-      if (!updatedPayment) {
-        throw new Error("Pagamento não encontrado")
-      }
-
-      const newPayment = {
-        ...updatedPayment,
-        status: 2 as const,
-        updatedDate: new Date().toISOString(),
-      }
-
-      setPayments((prev) => prev.map((payment) => (payment.id === id ? newPayment : payment)))
-
-      if (selectedPayment?.id === id) {
-        setSelectedPayment(newPayment)
-      }
-
+      setPayments((prev) => prev.map((p) => (p.id === id ? updatedPayment : p)))
       await fetchPaymentStatistics()
 
       toast({
-        title: "Sucesso",
-        description: "Pagamento marcado como vencido",
+        title: "Success",
+        description: "Payment marked as overdue",
       })
 
-      return newPayment
+      return updatedPayment
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao atualizar status do pagamento: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to mark payment as overdue: ${(err as Error).message}`,
         variant: "destructive",
       })
       throw err
@@ -346,39 +257,24 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 400))
+      const updatedPayment = await paymentsApi.updatePaymentStatus(id, {
+        status: 3,
+      })
 
-      const updatedPayment = payments.find((p) => p.id === id)
-      if (!updatedPayment) {
-        throw new Error("Pagamento não encontrado")
-      }
-
-      const newPayment = {
-        ...updatedPayment,
-        status: 3 as const,
-        updatedDate: new Date().toISOString(),
-      }
-
-      setPayments((prev) => prev.map((payment) => (payment.id === id ? newPayment : payment)))
-
-      if (selectedPayment?.id === id) {
-        setSelectedPayment(newPayment)
-      }
-
+      setPayments((prev) => prev.map((p) => (p.id === id ? updatedPayment : p)))
       await fetchPaymentStatistics()
 
       toast({
-        title: "Sucesso",
-        description: "Pagamento cancelado",
+        title: "Success",
+        description: "Payment cancelled",
       })
 
-      return newPayment
+      return updatedPayment
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao cancelar pagamento: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to cancel payment: ${(err as Error).message}`,
         variant: "destructive",
       })
       throw err
@@ -404,17 +300,19 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      const response = await paymentsApi.getPayments({
+        companyId,
+        status,
+        pageSize: 100,
+      })
 
-      const filteredPayments = mockPayments.filter((p) => p.companyId === companyId && p.status === status)
-      setPayments(filteredPayments)
+      setPayments(response.results || [])
       setFilters((prev) => ({ ...prev, status }))
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao buscar pagamentos por status: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to fetch payments by status: ${(err as Error).message}`,
         variant: "destructive",
       })
     } finally {
@@ -428,24 +326,20 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      const filteredPayments = mockPayments.filter((p) => {
-        if (p.companyId !== companyId) return false
-        const paymentDate = new Date(p.dueDate)
-        const start = new Date(startDate)
-        const end = new Date(endDate)
-        return paymentDate >= start && paymentDate <= end
+      const response = await paymentsApi.getPayments({
+        companyId,
+        startDate,
+        endDate,
+        pageSize: 100,
       })
 
-      setPayments(filteredPayments)
+      setPayments(response.results || [])
       setFilters((prev) => ({ ...prev, startDate, endDate }))
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao buscar pagamentos por período: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to fetch payments by date range: ${(err as Error).message}`,
         variant: "destructive",
       })
     } finally {
@@ -459,17 +353,19 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      const response = await paymentsApi.getPayments({
+        companyId,
+        planId,
+        pageSize: 100,
+      })
 
-      const filteredPayments = mockPayments.filter((p) => p.companyId === companyId && p.planId === planId)
-      setPayments(filteredPayments)
+      setPayments(response.results || [])
       setFilters((prev) => ({ ...prev, planId }))
     } catch (err) {
       setError(err as Error)
       toast({
-        title: "Erro",
-        description: `Falha ao buscar pagamentos por plano: ${(err as Error).message}`,
+        title: "Error",
+        description: `Failed to fetch payments by plan: ${(err as Error).message}`,
         variant: "destructive",
       })
     } finally {
@@ -480,7 +376,8 @@ export const CompanyPaymentsProvider: React.FC<{ children: ReactNode; companyId:
   // Fetch payment statistics
   const fetchPaymentStatistics = async () => {
     try {
-      const companyPayments = payments.length > 0 ? payments : mockPayments.filter((p) => p.companyId === companyId)
+      const companyPayments =
+        payments.length > 0 ? payments : await paymentsApi.getPayments({ companyId }).then((res) => res.results || [])
 
       let totalAmount = 0
       let pendingAmount = 0

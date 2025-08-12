@@ -16,12 +16,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Loader2 } from "lucide-react"
+import { DatePicker } from "@/components/ui/date-picker"
+import { Loader2 } from "lucide-react"
 import { format } from "date-fns"
-import { cn } from "@/lib/utils"
 import { getApiUrl } from "@/lib/api/utils"
+import { useToast } from "@/hooks/use-toast"
 
 interface AppointmentModalProps {
   isOpen: boolean
@@ -31,6 +30,7 @@ interface AppointmentModalProps {
 }
 
 export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: AppointmentModalProps) {
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [companies, setCompanies] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
@@ -46,9 +46,8 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
     professionalId: "",
     type: "",
     status: "0",
-    startDate: undefined as Date | undefined,
+    date: undefined as Date | undefined,
     startTime: "",
-    endDate: undefined as Date | undefined,
     endTime: "",
     notes: "",
   })
@@ -97,13 +96,12 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
         address: appointment.address || "",
         companyId: appointment.companyId?.toString() || "",
         customerId: appointment.customerId?.toString() || "",
-        teamId: appointment.teamId?.toString() || "",
-        professionalId: appointment.professionalId?.toString() || "",
+        teamId: appointment.teamId?.toString() || "none",
+        professionalId: appointment.professionalId?.toString() || "none",
         type: appointment.type?.toString() || "",
         status: appointment.status?.toString() || "0",
-        startDate: startDate,
+        date: startDate,
         startTime: startDate ? format(startDate, "HH:mm") : "",
-        endDate: endDate,
         endTime: endDate ? format(endDate, "HH:mm") : "",
         notes: appointment.notes || "",
       })
@@ -113,13 +111,12 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
         address: "",
         companyId: "",
         customerId: "",
-        teamId: "",
-        professionalId: "",
+        teamId: "none",
+        professionalId: "none",
         type: "",
         status: "0",
-        startDate: undefined,
+        date: undefined,
         startTime: "",
-        endDate: undefined,
         endTime: "",
         notes: "",
       })
@@ -130,16 +127,16 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
     setLoadingData(true)
     try {
       const [companiesData, customersData, teamsData, professionalsData] = await Promise.all([
-        apiCall("Companies/paged?PageNumber=1&PageSize=100"),
-        apiCall("Customer?PageNumber=1&PageSize=100"),
-        apiCall("Team/paged?Page=1&PageSize=100"),
-        apiCall("Professional?PageNumber=1&PageSize=100"),
+        apiCall("Companies"),
+        apiCall("Customer"),
+        apiCall("Team"),
+        apiCall("Professional"),
       ])
 
-      setCompanies(companiesData.result || companiesData.results || [])
-      setCustomers(customersData.result || customersData.results || [])
-      setTeams(teamsData.result || teamsData.results || [])
-      setProfessionals(professionalsData.result || professionalsData.results || [])
+      setCompanies(companiesData.results || companiesData || [])
+      setCustomers(customersData.results || customersData || [])
+      setTeams(teamsData.results || teamsData || [])
+      setProfessionals(professionalsData.results || professionalsData || [])
     } catch (error) {
       console.error("Error loading initial data:", error)
     } finally {
@@ -152,22 +149,50 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
     setIsLoading(true)
 
     try {
-      // Combine date and time for start and end
+      if (!formData.date) {
+        toast({
+          title: "Error",
+          description: "Please select a date for the appointment.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!formData.startTime || !formData.endTime) {
+        toast({
+          title: "Error",
+          description: "Please select start and end times.",
+          variant: "destructive",
+        })
+        return
+      }
+
       let startDateTime = ""
       let endDateTime = ""
 
-      if (formData.startDate && formData.startTime) {
+      if (formData.date && formData.startTime) {
         const [hours, minutes] = formData.startTime.split(":")
-        const start = new Date(formData.startDate)
+        const start = new Date(formData.date)
         start.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0)
         startDateTime = start.toISOString()
       }
 
-      if (formData.endDate && formData.endTime) {
+      if (formData.date && formData.endTime) {
         const [hours, minutes] = formData.endTime.split(":")
-        const end = new Date(formData.endDate)
+        const end = new Date(formData.date)
         end.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0)
         endDateTime = end.toISOString()
+
+        const startTime = new Date(startDateTime)
+        const endTime = new Date(endDateTime)
+        if (endTime <= startTime) {
+          toast({
+            title: "Error",
+            description: "End time must be after start time.",
+            variant: "destructive",
+          })
+          return
+        }
       }
 
       const appointmentData = {
@@ -177,16 +202,30 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
         end: endDateTime,
         companyId: Number.parseInt(formData.companyId),
         customerId: Number.parseInt(formData.customerId),
-        teamId: formData.teamId ? Number.parseInt(formData.teamId) : null,
-        professionalId: formData.professionalId ? Number.parseInt(formData.professionalId) : null,
+        teamId: formData.teamId && formData.teamId !== "none" ? Number.parseInt(formData.teamId) : null,
+        professionalId:
+          formData.professionalId && formData.professionalId !== "none"
+            ? Number.parseInt(formData.professionalId)
+            : null,
         status: Number.parseInt(formData.status),
         type: Number.parseInt(formData.type),
         notes: formData.notes,
       }
 
       await onSubmit(appointmentData)
+
+      toast({
+        title: "Success",
+        description: appointment ? "Appointment updated successfully!" : "Appointment created successfully!",
+        variant: "default",
+      })
     } catch (error) {
       console.error("Error submitting appointment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save appointment. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -309,7 +348,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
                     <SelectValue placeholder={loadingData ? "Loading..." : "Select a team"} />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
-                    <SelectItem value="" className="hover:bg-[#2a3349]">
+                    <SelectItem value="none" className="hover:bg-[#2a3349]">
                       No team
                     </SelectItem>
                     {teams.map((team) => (
@@ -332,7 +371,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
                     <SelectValue placeholder={loadingData ? "Loading..." : "Select a professional"} />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white max-h-[200px]">
-                    <SelectItem value="" className="hover:bg-[#2a3349]">
+                    <SelectItem value="none" className="hover:bg-[#2a3349]">
                       No professional
                     </SelectItem>
                     {professionals.map((professional) => (
@@ -349,32 +388,15 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
-                <Label>Start Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]",
-                        !formData.startDate && "text-gray-400",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.startDate ? format(formData.startDate, "PPP") : "Pick date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-[#1a2234] border-[#2a3349]" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.startDate}
-                      onSelect={(date) => handleChange("startDate", date)}
-                      initialFocus
-                      className="text-white"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label>Date</Label>
+                <DatePicker
+                  date={formData.date}
+                  onDateChange={(date) => handleChange("date", date)}
+                  placeholder="Pick appointment date"
+                  className="bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]"
+                />
               </div>
 
               <div className="grid gap-2">
@@ -387,33 +409,6 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
                   className="bg-[#0f172a] border-[#2a3349] text-white"
                   required
                 />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>End Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]",
-                        !formData.endDate && "text-gray-400",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.endDate ? format(formData.endDate, "PPP") : "Pick date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-[#1a2234] border-[#2a3349]" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.endDate}
-                      onSelect={(date) => handleChange("endDate", date)}
-                      initialFocus
-                      className="text-white"
-                    />
-                  </PopoverContent>
-                </Popover>
               </div>
 
               <div className="grid gap-2">

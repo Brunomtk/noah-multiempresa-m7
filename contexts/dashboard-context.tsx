@@ -118,7 +118,7 @@ export const DashboardProvider = ({ children }: DashboardProviderProps) => {
           apiCall("/Customer").catch(() => ({ results: [] })),
           apiCall("/Appointment").catch(() => ({ results: [] })),
           apiCall("/CheckRecord").catch(() => ({ results: [] })),
-          apiCall("/Payment").catch(() => ({ results: [] })),
+          apiCall("/Payments").catch(() => ({ results: [] })),
         ],
       )
 

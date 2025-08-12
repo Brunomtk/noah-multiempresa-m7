@@ -22,6 +22,7 @@ import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { getProfessionals, getCompanies, getCustomers, getTeams, getAppointments } from "@/lib/api/check-records"
+import { fetchApi } from "@/lib/api/utils"
 
 interface CheckInModalProps {
   isOpen: boolean
@@ -53,14 +54,6 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
   const [teams, setTeams] = useState<any[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
-
-  const [loadingStates, setLoadingStates] = useState({
-    professionals: false,
-    companies: false,
-    customers: false,
-    teams: false,
-    appointments: false,
-  })
 
   useEffect(() => {
     if (isOpen) {
@@ -117,7 +110,7 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
       // Handle professionals
       if (professionalsData.status === "fulfilled") {
         console.log("Professionals loaded:", professionalsData.value)
-        setProfessionals(professionalsData.value)
+        setProfessionals(Array.isArray(professionalsData.value) ? professionalsData.value : [])
       } else {
         console.error("Error loading professionals:", professionalsData.reason)
         setProfessionals([])
@@ -126,7 +119,7 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
       // Handle companies
       if (companiesData.status === "fulfilled") {
         console.log("Companies loaded:", companiesData.value)
-        setCompanies(companiesData.value)
+        setCompanies(Array.isArray(companiesData.value) ? companiesData.value : [])
       } else {
         console.error("Error loading companies:", companiesData.reason)
         setCompanies([])
@@ -135,7 +128,7 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
       // Handle customers
       if (customersData.status === "fulfilled") {
         console.log("Customers loaded:", customersData.value)
-        setCustomers(customersData.value)
+        setCustomers(Array.isArray(customersData.value) ? customersData.value : [])
       } else {
         console.error("Error loading customers:", customersData.reason)
         setCustomers([])
@@ -144,7 +137,7 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
       // Handle teams
       if (teamsData.status === "fulfilled") {
         console.log("Teams loaded:", teamsData.value)
-        setTeams(teamsData.value)
+        setTeams(Array.isArray(teamsData.value) ? teamsData.value : [])
       } else {
         console.error("Error loading teams:", teamsData.reason)
         setTeams([])
@@ -153,7 +146,7 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
       // Handle appointments
       if (appointmentsData.status === "fulfilled") {
         console.log("Appointments loaded:", appointmentsData.value)
-        setAppointments(appointmentsData.value)
+        setAppointments(Array.isArray(appointmentsData.value) ? appointmentsData.value : [])
       } else {
         console.error("Error loading appointments:", appointmentsData.reason)
         setAppointments([])
@@ -170,53 +163,170 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fetchCustomerName = async (customerId: string): Promise<string> => {
+    try {
+      const response = await fetchApi(`/Customer/${customerId}`)
+      return response.name || ""
+    } catch (error) {
+      console.error("Error fetching customer name:", error)
+      return ""
+    }
+  }
+
+  const fetchProfessionalName = async (professionalId: string): Promise<string> => {
+    try {
+      const response = await fetchApi(`/Professional/${professionalId}`)
+      return response.name || ""
+    } catch (error) {
+      console.error("Error fetching professional name:", error)
+      return ""
+    }
+  }
+
+  const fetchTeamName = async (teamId: string): Promise<string> => {
+    try {
+      const response = await fetchApi(`/Team/${teamId}`)
+      return response.name || ""
+    } catch (error) {
+      console.error("Error fetching team name:", error)
+      return ""
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const submitData = {
-      professionalId: Number.parseInt(formData.professionalId),
-      professionalName: formData.professionalName,
-      companyId: Number.parseInt(formData.companyId),
-      customerId: Number.parseInt(formData.customerId),
-      customerName: formData.customerName,
-      appointmentId: Number.parseInt(formData.appointmentId),
-      address: formData.address,
-      teamId: Number.parseInt(formData.teamId),
-      teamName: formData.teamName,
-      checkInTime: formData.checkInTime?.toISOString() || null,
-      checkOutTime: formData.checkOutTime?.toISOString() || null,
-      serviceType: formData.serviceType,
-      notes: formData.notes,
+    // Validação básica
+    if (!formData.professionalId || !formData.companyId || !formData.customerId || !formData.serviceType) {
+      console.error("Missing required fields")
+      return
     }
 
+    // Fetch names if they're missing
+    let customerName = formData.customerName
+    let professionalName = formData.professionalName
+    let teamName = formData.teamName
+
+    if (formData.customerId && !customerName) {
+      customerName = await fetchCustomerName(formData.customerId)
+    }
+
+    if (formData.professionalId && !professionalName) {
+      professionalName = await fetchProfessionalName(formData.professionalId)
+    }
+
+    if (formData.teamId && !teamName) {
+      teamName = await fetchTeamName(formData.teamId)
+    }
+
+    const submitData = {
+      professionalId: Number.parseInt(formData.professionalId) || null,
+      professionalName: professionalName,
+      companyId: Number.parseInt(formData.companyId) || null,
+      customerId: Number.parseInt(formData.customerId) || null,
+      customerName: customerName,
+      appointmentId: formData.appointmentId ? Number.parseInt(formData.appointmentId) : null,
+      address: formData.address,
+      teamId: formData.teamId ? Number.parseInt(formData.teamId) : null,
+      teamName: teamName,
+      serviceType: formData.serviceType,
+      notes: formData.notes,
+      checkInTime: formData.checkInTime,
+      checkOutTime: formData.checkOutTime,
+    }
+
+    console.log("Submitting check-in data:", submitData)
     onSubmit(submitData)
   }
 
-  const handleProfessionalChange = (value: string) => {
+  const handleProfessionalChange = async (value: string) => {
+    if (value === "none") {
+      setFormData({
+        ...formData,
+        professionalId: "",
+        professionalName: "",
+      })
+      return
+    }
+
     const professional = professionals.find((p) => p.id.toString() === value)
+    let professionalName = ""
+
+    if (professional) {
+      professionalName = professional.name || `${professional.firstName || ""} ${professional.lastName || ""}`.trim()
+    }
+
+    // If name is still empty, fetch it from API
+    if (!professionalName) {
+      professionalName = await fetchProfessionalName(value)
+    }
+
     setFormData({
       ...formData,
       professionalId: value,
-      professionalName: professional ? professional.name : "",
+      professionalName: professionalName,
     })
   }
 
-  const handleCustomerChange = (value: string) => {
+  const handleCustomerChange = async (value: string) => {
+    if (value === "none") {
+      setFormData({
+        ...formData,
+        customerId: "",
+        customerName: "",
+        address: "",
+      })
+      return
+    }
+
     const customer = customers.find((c) => c.id.toString() === value)
+    let customerName = ""
+    let address = ""
+
+    if (customer) {
+      customerName = customer.name || ""
+      address = customer.address || ""
+    }
+
+    // If name is still empty, fetch it from API
+    if (!customerName) {
+      customerName = await fetchCustomerName(value)
+    }
+
     setFormData({
       ...formData,
       customerId: value,
-      customerName: customer ? customer.name : "",
-      address: customer ? customer.address : "",
+      customerName: customerName,
+      address: address,
     })
   }
 
-  const handleTeamChange = (value: string) => {
+  const handleTeamChange = async (value: string) => {
+    if (value === "none") {
+      setFormData({
+        ...formData,
+        teamId: "",
+        teamName: "",
+      })
+      return
+    }
+
     const team = teams.find((t) => t.id.toString() === value)
+    let teamName = ""
+
+    if (team) {
+      teamName = team.name || ""
+    }
+
+    // If name is still empty, fetch it from API
+    if (!teamName) {
+      teamName = await fetchTeamName(value)
+    }
+
     setFormData({
       ...formData,
       teamId: value,
-      teamName: team ? team.name : "",
+      teamName: teamName,
     })
   }
 
@@ -239,19 +349,16 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
                   <SelectValue placeholder={isLoading ? "Loading professionals..." : "Select professional"} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {professionals.length === 0 && !isLoading ? (
-                    <SelectItem value="" disabled>
-                      No professionals available
+                  <SelectItem value="none" className="hover:bg-[#2a3349]">
+                    Select professional
+                  </SelectItem>
+                  {professionals.map((professional) => (
+                    <SelectItem key={professional.id} value={professional.id.toString()} className="hover:bg-[#2a3349]">
+                      {professional.name ||
+                        `${professional.firstName || ""} ${professional.lastName || ""}`.trim() ||
+                        `Professional ${professional.id}`}
                     </SelectItem>
-                  ) : (
-                    professionals.map((professional) => (
-                      <SelectItem key={professional.id} value={professional.id.toString()}>
-                        {professional.name ||
-                          professional.firstName + " " + professional.lastName ||
-                          `Professional ${professional.id}`}
-                      </SelectItem>
-                    ))
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -260,24 +367,21 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
               <Label htmlFor="company">Company *</Label>
               <Select
                 value={formData.companyId}
-                onValueChange={(value) => setFormData({ ...formData, companyId: value })}
+                onValueChange={(value) => setFormData({ ...formData, companyId: value === "none" ? "" : value })}
                 disabled={isLoading}
               >
                 <SelectTrigger className="bg-[#1a2234] border-[#2a3349] text-white">
                   <SelectValue placeholder={isLoading ? "Loading companies..." : "Select company"} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
-                  {companies.length === 0 && !isLoading ? (
-                    <SelectItem value="" disabled>
-                      No companies available
+                  <SelectItem value="none" className="hover:bg-[#2a3349]">
+                    Select company
+                  </SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id.toString()} className="hover:bg-[#2a3349]">
+                      {company.name || company.companyName || `Company ${company.id}`}
                     </SelectItem>
-                  ) : (
-                    companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id.toString()}>
-                        {company.name || company.companyName || `Company ${company.id}`}
-                      </SelectItem>
-                    ))
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -291,8 +395,11 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="none" className="hover:bg-[#2a3349]">
+                    Select customer
+                  </SelectItem>
                   {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id.toString()}>
+                    <SelectItem key={customer.id} value={customer.id.toString()} className="hover:bg-[#2a3349]">
                       {customer.name}
                     </SelectItem>
                   ))}
@@ -304,15 +411,18 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
               <Label htmlFor="appointment">Appointment</Label>
               <Select
                 value={formData.appointmentId}
-                onValueChange={(value) => setFormData({ ...formData, appointmentId: value })}
+                onValueChange={(value) => setFormData({ ...formData, appointmentId: value === "none" ? "" : value })}
                 disabled={isLoading}
               >
                 <SelectTrigger className="bg-[#1a2234] border-[#2a3349] text-white">
                   <SelectValue placeholder="Select appointment" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="none" className="hover:bg-[#2a3349]">
+                    No appointment
+                  </SelectItem>
                   {appointments.map((appointment) => (
-                    <SelectItem key={appointment.id} value={appointment.id.toString()}>
+                    <SelectItem key={appointment.id} value={appointment.id.toString()} className="hover:bg-[#2a3349]">
                       {appointment.title || `Appointment ${appointment.id}`}
                     </SelectItem>
                   ))}
@@ -329,8 +439,11 @@ export function CheckInModal({ isOpen, onClose, onSubmit, checkIn }: CheckInModa
                   <SelectValue placeholder="Select team" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a2234] border-[#2a3349] text-white">
+                  <SelectItem value="none" className="hover:bg-[#2a3349]">
+                    No team
+                  </SelectItem>
                   {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id.toString()}>
+                    <SelectItem key={team.id} value={team.id.toString()} className="hover:bg-[#2a3349]">
                       {team.name}
                     </SelectItem>
                   ))}

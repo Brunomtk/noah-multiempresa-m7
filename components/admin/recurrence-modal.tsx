@@ -163,14 +163,13 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate required fields
     if (!formData.title.trim()) {
-      alert("Title is required")
+      alert("Service Title is required")
       return
     }
 
     if (!formData.address.trim()) {
-      alert("Address is required")
+      alert("Service Address is required")
       return
     }
 
@@ -188,9 +187,20 @@ export function RecurrenceModal({ isOpen, onClose, onSubmit, recurrence }: Recur
 
     try {
       const submitData = {
-        ...formData,
+        Title: formData.title.trim(),
+        Address: formData.address.trim(),
+        customerId: formData.customerId,
+        companyId: formData.companyId,
+        teamId: formData.teamId || null,
+        frequency: formData.frequency,
+        day: formData.day,
+        time: formData.time,
+        duration: formData.duration,
+        status: formData.status,
+        type: formData.type,
         startDate: formData.startDate ? new Date(formData.startDate).toISOString() : "",
-        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : "",
+        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : null,
+        notes: formData.notes?.trim() || null,
       }
 
       console.log("Submitting recurrence data:", submitData)

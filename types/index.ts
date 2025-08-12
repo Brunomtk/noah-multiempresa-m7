@@ -271,3 +271,56 @@ export interface AppConfig {
   monitoring: MonitoringConfig
   security: SecurityConfig
 }
+
+export interface RegisterData {
+  name: string
+  email: string
+  password: string
+  confirmPassword: string
+  phone?: string
+  role: "admin" | "company" | "professional"
+  companyId?: number
+  termsAccepted: boolean
+}
+
+export interface ProfessionalWithDetails {
+  id: number
+  name: string
+  email: string
+  phone?: string
+  avatar?: string
+  status: "active" | "inactive" | "suspended"
+  rating: number
+  totalJobs: number
+  completedJobs: number
+  joinedAt: string
+  lastActive?: string
+  skills: string[]
+  certifications: string[]
+  location?: Address
+  availability: BusinessHours
+  companyId: number
+  teamId?: number
+  team?: {
+    id: number
+    name: string
+    region: string
+  }
+  company?: {
+    id: number
+    name: string
+    logo?: string
+  }
+}
+
+export interface ProfessionalPagedResponse {
+  data: ProfessionalWithDetails[]
+  meta: {
+    currentPage: number
+    totalPages: number
+    totalItems: number
+    itemsPerPage: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
+}

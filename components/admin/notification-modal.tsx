@@ -19,15 +19,41 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Notification, NotificationFormData, NotificationUpdateData } from "@/types/notification"
+import { fetchApi } from "@/lib/api/utils"
 
-// Mock data for recipients
-const mockRecipients = [
-  { id: 1, name: "Admin User 1", role: 1 },
-  { id: 2, name: "Company User 1", role: 2 },
-  { id: 3, name: "Professional User 1", role: 3 },
-  { id: 4, name: "Company User 2", role: 2 },
-  { id: 5, name: "Professional User 2", role: 3 },
-]
+interface Company {
+  id: number
+  name: string
+  cnpj: string
+  responsible: string
+  email: string
+  phone: string
+  planId: number
+  status: number
+}
+
+interface User {
+  id: number
+  name: string
+  email: string
+  role: number
+}
+
+interface CompaniesResponse {
+  result: Company[]
+  currentPage: number
+  pageCount: number
+  pageSize: number
+  totalItems: number
+}
+
+interface UsersResponse {
+  data: User[]
+  currentPage: number
+  pageCount: number
+  pageSize: number
+  totalItems: number
+}
 
 interface NotificationModalProps {
   isOpen: boolean
@@ -46,6 +72,35 @@ export function NotificationModal({ isOpen, onClose, notificationToEdit, onSubmi
   const [companyId, setCompanyId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState("0")
   const [loading, setLoading] = useState(false)
+
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loadingData, setLoadingData] = useState(false)
+
+  const loadDropdownData = async () => {
+    setLoadingData(true)
+    try {
+      // Load companies
+      const companiesRes = await fetchApi<CompaniesResponse>("/Companies/paged?PageSize=100")
+      setCompanies(Array.isArray(companiesRes?.result) ? companiesRes.result : [])
+
+      // Load users for recipients
+      const usersRes = await fetchApi<UsersResponse>("/Users/paged?PageSize=100")
+      setUsers(Array.isArray(usersRes?.data) ? usersRes.data : [])
+    } catch (error) {
+      console.error("Failed to load dropdown data:", error)
+      setCompanies([])
+      setUsers([])
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      loadDropdownData()
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (notificationToEdit) {
@@ -107,7 +162,7 @@ export function NotificationModal({ isOpen, onClose, notificationToEdit, onSubmi
     }
   }
 
-  const filteredRecipients = mockRecipients.filter((recipient) => recipient.role.toString() === recipientRole)
+  const filteredRecipients = users.filter((user) => user.role.toString() === recipientRole)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -238,7 +293,9 @@ export function NotificationModal({ isOpen, onClose, notificationToEdit, onSubmi
                         </div>
                       ))}
                       {filteredRecipients.length === 0 && (
-                        <p className="text-sm text-muted-foreground">No recipients available for selected role</p>
+                        <p className="text-sm text-muted-foreground">
+                          {loadingData ? "Loading recipients..." : "No recipients available for selected role"}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -246,16 +303,26 @@ export function NotificationModal({ isOpen, onClose, notificationToEdit, onSubmi
 
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="company-id" className="text-right">
-                    Company ID
+                    Company * ({companies.length} loaded)
                   </Label>
-                  <Input
-                    id="company-id"
-                    type="number"
-                    value={companyId || ""}
-                    onChange={(e) => setCompanyId(e.target.value ? Number.parseInt(e.target.value) : undefined)}
-                    className="col-span-3"
-                    placeholder="Optional"
-                  />
+                  <div className="col-span-3">
+                    <Select
+                      value={companyId?.toString() || "0"}
+                      onValueChange={(value) => setCompanyId(value ? Number.parseInt(value) : undefined)}
+                    >
+                      <SelectTrigger id="company-id">
+                        <SelectValue placeholder={loadingData ? "Loading companies..." : "Select company (optional)"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">No Company</SelectItem>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id.toString()}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </>
             )}
@@ -264,7 +331,7 @@ export function NotificationModal({ isOpen, onClose, notificationToEdit, onSubmi
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || loadingData}>
               {loading ? "Saving..." : notificationToEdit ? "Update" : "Create"}
             </Button>
           </DialogFooter>

@@ -70,7 +70,7 @@ export default function ClientsPage() {
           pageNumber: 1,
           pageSize: 100,
         })
-        setClients(response.data || [])
+        setClients(response.results || [])
       } catch (error) {
         console.error("Error fetching clients:", error)
         toast({
@@ -237,7 +237,7 @@ export default function ClientsPage() {
         pageNumber: 1,
         pageSize: 100,
       })
-      setClients(response.data || [])
+      setClients(response.results || [])
     } catch (error) {
       console.error("Error refreshing clients:", error)
     }

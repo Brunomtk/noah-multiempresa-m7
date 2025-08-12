@@ -1,12 +1,15 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Calendar, Clock, MapPin, User, Phone, Mail, FileText, Edit, Trash2 } from "lucide-react"
+import { Calendar, Clock, MapPin, User, Phone, Mail, FileText, Edit, Trash2, Plus } from "lucide-react"
 import { format, isValid } from "date-fns"
 import type { Appointment } from "@/types/appointment"
+import { CompanyCheckRecordModal } from "./company-check-record-modal"
+import { useToast } from "@/hooks/use-toast"
 
 interface CompanyAppointmentDetailsModalProps {
   appointment: Appointment | null
@@ -96,6 +99,9 @@ export function CompanyAppointmentDetailsModal({
   onEdit,
   onDelete,
 }: CompanyAppointmentDetailsModalProps) {
+  const [isCheckRecordModalOpen, setIsCheckRecordModalOpen] = useState(false)
+  const { toast } = useToast()
+
   if (!appointment) return null
 
   const startDate = new Date(appointment.start)
@@ -104,179 +110,208 @@ export function CompanyAppointmentDetailsModal({
   const isValidEndDate = isValid(endDate)
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-[#1a2234] border-[#2a3349] text-white">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-semibold text-white">
-              {appointment.title || "Appointment Details"}
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Badge className={getStatusColor(appointment.status)}>{getStatusText(appointment.status)}</Badge>
-              <Badge variant="outline" className={getPriorityColor(appointment.priority || 0)}>
-                {getPriorityText(appointment.priority || 0)}
-              </Badge>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Basic Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-gray-300">
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm font-medium">Date & Time</span>
-              </div>
-              <div className="pl-6 space-y-1">
-                <p className="text-white">
-                  {isValidStartDate ? format(startDate, "EEEE, MMMM d, yyyy") : "Invalid date"}
-                </p>
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Clock className="h-3 w-3" />
-                  <span className="text-sm">
-                    {isValidStartDate && isValidEndDate
-                      ? `${format(startDate, "h:mm a")} - ${format(endDate, "h:mm a")}`
-                      : "Invalid time"}
-                  </span>
-                </div>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl bg-[#1a2234] border-[#2a3349] text-white">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-xl font-semibold text-white">
+                {appointment.title || "Appointment Details"}
+              </DialogTitle>
+              <div className="flex items-center gap-2">
+                <Badge className={getStatusColor(appointment.status)}>{getStatusText(appointment.status)}</Badge>
+                <Badge variant="outline" className={getPriorityColor(appointment.priority || 0)}>
+                  {getPriorityText(appointment.priority || 0)}
+                </Badge>
               </div>
             </div>
+          </DialogHeader>
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-gray-300">
-                <FileText className="h-4 w-4" />
-                <span className="text-sm font-medium">Service Type</span>
-              </div>
-              <div className="pl-6">
-                <p className="text-white">{getTypeText(appointment.type)}</p>
-              </div>
-            </div>
-          </div>
-
-          <Separator className="bg-[#2a3349]" />
-
-          {/* Customer Information */}
-          {appointment.customer && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-gray-300">
-                <User className="h-4 w-4" />
-                <span className="text-sm font-medium">Customer Information</span>
-              </div>
-              <div className="pl-6 space-y-2">
-                <p className="text-white font-medium">{appointment.customer.name}</p>
-                {appointment.customer.email && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Mail className="h-3 w-3" />
-                    <span className="text-sm">{appointment.customer.email}</span>
-                  </div>
-                )}
-                {appointment.customer.phone && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Phone className="h-3 w-3" />
-                    <span className="text-sm">{appointment.customer.phone}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Location */}
-          {appointment.address && (
-            <>
-              <Separator className="bg-[#2a3349]" />
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-gray-300">
-                  <MapPin className="h-4 w-4" />
-                  <span className="text-sm font-medium">Location</span>
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm font-medium">Date & Time</span>
                 </div>
-                <div className="pl-6">
-                  <p className="text-white">{appointment.address}</p>
+                <div className="pl-6 space-y-1">
+                  <p className="text-white">
+                    {isValidStartDate ? format(startDate, "EEEE, MMMM d, yyyy") : "Invalid date"}
+                  </p>
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Clock className="h-3 w-3" />
+                    <span className="text-sm">
+                      {isValidStartDate && isValidEndDate
+                        ? `${format(startDate, "h:mm a")} - ${format(endDate, "h:mm a")}`
+                        : "Invalid time"}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </>
-          )}
 
-          {/* Description */}
-          {appointment.notes && (
-            <>
-              <Separator className="bg-[#2a3349]" />
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-gray-300">
                   <FileText className="h-4 w-4" />
-                  <span className="text-sm font-medium">Notes</span>
+                  <span className="text-sm font-medium">Service Type</span>
                 </div>
                 <div className="pl-6">
-                  <p className="text-gray-300 text-sm leading-relaxed">{appointment.notes}</p>
+                  <p className="text-white">{getTypeText(appointment.type)}</p>
                 </div>
               </div>
-            </>
-          )}
+            </div>
 
-          {/* Professional Assignment */}
-          {appointment.professional && (
-            <>
-              <Separator className="bg-[#2a3349]" />
+            <Separator className="bg-[#2a3349]" />
+
+            {/* Customer Information */}
+            {appointment.customer && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-gray-300">
                   <User className="h-4 w-4" />
-                  <span className="text-sm font-medium">Assigned Professional</span>
+                  <span className="text-sm font-medium">Customer Information</span>
                 </div>
-                <div className="pl-6">
-                  <p className="text-white font-medium">{appointment.professional.name}</p>
-                  {appointment.professional.email && (
-                    <div className="flex items-center gap-2 text-gray-400 mt-1">
+                <div className="pl-6 space-y-2">
+                  <p className="text-white font-medium">{appointment.customer.name}</p>
+                  {appointment.customer.email && (
+                    <div className="flex items-center gap-2 text-gray-400">
                       <Mail className="h-3 w-3" />
-                      <span className="text-sm">{appointment.professional.email}</span>
+                      <span className="text-sm">{appointment.customer.email}</span>
+                    </div>
+                  )}
+                  {appointment.customer.phone && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Phone className="h-3 w-3" />
+                      <span className="text-sm">{appointment.customer.phone}</span>
                     </div>
                   )}
                 </div>
               </div>
-            </>
-          )}
+            )}
 
-          {/* Additional Details */}
-          <Separator className="bg-[#2a3349]" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-400">Created:</span>
-              <p className="text-white">
-                {appointment.createdAt && isValid(new Date(appointment.createdAt))
-                  ? format(new Date(appointment.createdAt), "MMM d, yyyy 'at' h:mm a")
-                  : "N/A"}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-400">Last Updated:</span>
-              <p className="text-white">
-                {appointment.updatedAt && isValid(new Date(appointment.updatedAt))
-                  ? format(new Date(appointment.updatedAt), "MMM d, yyyy 'at' h:mm a")
-                  : "N/A"}
-              </p>
+            {/* Location */}
+            {appointment.address && (
+              <>
+                <Separator className="bg-[#2a3349]" />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-sm font-medium">Location</span>
+                  </div>
+                  <div className="pl-6">
+                    <p className="text-white">{appointment.address}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Description */}
+            {appointment.notes && (
+              <>
+                <Separator className="bg-[#2a3349]" />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <FileText className="h-4 w-4" />
+                    <span className="text-sm font-medium">Notes</span>
+                  </div>
+                  <div className="pl-6">
+                    <p className="text-gray-300 text-sm leading-relaxed">{appointment.notes}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Professional Assignment */}
+            {appointment.professional && (
+              <>
+                <Separator className="bg-[#2a3349]" />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <User className="h-4 w-4" />
+                    <span className="text-sm font-medium">Assigned Professional</span>
+                  </div>
+                  <div className="pl-6">
+                    <p className="text-white font-medium">{appointment.professional.name}</p>
+                    {appointment.professional.email && (
+                      <div className="flex items-center gap-2 text-gray-400 mt-1">
+                        <Mail className="h-3 w-3" />
+                        <span className="text-sm">{appointment.professional.email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Additional Details */}
+            <Separator className="bg-[#2a3349]" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-400">Created:</span>
+                <p className="text-white">
+                  {appointment.createdAt && isValid(new Date(appointment.createdAt))
+                    ? format(new Date(appointment.createdAt), "MMM d, yyyy 'at' h:mm a")
+                    : "N/A"}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-400">Last Updated:</span>
+                <p className="text-white">
+                  {appointment.updatedAt && isValid(new Date(appointment.updatedAt))
+                    ? format(new Date(appointment.updatedAt), "MMM d, yyyy 'at' h:mm a")
+                    : "N/A"}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-[#2a3349]">
-          <Button
-            variant="outline"
-            onClick={() => onEdit(appointment)}
-            className="border-[#2a3349] text-white hover:bg-[#2a3349]"
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => onDelete(appointment)}
-            className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#2a3349]">
+            <Button
+              variant="outline"
+              onClick={() => setIsCheckRecordModalOpen(true)}
+              className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Check Record
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onEdit(appointment)}
+              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onDelete(appointment)}
+              className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Check Record Modal */}
+      <CompanyCheckRecordModal
+        isOpen={isCheckRecordModalOpen}
+        onClose={() => setIsCheckRecordModalOpen(false)}
+        onSuccess={() => {
+          setIsCheckRecordModalOpen(false)
+          toast({
+            title: "Success",
+            description: "Check record created successfully",
+          })
+        }}
+        prefilledData={{
+          appointmentId: appointment?.id?.toString() || "",
+          customerId: appointment?.customer?.id?.toString() || "",
+          address: appointment?.address || "",
+          professionalId: appointment?.professional?.id?.toString() || "",
+        }}
+      />
+    </>
   )
 }

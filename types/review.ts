@@ -93,6 +93,18 @@ export interface ReviewFormData {
   response?: string
 }
 
+export interface ReviewResponse {
+  data: Review[]
+  meta: {
+    currentPage: number
+    totalPages: number
+    totalItems: number
+    itemsPerPage: number
+  }
+  status: number
+  message?: string
+}
+
 // Entities for dropdowns
 export interface Customer {
   id: number

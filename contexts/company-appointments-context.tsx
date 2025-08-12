@@ -30,6 +30,8 @@ interface CompanyAppointmentsContextType {
 
 const CompanyAppointmentsContext = createContext<CompanyAppointmentsContextType | undefined>(undefined)
 
+export { CompanyAppointmentsContext }
+
 export function CompanyAppointmentsProvider({ children }: { children: ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -169,6 +171,3 @@ export function useCompanyAppointments() {
   }
   return context
 }
-
-// Export the context for direct access
-export { CompanyAppointmentsContext }

@@ -3,15 +3,9 @@ import type {
   InternalFeedbackFormData,
   InternalFeedbackFilters,
   InternalFeedbackComment,
+  InternalFeedbackPagedResponse,
 } from "@/types/internal-feedback"
-import {
-  getInternalFeedback,
-  getInternalFeedbackById,
-  createInternalFeedback,
-  updateInternalFeedback,
-  deleteInternalFeedback,
-  addCommentToInternalFeedback,
-} from "./internal-feedback"
+import { fetchApi } from "./utils"
 
 // Company-specific feedback API functions that ensure company isolation
 export async function getCompanyFeedback(
@@ -19,16 +13,18 @@ export async function getCompanyFeedback(
   filters?: InternalFeedbackFilters,
 ): Promise<InternalFeedback[]> {
   try {
-    // Get all feedback and filter by company
-    const allFeedback = await getInternalFeedback(filters)
+    const params = new URLSearchParams()
+    if (filters?.status && filters.status !== "all") params.append("Status", filters.status.toString())
+    if (filters?.priority && filters.priority !== "all") params.append("Priority", filters.priority.toString())
+    if (filters?.category) params.append("Category", filters.category)
+    if (filters?.professionalId) params.append("ProfessionalId", filters.professionalId.toString())
+    if (filters?.teamId) params.append("TeamId", filters.teamId.toString())
+    if (filters?.search) params.append("Search", filters.search)
+    params.append("PageNumber", (filters?.pageNumber || 1).toString())
+    params.append("PageSize", (filters?.pageSize || 100).toString())
 
-    // In a real app, this filtering would be done on the backend
-    // For now, we'll filter client-side to simulate company isolation
-    return allFeedback.filter((feedback) => {
-      // Assuming feedback has a companyId field or we can derive it from the professional/team
-      // This is a simplified example - in production, this would be handled by the API
-      return true // For now, return all feedback as mock data doesn't have companyId
-    })
+    const response = await fetchApi<InternalFeedbackPagedResponse>(`/InternalFeedback/paged?${params.toString()}`)
+    return Array.isArray(response) ? response : response?.data || []
   } catch (error) {
     console.error("Error fetching company feedback:", error)
     throw error
@@ -37,10 +33,7 @@ export async function getCompanyFeedback(
 
 export async function getCompanyFeedbackById(companyId: string, feedbackId: string): Promise<InternalFeedback | null> {
   try {
-    const feedback = await getInternalFeedbackById(feedbackId)
-
-    // In a real app, verify that this feedback belongs to the company
-    // For now, we'll return it as-is
+    const feedback = await fetchApi<InternalFeedback>(`/InternalFeedback/${feedbackId}`)
     return feedback
   } catch (error) {
     console.error(`Error fetching company feedback with ID ${feedbackId}:`, error)
@@ -53,13 +46,22 @@ export async function createCompanyFeedback(
   data: InternalFeedbackFormData,
 ): Promise<InternalFeedback> {
   try {
-    // In a real app, we would add the companyId to the data
     const feedbackData = {
-      ...data,
-      // companyId would be added here
+      title: data.title,
+      professionalId: Number.parseInt(data.professionalId.toString()),
+      teamId: Number.parseInt(data.teamId.toString()),
+      category: data.category,
+      status: Number.parseInt(data.status.toString()),
+      date: new Date().toISOString(),
+      description: data.description,
+      priority: Number.parseInt(data.priority.toString()),
+      assignedToId: Number.parseInt(data.assignedToId.toString()),
     }
 
-    return await createInternalFeedback(feedbackData)
+    return await fetchApi<InternalFeedback>("/InternalFeedback", {
+      method: "POST",
+      body: JSON.stringify(feedbackData),
+    })
   } catch (error) {
     console.error("Error creating company feedback:", error)
     throw error
@@ -72,8 +74,21 @@ export async function updateCompanyFeedback(
   data: Partial<InternalFeedbackFormData>,
 ): Promise<InternalFeedback> {
   try {
-    // In a real app, verify that this feedback belongs to the company before updating
-    return await updateInternalFeedback(feedbackId, data)
+    const updateData = {
+      ...(data.title && { title: data.title }),
+      ...(data.professionalId && { professionalId: Number.parseInt(data.professionalId.toString()) }),
+      ...(data.teamId && { teamId: Number.parseInt(data.teamId.toString()) }),
+      ...(data.category && { category: data.category }),
+      ...(data.status && { status: Number.parseInt(data.status.toString()) }),
+      ...(data.description && { description: data.description }),
+      ...(data.priority && { priority: Number.parseInt(data.priority.toString()) }),
+      ...(data.assignedToId && { assignedToId: Number.parseInt(data.assignedToId.toString()) }),
+    }
+
+    return await fetchApi<InternalFeedback>(`/InternalFeedback/${feedbackId}`, {
+      method: "PUT",
+      body: JSON.stringify(updateData),
+    })
   } catch (error) {
     console.error(`Error updating company feedback with ID ${feedbackId}:`, error)
     throw error
@@ -82,8 +97,9 @@ export async function updateCompanyFeedback(
 
 export async function deleteCompanyFeedback(companyId: string, feedbackId: string): Promise<void> {
   try {
-    // In a real app, verify that this feedback belongs to the company before deleting
-    await deleteInternalFeedback(feedbackId)
+    await fetchApi(`/InternalFeedback/${feedbackId}`, {
+      method: "DELETE",
+    })
   } catch (error) {
     console.error(`Error deleting company feedback with ID ${feedbackId}:`, error)
     throw error
@@ -96,8 +112,16 @@ export async function addCommentToCompanyFeedback(
   comment: Omit<InternalFeedbackComment, "id" | "date">,
 ): Promise<InternalFeedbackComment> {
   try {
-    // In a real app, verify that this feedback belongs to the company before adding comment
-    return await addCommentToInternalFeedback(feedbackId, comment)
+    const commentData = {
+      authorId: comment.authorId,
+      author: comment.author,
+      text: comment.text,
+    }
+
+    return await fetchApi<InternalFeedbackComment>(`/InternalFeedback/${feedbackId}/comments`, {
+      method: "POST",
+      body: JSON.stringify(commentData),
+    })
   } catch (error) {
     console.error(`Error adding comment to company feedback with ID ${feedbackId}:`, error)
     throw error

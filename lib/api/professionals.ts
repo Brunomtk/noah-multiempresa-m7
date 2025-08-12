@@ -586,3 +586,5 @@ export const professionalsApi = {
 
 // Legacy exports for backward compatibility
 export const getProfessional = professionalsApi.getById
+
+export type { ProfessionalWithDetails }

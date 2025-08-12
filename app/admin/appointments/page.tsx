@@ -8,6 +8,7 @@ import { AppointmentList } from "@/components/admin/appointment-list"
 import { AppointmentCalendar } from "@/components/admin/appointment-calendar"
 import { AppointmentModal } from "@/components/admin/appointment-modal"
 import { AppointmentDetailsModal } from "@/components/admin/appointment-details-modal"
+import { CheckInModal } from "@/components/admin/check-in-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useAppointments } from "@/hooks/use-appointments"
 import { format } from "date-fns"
@@ -25,6 +26,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Appointment, AppointmentFilters } from "@/types/appointment"
 import { apiRequest } from "@/lib/api/utils"
+import { createCheckRecord } from "@/lib/api/check-records"
+import Swal from "sweetalert2"
 
 interface Company {
   id: number
@@ -67,6 +70,7 @@ export default function AppointmentsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false)
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -81,6 +85,7 @@ export default function AppointmentsPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [loadingCompanies, setLoadingCompanies] = useState(false)
   const [loadingProfessionals, setLoadingProfessionals] = useState(false)
+  const [createdAppointmentData, setCreatedAppointmentData] = useState<any>(null)
   const { toast } = useToast()
 
   // Load companies and professionals on component mount
@@ -94,12 +99,15 @@ export default function AppointmentsPage() {
     loadAppointments()
   }, [currentPage, pageSize, statusFilter, companyFilter, professionalFilter, searchTerm])
 
+  // Update the loadCompanies function to use the correct endpoint
   const loadCompanies = async () => {
     try {
       setLoadingCompanies(true)
       const response = await apiRequest("/Companies")
       if (Array.isArray(response)) {
         setCompanies(response)
+      } else if (response.results && Array.isArray(response.results)) {
+        setCompanies(response.results)
       }
     } catch (error) {
       console.error("Error loading companies:", error)
@@ -113,12 +121,15 @@ export default function AppointmentsPage() {
     }
   }
 
+  // Update the loadProfessionals function to use the correct endpoint
   const loadProfessionals = async () => {
     try {
       setLoadingProfessionals(true)
       const response = await apiRequest("/Professional")
       if (Array.isArray(response)) {
         setProfessionals(response)
+      } else if (response.results && Array.isArray(response.results)) {
+        setProfessionals(response.results)
       }
     } catch (error) {
       console.error("Error loading professionals:", error)
@@ -160,8 +171,48 @@ export default function AppointmentsPage() {
   const handleAddAppointment = async (data: any) => {
     const success = await addAppointment(data)
     if (success) {
+      // Sempre fechar o modal primeiro
       setIsModalOpen(false)
       setSelectedAppointment(null)
+
+      // Mostrar SweetAlert com opções
+      const result = await Swal.fire({
+        title: "Appointment Created!",
+        text: "What would you like to do next?",
+        icon: "success",
+        showCancelButton: true,
+        confirmButtonText: "Create Check Record",
+        cancelButtonText: "Continue",
+        confirmButtonColor: "#06b6d4",
+        cancelButtonColor: "#6b7280",
+        background: "#1a2234",
+        color: "#ffffff",
+        customClass: {
+          popup: "swal-dark-popup",
+          title: "swal-dark-title",
+          content: "swal-dark-content",
+        },
+      })
+
+      if (result.isConfirmed) {
+        // Preparar dados para o check record baseado no appointment
+        const checkRecordData = {
+          professionalId: data.professionalId || "",
+          professionalName: "",
+          companyId: data.companyId || "",
+          customerId: data.customerId || "",
+          customerName: "",
+          appointmentId: "", // Será preenchido com o ID do appointment criado se disponível
+          address: data.address || "",
+          teamId: data.teamId || "",
+          teamName: "",
+          serviceType: getServiceTypeText(data.type) || "General Service",
+          notes: data.notes || "",
+        }
+
+        setCreatedAppointmentData(checkRecordData)
+        setIsCheckInModalOpen(true)
+      }
     }
   }
 
@@ -250,6 +301,46 @@ export default function AppointmentsPage() {
       // Load more appointments for calendar view
       setCurrentPage(1)
       loadAppointments()
+    }
+  }
+
+  const handleCreateCheckRecord = async (checkRecordData: any) => {
+    try {
+      const result = await createCheckRecord(checkRecordData)
+      if (result.data) {
+        toast({
+          title: "Success",
+          description: "Check record created successfully!",
+        })
+        setIsCheckInModalOpen(false)
+        setCreatedAppointmentData(null)
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to create check record",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error creating check record:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create check record",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const getServiceTypeText = (type: number): string => {
+    switch (type) {
+      case 0:
+        return "Residential"
+      case 1:
+        return "Commercial"
+      case 2:
+        return "Industrial"
+      default:
+        return "General Service"
     }
   }
 
@@ -493,6 +584,16 @@ export default function AppointmentsPage() {
         onDelete={setAppointmentToDelete}
       />
 
+      <CheckInModal
+        isOpen={isCheckInModalOpen}
+        onClose={() => {
+          setIsCheckInModalOpen(false)
+          setCreatedAppointmentData(null)
+        }}
+        onSubmit={handleCreateCheckRecord}
+        checkIn={createdAppointmentData}
+      />
+
       <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
         <AlertDialogContent className="bg-[#1a2234] border-[#2a3349] text-white">
           <AlertDialogHeader>
@@ -519,6 +620,19 @@ export default function AppointmentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <style jsx global>{`
+        .swal-dark-popup {
+          background-color: #1a2234 !important;
+          border: 1px solid #2a3349 !important;
+        }
+        .swal-dark-title {
+          color: #ffffff !important;
+        }
+        .swal-dark-content {
+          color: #d1d5db !important;
+        }
+      `}</style>
     </div>
   )
 }

@@ -72,6 +72,46 @@ export default function ProfessionalSchedule() {
     })
   }, [appointments, currentDate])
 
+  const generateDayTimeSlots = useMemo(() => {
+    const timeSlots = []
+    for (let i = 8; i <= 20; i++) {
+      // Add hour slot (e.g., 08:00)
+      const hourTime = i < 10 ? `0${i}:00` : `${i}:00`
+      const hourAppointments = getTodayAppointments.filter((appointment) => {
+        const startTime = new Date(appointment.start)
+        const startHour = startTime.getHours()
+        const startMinutes = startTime.getMinutes()
+        return startHour === i && startMinutes < 30
+      })
+
+      timeSlots.push({
+        time: hourTime,
+        fullHour: `${i}:00`,
+        appointments: hourAppointments,
+        isHalfHour: false,
+      })
+
+      // Add half-hour slot (e.g., 08:30) - only if not the last hour
+      if (i < 20) {
+        const halfHourTime = i < 10 ? `0${i}:30` : `${i}:30`
+        const halfHourAppointments = getTodayAppointments.filter((appointment) => {
+          const startTime = new Date(appointment.start)
+          const startHour = startTime.getHours()
+          const startMinutes = startTime.getMinutes()
+          return startHour === i && startMinutes >= 30
+        })
+
+        timeSlots.push({
+          time: halfHourTime,
+          fullHour: `${i}:30`,
+          appointments: halfHourAppointments,
+          isHalfHour: true,
+        })
+      }
+    }
+    return timeSlots
+  }, [getTodayAppointments])
+
   // Generate hours for the day view (8 AM to 8 PM)
   const generateDayHours = useMemo(() => {
     const hours = []
@@ -212,6 +252,24 @@ export default function ProfessionalSchedule() {
     }
   }
 
+  const getAppointmentStyle = (appointment: any) => {
+    const startTime = new Date(appointment.start)
+    const endTime = new Date(appointment.end)
+    const startMinutes = startTime.getMinutes()
+    const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60) // duration in minutes
+
+    // Calculate height based on duration (minimum 40px, 2px per minute)
+    const height = Math.max(40, Math.min(duration * 2, 120))
+
+    // Calculate top offset within the 30-minute slot (0-30 minutes = 0-50px offset)
+    const topOffset = startMinutes >= 30 ? (startMinutes - 30) * 1.67 : startMinutes * 1.67
+
+    return {
+      height: `${height}px`,
+      marginTop: `${topOffset}px`,
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -280,101 +338,92 @@ export default function ProfessionalSchedule() {
         <CardContent>
           {/* Day View */}
           {view === "day" && (
-            <div className="space-y-6">
-              <div className="border rounded-lg overflow-hidden">
-                <div className="grid grid-cols-1 divide-y">
-                  {generateDayHours.map((hourData, i) => (
-                    <div
-                      key={i}
-                      className={`p-2 min-h-[100px] ${hourData.appointments.length > 0 ? "bg-primary/5" : ""}`}
-                    >
-                      <div className="font-medium text-sm text-muted-foreground sticky top-0 bg-background/80 backdrop-blur-sm z-10 py-1">
-                        {hourData.hour}
-                      </div>
-                      <div className="space-y-2 mt-1">
-                        {hourData.appointments.map((appointment) => (
-                          <div
-                            key={appointment.id}
-                            className="p-2 bg-primary/10 text-primary rounded-md border border-primary/20 hover:bg-primary/15 transition-colors cursor-pointer"
-                            onClick={() => handleViewDetails(appointment)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="font-medium">{appointment.title}</div>
-                              <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
-                                {getStatusBadge(appointment.status).label}
-                              </Badge>
-                            </div>
-                            <div className="text-xs flex items-center mt-1">
-                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                              <span className="truncate">{appointment.address}</span>
-                            </div>
-                            <div className="text-xs flex items-center mt-1">
-                              <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {format(new Date(appointment.start), "HH:mm")} -{" "}
-                              {format(new Date(appointment.end), "HH:mm")}
-                            </div>
-                            <div className="text-xs flex items-center mt-1">
-                              <Users className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {appointment.customer?.name || "No customer"}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="flex flex-col h-[600px] bg-[#1a2234] rounded-lg border border-[#2a3349]">
+              <div className="flex justify-between items-center p-4 border-b border-[#2a3349]">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={navigatePrevious}
+                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <h3 className="text-lg font-medium text-white">{format(currentDate, "EEEE, MMMM d, yyyy")}</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={navigateNext}
+                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Today's Appointments</h3>
-                <div className="space-y-3">
-                  {getTodayAppointments.length > 0 ? (
-                    getTodayAppointments.map((appointment) => (
-                      <div key={appointment.id} className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className={getStatusBadge(appointment.status).className}>
+              <div className="flex-1 overflow-y-auto">
+                <div className="relative min-h-full">
+                  {Array.from({ length: 17 }, (_, i) => i + 6).map((hour) => (
+                    <div
+                      key={hour}
+                      className="flex border-b border-[#2a3349] h-12 cursor-pointer hover:bg-[#1a2234]/30"
+                    >
+                      <div className="w-16 flex-shrink-0 border-r border-[#2a3349] p-1 text-xs text-gray-400 text-right pr-2">
+                        {hour}:00
+                      </div>
+                      <div className="flex-1 relative"></div>
+                    </div>
+                  ))}
+
+                  {getTodayAppointments.map((appointment) => {
+                    const startDate = new Date(appointment.start)
+                    const endDate = new Date(appointment.end)
+
+                    if (startDate.toString() === "Invalid Date" || endDate.toString() === "Invalid Date") {
+                      return null
+                    }
+
+                    const startHour = startDate.getHours()
+                    const startMinutes = startDate.getMinutes()
+                    const endHour = endDate.getHours()
+                    const endMinutes = endDate.getMinutes()
+
+                    const top = ((startHour - 6) * 60 + startMinutes) * (48 / 60)
+                    const height = ((endHour - startHour) * 60 + (endMinutes - startMinutes)) * (48 / 60)
+
+                    return (
+                      <div
+                        key={appointment.id}
+                        className="absolute left-16 right-2 rounded-md p-2 border-l-4 border-blue-400 bg-[#0f172a] overflow-hidden cursor-pointer hover:bg-[#2a3349] transition-colors"
+                        style={{
+                          top: `${top}px`,
+                          height: `${Math.max(height, 24)}px`,
+                          maxHeight: `${height}px`,
+                        }}
+                        onClick={() => handleViewDetails(appointment)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="overflow-hidden">
+                            <h4 className="font-medium text-sm truncate text-white">
+                              {appointment.title || "No Title"}
+                            </h4>
+                            <p className="text-xs text-gray-400 truncate">
+                              {appointment.customer?.name || "No customer"}
+                            </p>
+                            <div className="flex items-center mt-1">
+                              <Badge
+                                variant="outline"
+                                className={`${getStatusBadge(appointment.status).className} text-white text-xs px-1 py-0 h-4`}
+                              >
                                 {getStatusBadge(appointment.status).label}
                               </Badge>
-                              <span className="text-sm text-muted-foreground">
-                                {format(new Date(appointment.start), "HH:mm")} -{" "}
-                                {format(new Date(appointment.end), "HH:mm")}
+                              <span className="text-xs text-gray-400 ml-2">
+                                {format(startDate, "h:mm a")} - {format(endDate, "h:mm a")}
                               </span>
-                              <Badge variant="secondary">{getTypeLabel(appointment.type)}</Badge>
                             </div>
-                            <h3 className="font-semibold">{appointment.title}</h3>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4" />
-                              <span>{appointment.address}</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage
-                                  src={`/placeholder.svg?height=32&width=32&query=${appointment.customer?.name || "Customer"}`}
-                                  alt={appointment.customer?.name || "Customer"}
-                                />
-                                <AvatarFallback>
-                                  {appointment.customer?.name
-                                    ?.split(" ")
-                                    .map((n) => n[0])
-                                    .join("") || "C"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm">{appointment.customer?.name || "No customer"}</span>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(appointment)}>
-                              View Details
-                            </Button>
                           </div>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">No appointments scheduled for today</div>
-                  )}
+                    )
+                  })}
                 </div>
               </div>
             </div>

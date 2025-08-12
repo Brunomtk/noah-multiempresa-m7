@@ -1,90 +1,258 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Clock, MapPin, Calendar, AlertTriangle, CheckSquare, User, FileText, CheckCircle2, XCircle, Timer } from 'lucide-react'
-import { useEffect, useState } from "react"
-import { 
-  getProfessionalAppointments, 
-  getCheckRecords, 
-  getInternalFeedback,
-  type ProfessionalAppointment,
-  type CheckRecord,
-  type InternalFeedback
-} from "@/lib/api/professional-dashboard"
+import {
+  Calendar,
+  Users,
+  CheckCircle2,
+  Clock,
+  RefreshCw,
+  User,
+  FileText,
+  ClipboardList,
+  Phone,
+  Mail,
+} from "lucide-react"
+import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
+import { toast } from "@/hooks/use-toast"
+import { fetchApi } from "@/lib/api/utils"
 import { format } from "date-fns"
-import { enUS } from "date-fns/locale"
 
-export default function ProfessionalDashboard() {
-  const { user } = useAuth()
-  const router = useRouter()
-  const [appointments, setAppointments] = useState<ProfessionalAppointment[]>([])
+interface Appointment {
+  id: number
+  title: string
+  customerId: number
+  customer?: {
+    id: number
+    name: string
+    email: string
+    phone: string
+  }
+  address: string
+  start: string
+  end: string
+  status: string | number
+  professionalId?: number
+  companyId: number
+  notes?: string
+  createdDate: string
+  updatedDate: string
+}
+
+interface CheckRecord {
+  id: number
+  professionalId: number
+  professionalName: string
+  customerId: number
+  customerName: string
+  address: string
+  checkInTime?: string
+  checkOutTime?: string
+  status: number
+  serviceType: string
+  notes?: string
+  createdDate: string
+  updatedDate: string
+}
+
+interface InternalFeedback {
+  id: number
+  title: string
+  description: string
+  category: string
+  priority: number
+  status: number
+  professionalId: number
+  assignedToId?: number
+  date: string
+  createdDate: string
+  updatedDate: string
+}
+
+export default function ProfessionalDashboardPage() {
+  const [isLoading, setIsLoading] = useState(true)
+  const [stats, setStats] = useState({
+    todayAppointments: 0,
+    completedServices: 0,
+    pendingCheckIns: 0,
+    openFeedbacks: 0,
+  })
+  const [appointments, setAppointments] = useState<Appointment[]>([])
   const [checkRecords, setCheckRecords] = useState<CheckRecord[]>([])
   const [feedbacks, setFeedbacks] = useState<InternalFeedback[]>([])
-  const [loading, setLoading] = useState(true)
+  const [appointmentStatus, setAppointmentStatus] = useState({
+    scheduled: 0,
+    confirmed: 0,
+    completed: 0,
+    cancelled: 0,
+  })
+  const [checkRecordStatus, setCheckRecordStatus] = useState({
+    pending: 0,
+    "in-progress": 0,
+    completed: 0,
+    cancelled: 0,
+  })
+  const { user } = useAuth()
 
   useEffect(() => {
-    loadDashboardData()
-  }, [user])
+    const loadDashboardData = async () => {
+      if (!user?.id) return
 
-  const loadDashboardData = async () => {
-    if (!user?.id) return
+      setIsLoading(true)
+      try {
+        const professionalId = user.id.toString()
+        const today = new Date()
+        const startDate = format(today, "yyyy-MM-dd")
+        const endDate = format(today, "yyyy-MM-dd")
 
-    try {
-      setLoading(true)
-      
-      // Load today's appointments
-      const today = new Date()
-      const startDate = format(today, 'yyyy-MM-dd')
-      const endDate = format(today, 'yyyy-MM-dd')
-      
-      const [appointmentsRes, checkRecordsRes, feedbacksRes] = await Promise.all([
-        getProfessionalAppointments({
-          professionalId: user.id,
-          startDate: startDate + 'T00:00:00',
-          endDate: endDate + 'T23:59:59',
-          pageSize: 10
-        }),
-        getCheckRecords({
-          professionalId: user.id,
-          pageSize: 10
-        }),
-        getInternalFeedback({
-          professionalId: user.id,
-          pageSize: 5
+        const [appointmentsRes, checkRecordsRes, feedbacksRes] = await Promise.allSettled([
+          fetchApi<{ results: Appointment[] }>(`Appointment?ProfessionalId=${professionalId}&PageSize=100`),
+          fetchApi<{ results: CheckRecord[] }>(`CheckRecord?ProfessionalId=${professionalId}&PageSize=100`),
+          fetchApi<{ data: InternalFeedback[] }>(
+            `InternalFeedback/paged?ProfessionalId=${professionalId}&PageSize=100`,
+          ),
+        ])
+
+        const appointments =
+          appointmentsRes.status === "fulfilled" && appointmentsRes.value?.results ? appointmentsRes.value.results : []
+        const checkRecords =
+          checkRecordsRes.status === "fulfilled" && checkRecordsRes.value?.results ? checkRecordsRes.value.results : []
+        const feedbacks = feedbacksRes.status === "fulfilled" && feedbacksRes.value?.data ? feedbacksRes.value.data : []
+
+        // Filter today's appointments
+        const todayAppointments = appointments.filter((apt) => {
+          const aptDate = new Date(apt.start)
+          return aptDate.toDateString() === today.toDateString()
         })
-      ])
 
-      setAppointments(appointmentsRes.results || [])
-      setCheckRecords(checkRecordsRes.results || [])
-      setFeedbacks(feedbacksRes.data || [])
-    } catch (error) {
-      console.error("Error loading dashboard data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+        setAppointments(todayAppointments)
+        setCheckRecords(checkRecords.slice(0, 10)) // Show recent 10
+        setFeedbacks(feedbacks.slice(0, 5)) // Show recent 5
 
-  const getStatusBadge = (status: number, type: 'appointment' | 'check' | 'feedback') => {
-    if (type === 'check') {
-      switch (status) {
-        case 0: return <Badge variant="outline">Pending</Badge>
-        case 1: return <Badge className="bg-blue-500">Checked In</Badge>
-        case 2: return <Badge className="bg-green-500">Completed</Badge>
-        default: return <Badge variant="outline">Unknown</Badge>
+        setStats({
+          todayAppointments: todayAppointments.length,
+          completedServices: checkRecords.filter((record) => record.status === 2 || record.status === "completed")
+            .length,
+          pendingCheckIns: checkRecords.filter((record) => record.status === 0 || record.status === "pending").length,
+          openFeedbacks: feedbacks.filter((feedback) => feedback.status === 0 || feedback.status === "pending").length,
+        })
+
+        const appointmentStatusCounts = appointments.reduce(
+          (acc, apt) => {
+            let status = "scheduled"
+
+            // Map integer status to string status
+            if (typeof apt.status === "number") {
+              switch (apt.status) {
+                case 0:
+                case 1:
+                  status = "scheduled"
+                  break
+                case 2:
+                  status = "confirmed"
+                  break
+                case 3:
+                  status = "completed"
+                  break
+                case 4:
+                  status = "cancelled"
+                  break
+                default:
+                  status = "scheduled"
+              }
+            } else if (typeof apt.status === "string") {
+              status = apt.status.toLowerCase()
+            }
+
+            if (status in acc) {
+              acc[status as keyof typeof acc]++
+            }
+            return acc
+          },
+          { scheduled: 0, confirmed: 0, completed: 0, cancelled: 0 },
+        )
+
+        setAppointmentStatus(appointmentStatusCounts)
+
+        const checkRecordStatusCounts = checkRecords.reduce(
+          (acc, record) => {
+            let status = "pending"
+
+            // Map integer status to string status
+            if (typeof record.status === "number") {
+              switch (record.status) {
+                case 0:
+                  status = "pending"
+                  break
+                case 1:
+                  status = "in-progress"
+                  break
+                case 2:
+                  status = "completed"
+                  break
+                case 3:
+                  status = "cancelled"
+                  break
+                default:
+                  status = "pending"
+              }
+            } else if (typeof record.status === "string") {
+              status = record.status.toLowerCase()
+            }
+
+            if (status in acc) {
+              acc[status as keyof typeof acc]++
+            }
+            return acc
+          },
+          { pending: 0, "in-progress": 0, completed: 0, cancelled: 0 },
+        )
+
+        setCheckRecordStatus(checkRecordStatusCounts)
+      } catch (error) {
+        console.error("Error loading dashboard data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
       }
     }
-    
-    if (type === 'feedback') {
+
+    loadDashboardData()
+  }, [user?.id, toast])
+
+  const getStatusBadge = (status: number, type: "appointment" | "check" | "feedback") => {
+    if (type === "check") {
       switch (status) {
-        case 0: return <Badge variant="destructive">Open</Badge>
-        case 1: return <Badge className="bg-yellow-500">In Progress</Badge>
-        case 2: return <Badge className="bg-green-500">Resolved</Badge>
-        default: return <Badge variant="outline">Unknown</Badge>
+        case 0:
+          return <Badge variant="outline">Pending</Badge>
+        case 1:
+          return <Badge className="bg-blue-500">Checked In</Badge>
+        case 2:
+          return <Badge className="bg-green-500">Completed</Badge>
+        default:
+          return <Badge variant="outline">Unknown</Badge>
+      }
+    }
+
+    if (type === "feedback") {
+      switch (status) {
+        case 0:
+          return <Badge variant="destructive">Open</Badge>
+        case 1:
+          return <Badge className="bg-yellow-500">In Progress</Badge>
+        case 2:
+          return <Badge className="bg-green-500">Resolved</Badge>
+        default:
+          return <Badge variant="outline">Unknown</Badge>
       }
     }
 
@@ -93,157 +261,212 @@ export default function ProfessionalDashboard() {
 
   const getPriorityBadge = (priority: number) => {
     switch (priority) {
-      case 0: return <Badge variant="outline">Low</Badge>
-      case 1: return <Badge className="bg-yellow-500">Medium</Badge>
-      case 2: return <Badge variant="destructive">High</Badge>
-      default: return <Badge variant="outline">Unknown</Badge>
+      case 0:
+        return <Badge variant="outline">Low</Badge>
+      case 1:
+        return <Badge className="bg-yellow-500">Medium</Badge>
+      case 2:
+        return <Badge variant="destructive">High</Badge>
+      default:
+        return <Badge variant="outline">Unknown</Badge>
     }
   }
 
-  const todayAppointments = appointments.length
-  const completedToday = checkRecords.filter(record => record.status === 2).length
-  const pendingCheckIns = checkRecords.filter(record => record.status === 0).length
-  const openFeedbacks = feedbacks.filter(feedback => feedback.status === 0).length
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="space-y-6 p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-300 rounded w-48 mb-2"></div>
+          <div className="h-4 bg-gray-300 rounded w-64"></div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-32 bg-gray-200 rounded-lg animate-pulse"></div>
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Hello, {user?.name || 'Professional'}</h2>
-          <p className="text-muted-foreground">
-            Dashboard | {format(new Date(), "EEEE, MMMM do, yyyy", { locale: enUS })}
-          </p>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-gray-600">Welcome back! Here's your professional overview.</p>
+          {user && (
+            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+              <div className="flex items-center gap-1">
+                <User className="h-4 w-4" />
+                {user.name}
+              </div>
+              <div className="flex items-center gap-1">
+                <Mail className="h-4 w-4" />
+                {user.email}
+              </div>
+              <div className="flex items-center gap-1">
+                <Phone className="h-4 w-4" />
+                {user.phone}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => router.push('/professional/schedule')}>
-            <Calendar className="h-4 w-4 mr-2" />
-            View Schedule
+          <Button onClick={() => setIsLoading(true)} disabled={isLoading} variant="outline">
+            {isLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Refresh
           </Button>
-          <Button onClick={() => router.push('/professional/check')} variant="outline">
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            Check-in/out
+          <Button asChild>
+            <Link href="/professional/check-in">
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Check-in/out
+            </Link>
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border dark:border-slate-700">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Appointments</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{todayAppointments}</div>
-            <p className="text-xs text-muted-foreground">
-              {completedToday} completed
-            </p>
+            <div className="text-2xl font-bold">{stats.todayAppointments}</div>
+            <p className="text-xs text-muted-foreground">Scheduled for today</p>
           </CardContent>
         </Card>
 
-        <Card className="border dark:border-slate-700">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Check-ins</CardTitle>
-            <Timer className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingCheckIns}</div>
-            <p className="text-xs text-muted-foreground">
-              Awaiting check-in
-            </p>
+            <div className="text-2xl font-bold">{stats.pendingCheckIns}</div>
+            <p className="text-xs text-muted-foreground">Awaiting check-in</p>
           </CardContent>
         </Card>
 
-        <Card className="border dark:border-slate-700">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completed Services</CardTitle>
-            <CheckSquare className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{completedToday}</div>
-            <p className="text-xs text-muted-foreground">
-              Today
-            </p>
+            <div className="text-2xl font-bold">{stats.completedServices}</div>
+            <p className="text-xs text-muted-foreground">Services completed</p>
           </CardContent>
         </Card>
 
-        <Card className="border dark:border-slate-700">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Open Feedbacks</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{openFeedbacks}</div>
-            <p className="text-xs text-muted-foreground">
-              Requires attention
-            </p>
+            <div className="text-2xl font-bold">{stats.openFeedbacks}</div>
+            <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="border dark:border-slate-700">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Access main features quickly</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Button 
-              variant="outline" 
-              className="h-20 flex-col gap-2"
-              onClick={() => router.push('/professional/schedule')}
-            >
-              <Calendar className="h-6 w-6" />
-              <span>Schedule</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="h-20 flex-col gap-2"
-              onClick={() => router.push('/professional/check')}
-            >
-              <CheckCircle2 className="h-6 w-6" />
-              <span>Check-in/out</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="h-20 flex-col gap-2"
-              onClick={() => router.push('/professional/feedback')}
-            >
-              <FileText className="h-6 w-6" />
-              <span>Feedback</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="h-20 flex-col gap-2"
-              onClick={() => router.push('/professional/profile')}
-            >
-              <User className="h-6 w-6" />
-              <span>Profile</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Appointment Status
+              </span>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/professional/history">View All</Link>
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span className="text-sm">Scheduled</span>
+                </div>
+                <span className="font-semibold">{appointmentStatus.scheduled}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm">Confirmed</span>
+                </div>
+                <span className="font-semibold">{appointmentStatus.confirmed}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                  <span className="text-sm">Completed</span>
+                </div>
+                <span className="font-semibold">{appointmentStatus.completed}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-sm">Cancelled</span>
+                </div>
+                <span className="font-semibold">{appointmentStatus.cancelled}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Button
+                asChild
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center gap-2 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-blue-200"
+              >
+                <Link href="/professional/check-in">
+                  <CheckCircle2 className="h-6 w-6 text-blue-600" />
+                  <div className="text-center">
+                    <div className="font-semibold text-blue-900">Check-in/out</div>
+                    <div className="text-xs text-blue-700">Track attendance</div>
+                  </div>
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center gap-2 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 border-green-200"
+              >
+                <Link href="/professional/chat">
+                  <Users className="h-6 w-6 text-green-600" />
+                  <div className="text-center">
+                    <div className="font-semibold text-green-900">Chat</div>
+                    <div className="text-xs text-green-700">Team communication</div>
+                  </div>
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Today's Appointments */}
-      <Card className="border dark:border-slate-700">
+      <Card>
         <CardHeader>
           <CardTitle>Today's Appointments</CardTitle>
-          <CardDescription>Your appointments for today</CardDescription>
         </CardHeader>
         <CardContent>
           {appointments.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No appointments for today
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No appointments for today</div>
           ) : (
             <Table>
               <TableHeader>
@@ -259,14 +482,14 @@ export default function ProfessionalDashboard() {
                 {appointments.map((appointment) => (
                   <TableRow key={appointment.id}>
                     <TableCell className="font-medium">{appointment.title}</TableCell>
-                    <TableCell>{appointment.customer.name}</TableCell>
+                    <TableCell>{appointment.customer?.name || "N/A"}</TableCell>
                     <TableCell>
-                      {format(new Date(appointment.start), 'HH:mm')} - {format(new Date(appointment.end), 'HH:mm')}
+                      {format(new Date(appointment.start), "HH:mm")} - {format(new Date(appointment.end), "HH:mm")}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{appointment.address}</TableCell>
                     <TableCell>
-                      <Button size="sm" onClick={() => router.push('/professional/check')}>
-                        Check-in
+                      <Button size="sm" asChild>
+                        <Link href="/professional/check-in">Check-in</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -278,16 +501,13 @@ export default function ProfessionalDashboard() {
       </Card>
 
       {/* Check Records */}
-      <Card className="border dark:border-slate-700">
+      <Card>
         <CardHeader>
-          <CardTitle>Check Records</CardTitle>
-          <CardDescription>Recent check-in and check-out history</CardDescription>
+          <CardTitle>Recent Check Records</CardTitle>
         </CardHeader>
         <CardContent>
           {checkRecords.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No check records found
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No check records found</div>
           ) : (
             <Table>
               <TableHeader>
@@ -306,12 +526,12 @@ export default function ProfessionalDashboard() {
                     <TableCell className="font-medium">{record.customerName}</TableCell>
                     <TableCell className="max-w-xs truncate">{record.address}</TableCell>
                     <TableCell>
-                      {record.checkInTime ? format(new Date(record.checkInTime), 'MM/dd HH:mm') : '-'}
+                      {record.checkInTime ? format(new Date(record.checkInTime), "MM/dd HH:mm") : "-"}
                     </TableCell>
                     <TableCell>
-                      {record.checkOutTime ? format(new Date(record.checkOutTime), 'MM/dd HH:mm') : '-'}
+                      {record.checkOutTime ? format(new Date(record.checkOutTime), "MM/dd HH:mm") : "-"}
                     </TableCell>
-                    <TableCell>{getStatusBadge(record.status, 'check')}</TableCell>
+                    <TableCell>{getStatusBadge(record.status, "check")}</TableCell>
                     <TableCell>{record.serviceType}</TableCell>
                   </TableRow>
                 ))}
@@ -322,16 +542,13 @@ export default function ProfessionalDashboard() {
       </Card>
 
       {/* Internal Feedback */}
-      <Card className="border dark:border-slate-700">
+      <Card>
         <CardHeader>
-          <CardTitle>Internal Feedback</CardTitle>
-          <CardDescription>Your recent feedback and requests</CardDescription>
+          <CardTitle>Recent Feedback</CardTitle>
         </CardHeader>
         <CardContent>
           {feedbacks.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No feedback found
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No feedback found</div>
           ) : (
             <Table>
               <TableHeader>
@@ -341,7 +558,6 @@ export default function ProfessionalDashboard() {
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -350,13 +566,8 @@ export default function ProfessionalDashboard() {
                     <TableCell className="font-medium">{feedback.title}</TableCell>
                     <TableCell>{feedback.category}</TableCell>
                     <TableCell>{getPriorityBadge(feedback.priority)}</TableCell>
-                    <TableCell>{getStatusBadge(feedback.status, 'feedback')}</TableCell>
-                    <TableCell>{format(new Date(feedback.date), 'MM/dd/yyyy')}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => router.push('/professional/feedback')}>
-                        View Details
-                      </Button>
-                    </TableCell>
+                    <TableCell>{getStatusBadge(feedback.status, "feedback")}</TableCell>
+                    <TableCell>{format(new Date(feedback.date), "MM/dd/yyyy")}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

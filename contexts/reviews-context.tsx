@@ -271,5 +271,6 @@ export function useReviews() {
   return context
 }
 
-// Export useReviewsContext as alias for useReviews
-export const useReviewsContext = useReviews
+export function useReviewsContext() {
+  return useReviews()
+}

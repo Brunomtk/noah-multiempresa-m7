@@ -19,6 +19,14 @@ export const useCheckRecords = (initialFilters?: CheckRecordFilters) => {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<CheckRecordFilters>(initialFilters || {})
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    pageCount: 1,
+    pageSize: 10,
+    totalItems: 0,
+    firstRowOnPage: 1,
+    lastRowOnPage: 10,
+  })
   const { toast } = useToast()
 
   const fetchRecords = useCallback(
@@ -27,9 +35,17 @@ export const useCheckRecords = (initialFilters?: CheckRecordFilters) => {
       setError(null)
       try {
         const filtersToUse = customFilters || filters
-        const data = await getCheckRecords(filtersToUse)
-        setRecords(data)
-        return data
+        const response = await getCheckRecords(filtersToUse)
+        setRecords(response.results)
+        setPagination({
+          currentPage: response.currentPage,
+          pageCount: response.pageCount,
+          pageSize: response.pageSize,
+          totalItems: response.totalItems,
+          firstRowOnPage: response.firstRowOnPage,
+          lastRowOnPage: response.lastRowOnPage,
+        })
+        return response.results
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to fetch check records"
         setError(errorMessage)
@@ -305,6 +321,7 @@ export const useCheckRecords = (initialFilters?: CheckRecordFilters) => {
     isLoading,
     error,
     filters,
+    pagination, // Added pagination to return object
     fetchRecords,
     getRecordById,
     createRecord,

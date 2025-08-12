@@ -5,7 +5,6 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -20,6 +19,30 @@ import {
   type CancellationFormData,
   type CancellationUpdateData,
 } from "@/types/cancellation"
+import { fetchApi } from "@/lib/api/utils"
+
+interface Company {
+  id: number
+  name: string
+}
+
+interface Customer {
+  id: number
+  name: string
+}
+
+interface Appointment {
+  id: number
+  title?: string
+  address?: string
+  customer?: { name: string }
+  professional?: { name: string }
+}
+
+interface Professional {
+  id: number
+  name: string
+}
 
 interface CancellationModalProps {
   open: boolean
@@ -41,6 +64,39 @@ export function CancellationModal({ open, onOpenChange, cancellation, isEditing,
     refundStatus: RefundStatus.Pending,
     notes: "",
   })
+
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const loadDropdownData = async () => {
+    if (!open || isEditing) return
+
+    setLoading(true)
+    try {
+      const companiesRes = await fetchApi<any>("/Companies/paged?PageSize=100")
+      setCompanies(Array.isArray(companiesRes) ? companiesRes : companiesRes?.result || [])
+
+      const customersRes = await fetchApi<any>("/Customer?PageSize=100")
+      setCustomers(Array.isArray(customersRes) ? customersRes : customersRes?.results || [])
+
+      const appointmentsRes = await fetchApi<any>("/Appointment?PageSize=100")
+      setAppointments(Array.isArray(appointmentsRes) ? appointmentsRes : appointmentsRes?.results || [])
+
+      const usersRes = await fetchApi<any>("/Users/paged?PageSize=100")
+      setProfessionals(Array.isArray(usersRes) ? usersRes : usersRes?.data || [])
+    } catch (error) {
+      console.error("Error loading dropdown data:", error)
+      setCompanies([])
+      setCustomers([])
+      setAppointments([])
+      setProfessionals([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (cancellation && isEditing) {
@@ -69,11 +125,14 @@ export function CancellationModal({ open, onOpenChange, cancellation, isEditing,
     setActiveTab("details")
   }, [cancellation, isEditing, open])
 
+  useEffect(() => {
+    loadDropdownData()
+  }, [open, isEditing])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (isEditing && cancellation) {
-      // For editing, only send updatable fields
       const updateData: CancellationUpdateData = {
         reason: formData.reason,
         refundStatus: formData.refundStatus,
@@ -81,7 +140,6 @@ export function CancellationModal({ open, onOpenChange, cancellation, isEditing,
       }
       onSave(updateData)
     } else {
-      // For creating, send all required fields
       const createData: CancellationFormData = {
         appointmentId: formData.appointmentId,
         customerId: formData.customerId,
@@ -126,6 +184,28 @@ export function CancellationModal({ open, onOpenChange, cancellation, isEditing,
     }
   }
 
+  const getAppointmentDisplay = (appointment: Appointment) => {
+    const title = appointment.title || `Appointment #${appointment.id}`
+    const customer = appointment.customer?.name ? ` - ${appointment.customer.name}` : ""
+    const address = appointment.address ? ` (${appointment.address})` : ""
+    return `${title}${customer}${address}`
+  }
+
+  const getCancelledByOptions = () => {
+    switch (formData.cancelledByRole) {
+      case CancelledByRole.Customer:
+        return customers
+      case CancelledByRole.Professional:
+        return professionals
+      case CancelledByRole.Company:
+        return companies
+      case CancelledByRole.Admin:
+        return [{ id: 1, name: "Administrator" }]
+      default:
+        return []
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#1a2234] border-[#2a3349] text-white max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -152,51 +232,63 @@ export function CancellationModal({ open, onOpenChange, cancellation, isEditing,
                   {!isEditing && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="appointmentId">Appointment ID</Label>
-                        <Input
-                          id="appointmentId"
-                          type="number"
-                          value={formData.appointmentId}
-                          onChange={(e) => setFormData({ ...formData, appointmentId: Number(e.target.value) })}
-                          className="bg-[#0f172a] border-[#2a3349] text-white"
-                          required
-                        />
+                        <Label htmlFor="appointmentId">Appointment * ({appointments.length} loaded)</Label>
+                        <Select
+                          value={formData.appointmentId.toString()}
+                          onValueChange={(value) => setFormData({ ...formData, appointmentId: Number(value) })}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                            <SelectValue placeholder={loading ? "Loading appointments..." : "Select appointment"} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#1a2234] border-[#2a3349]">
+                            {appointments.map((appointment) => (
+                              <SelectItem key={appointment.id} value={appointment.id.toString()}>
+                                {getAppointmentDisplay(appointment)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="customerId">Customer ID</Label>
-                        <Input
-                          id="customerId"
-                          type="number"
-                          value={formData.customerId}
-                          onChange={(e) => setFormData({ ...formData, customerId: Number(e.target.value) })}
-                          className="bg-[#0f172a] border-[#2a3349] text-white"
-                          required
-                        />
+                        <Label htmlFor="customerId">Customer * ({customers.length} loaded)</Label>
+                        <Select
+                          value={formData.customerId.toString()}
+                          onValueChange={(value) => setFormData({ ...formData, customerId: Number(value) })}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                            <SelectValue placeholder={loading ? "Loading customers..." : "Select customer"} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#1a2234] border-[#2a3349]">
+                            {customers.map((customer) => (
+                              <SelectItem key={customer.id} value={customer.id.toString()}>
+                                {customer.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="companyId">Company ID</Label>
-                        <Input
-                          id="companyId"
-                          type="number"
-                          value={formData.companyId}
-                          onChange={(e) => setFormData({ ...formData, companyId: Number(e.target.value) })}
-                          className="bg-[#0f172a] border-[#2a3349] text-white"
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cancelledById">Cancelled By ID</Label>
-                        <Input
-                          id="cancelledById"
-                          type="number"
-                          value={formData.cancelledById}
-                          onChange={(e) => setFormData({ ...formData, cancelledById: Number(e.target.value) })}
-                          className="bg-[#0f172a] border-[#2a3349] text-white"
-                          required
-                        />
+                        <Label htmlFor="companyId">Company * ({companies.length} loaded)</Label>
+                        <Select
+                          value={formData.companyId.toString()}
+                          onValueChange={(value) => setFormData({ ...formData, companyId: Number(value) })}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                            <SelectValue placeholder={loading ? "Loading companies..." : "Select company"} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#1a2234] border-[#2a3349]">
+                            {companies.map((company) => (
+                              <SelectItem key={company.id} value={company.id.toString()}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">
@@ -204,7 +296,11 @@ export function CancellationModal({ open, onOpenChange, cancellation, isEditing,
                         <Select
                           value={formData.cancelledByRole.toString()}
                           onValueChange={(value) =>
-                            setFormData({ ...formData, cancelledByRole: Number(value) as CancelledByRole })
+                            setFormData({
+                              ...formData,
+                              cancelledByRole: Number(value) as CancelledByRole,
+                              cancelledById: 0,
+                            })
                           }
                         >
                           <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
@@ -215,6 +311,32 @@ export function CancellationModal({ open, onOpenChange, cancellation, isEditing,
                             <SelectItem value={CancelledByRole.Professional.toString()}>Professional</SelectItem>
                             <SelectItem value={CancelledByRole.Company.toString()}>Company</SelectItem>
                             <SelectItem value={CancelledByRole.Admin.toString()}>Administrator</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cancelledById">Cancelled By * ({getCancelledByOptions().length} loaded)</Label>
+                        <Select
+                          value={formData.cancelledById.toString()}
+                          onValueChange={(value) => setFormData({ ...formData, cancelledById: Number(value) })}
+                          disabled={loading || getCancelledByOptions().length === 0}
+                        >
+                          <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white">
+                            <SelectValue
+                              placeholder={
+                                loading
+                                  ? "Loading..."
+                                  : `Select ${getCancelledByLabel(formData.cancelledByRole).toLowerCase()}`
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#1a2234] border-[#2a3349]">
+                            {getCancelledByOptions().map((option) => (
+                              <SelectItem key={option.id} value={option.id.toString()}>
+                                {option.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>

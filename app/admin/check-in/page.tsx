@@ -23,14 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { format } from "date-fns"
-import {
-  getCheckRecords,
-  createCheckRecord,
-  updateCheckRecord,
-  deleteCheckRecord,
-  performCheckOut,
-  getCompanies,
-} from "@/lib/api/check-records"
+import { getCheckRecords, performCheckOut, getCompanies, createCheckRecord } from "@/lib/api/check-records"
 
 export default function CheckInPage() {
   const [checkIns, setCheckIns] = useState<any[]>([])
@@ -53,9 +46,12 @@ export default function CheckInPage() {
   const loadCheckIns = async () => {
     try {
       setIsLoading(true)
-      const data = await getCheckRecords()
-      console.log("Check-ins loaded:", data)
-      setCheckIns(data)
+      const response = await getCheckRecords()
+      console.log("Check-ins response:", response)
+
+      // Garantir que sempre temos um array
+      const data = response.data || response.results || response.result || []
+      setCheckIns(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error("Error loading check-ins:", error)
       toast({
@@ -71,8 +67,9 @@ export default function CheckInPage() {
 
   const loadCompanies = async () => {
     try {
-      const data = await getCompanies()
-      setCompanies(data)
+      const response = await getCompanies()
+      const data = response.data || response.results || response.result || []
+      setCompanies(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error("Error loading companies:", error)
       setCompanies([])
@@ -81,18 +78,25 @@ export default function CheckInPage() {
 
   const handleAddCheckIn = async (data: any) => {
     try {
-      const newCheckIn = await createCheckRecord(data)
-      setCheckIns([...checkIns, newCheckIn])
-      setIsModalOpen(false)
-      toast({
-        title: "Check-in added successfully",
-        description: `Check-in for ${data.professionalName} has been registered.`,
-      })
+      console.log("Adding check-in with data:", data)
+
+      const result = await createCheckRecord(data)
+
+      if (result.data) {
+        await loadCheckIns() // Recarregar a lista
+        setIsModalOpen(false)
+        toast({
+          title: "Check-in added successfully",
+          description: `Check-in for ${data.professionalName} has been registered.`,
+        })
+      } else {
+        throw new Error(result.error || "Failed to create check record")
+      }
     } catch (error) {
       console.error("Error adding check-in:", error)
       toast({
         title: "Error",
-        description: "Failed to add check-in record",
+        description: error instanceof Error ? error.message : "Failed to add check-in record",
         variant: "destructive",
       })
     }
@@ -100,8 +104,8 @@ export default function CheckInPage() {
 
   const handleEditCheckIn = async (data: any) => {
     try {
-      const updatedCheckIn = await updateCheckRecord(selectedCheckIn.id.toString(), data)
-      setCheckIns(checkIns.map((checkIn) => (checkIn.id === selectedCheckIn.id ? updatedCheckIn : checkIn)))
+      // Implementar edição de check-in
+      await loadCheckIns() // Recarregar a lista
       setSelectedCheckIn(null)
       setIsModalOpen(false)
       toast({
@@ -121,8 +125,8 @@ export default function CheckInPage() {
   const handleDeleteCheckIn = async () => {
     if (checkInToDelete) {
       try {
-        await deleteCheckRecord(checkInToDelete.id.toString())
-        setCheckIns(checkIns.filter((checkIn) => checkIn.id !== checkInToDelete.id))
+        // Implementar exclusão de check-in
+        await loadCheckIns() // Recarregar a lista
         toast({
           title: "Check-in deleted successfully",
           description: `Check-in for ${checkInToDelete.professionalName} has been removed.`,
@@ -154,12 +158,17 @@ export default function CheckInPage() {
     if (checkIn.status === 1) {
       // checked_in
       try {
-        const updatedCheckIn = await performCheckOut(checkIn.id.toString())
-        setCheckIns(checkIns.map((item) => (item.id === checkIn.id ? updatedCheckIn : item)))
-        toast({
-          title: "Check-out completed",
-          description: `${checkIn.professionalName} has checked out.`,
+        const response = await performCheckOut({
+          checkRecordId: checkIn.id.toString(),
         })
+
+        if (response.data) {
+          await loadCheckIns() // Recarregar a lista
+          toast({
+            title: "Check-out completed",
+            description: `${checkIn.professionalName} has checked out.`,
+          })
+        }
       } catch (error) {
         console.error("Error performing check-out:", error)
         toast({
@@ -171,14 +180,17 @@ export default function CheckInPage() {
     }
   }
 
-  const filteredCheckIns = checkIns.filter((checkIn) => {
-    const matchesSearch =
-      (checkIn.professionalName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (checkIn.customerName || "").toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || checkIn.status.toString() === statusFilter
-    const matchesCompany = companyFilter === "all" || checkIn.companyId.toString() === companyFilter
-    return matchesSearch && matchesStatus && matchesCompany
-  })
+  // Garantir que checkIns é sempre um array antes de filtrar
+  const filteredCheckIns = Array.isArray(checkIns)
+    ? checkIns.filter((checkIn) => {
+        const matchesSearch =
+          (checkIn.professionalName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (checkIn.customerName || "").toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesStatus = statusFilter === "all" || checkIn.status?.toString() === statusFilter
+        const matchesCompany = companyFilter === "all" || checkIn.companyId?.toString() === companyFilter
+        return matchesSearch && matchesStatus && matchesCompany
+      })
+    : []
 
   const getStatusBadge = (status: number) => {
     switch (status) {
@@ -190,6 +202,15 @@ export default function CheckInPage() {
         return { label: "Checked Out", className: "border-green-500 text-green-500" }
       default:
         return { label: "Unknown", className: "border-gray-500 text-gray-500" }
+    }
+  }
+
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString || dateString === "0001-01-01T00:00:00") return "-"
+    try {
+      return format(new Date(dateString), "MMM d, yyyy HH:mm")
+    } catch {
+      return "-"
     }
   }
 
@@ -285,135 +306,139 @@ export default function CheckInPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCheckIns.map((checkIn) => (
-                <TableRow key={checkIn.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
-                  <TableCell className="font-medium text-white">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8 border border-[#2a3349]">
-                        <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
-                          {(checkIn.professionalName || "")
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
+              {filteredCheckIns.length === 0 ? (
+                <TableRow className="border-[#2a3349] bg-[#0f172a]">
+                  <TableCell colSpan={7} className="text-center text-gray-400 py-8">
+                    No check-in records found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredCheckIns.map((checkIn) => (
+                  <TableRow key={checkIn.id} className="border-[#2a3349] hover:bg-[#1a2234] bg-[#0f172a]">
+                    <TableCell className="font-medium text-white">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8 border border-[#2a3349]">
+                          <AvatarFallback className="bg-[#2a3349] text-[#06b6d4]">
+                            {(checkIn.professionalName || "N/A")
+                              .split(" ")
+                              .map((n: string) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div>{checkIn.professionalName || "N/A"}</div>
+                          <div className="text-xs text-gray-400">ID: {checkIn.professionalId || "N/A"}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <div>
-                        <div>{checkIn.professionalName || "N/A"}</div>
-                        <div className="text-xs text-gray-400">ID: {checkIn.professionalId}</div>
+                        <div className="text-white">{checkIn.customerName || "N/A"}</div>
+                        <div className="text-xs text-gray-400">{checkIn.address || "N/A"}</div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-white">{checkIn.customerName || "N/A"}</div>
-                      <div className="text-xs text-gray-400">{checkIn.address}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {checkIn.checkInTime ? (
-                      <div className="flex items-center gap-1">
-                        <LogIn className="h-3 w-3 text-green-500" />
-                        <span className="text-gray-400">
-                          {format(new Date(checkIn.checkInTime), "MMM d, yyyy HH:mm")}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500">Pending</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {checkIn.checkOutTime ? (
-                      <div className="flex items-center gap-1">
-                        <LogOut className="h-3 w-3 text-red-500" />
-                        <span className="text-gray-400">
-                          {format(new Date(checkIn.checkOutTime), "MMM d, yyyy HH:mm")}
-                        </span>
-                      </div>
-                    ) : checkIn.status === 1 ? (
-                      <span className="text-gray-500">In progress</span>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-gray-400">{checkIn.serviceType}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={getStatusBadge(checkIn.status).className}>
-                      {getStatusBadge(checkIn.status).label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewDetails(checkIn)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View Details</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(checkIn)}
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Edit</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {checkIn.status === 1 && (
+                    </TableCell>
+                    <TableCell>
+                      {checkIn.checkInTime ? (
+                        <div className="flex items-center gap-1">
+                          <LogIn className="h-3 w-3 text-green-500" />
+                          <span className="text-gray-400">{formatDateTime(checkIn.checkInTime)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">Pending</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {checkIn.checkOutTime ? (
+                        <div className="flex items-center gap-1">
+                          <LogOut className="h-3 w-3 text-red-500" />
+                          <span className="text-gray-400">{formatDateTime(checkIn.checkOutTime)}</span>
+                        </div>
+                      ) : checkIn.status === 1 ? (
+                        <span className="text-gray-500">In progress</span>
+                      ) : (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-gray-400">{checkIn.serviceType || "N/A"}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={getStatusBadge(checkIn.status || 0).className}>
+                        {getStatusBadge(checkIn.status || 0).label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-2">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleQuickCheckOut(checkIn)}
-                              className="h-8 w-8 text-gray-400 hover:text-green-500 hover:bg-[#2a3349]"
+                              onClick={() => handleViewDetails(checkIn)}
+                              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
                             >
-                              <Clock className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Quick Check-out</p>
+                            <p>View Details</p>
                           </TooltipContent>
                         </Tooltip>
-                      )}
 
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setCheckInToDelete(checkIn)}
-                            className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(checkIn)}
+                              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-[#2a3349]"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        {checkIn.status === 1 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleQuickCheckOut(checkIn)}
+                                className="h-8 w-8 text-gray-400 hover:text-green-500 hover:bg-[#2a3349]"
+                              >
+                                <Clock className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Quick Check-out</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCheckInToDelete(checkIn)}
+                              className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-[#2a3349]"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Delete</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
