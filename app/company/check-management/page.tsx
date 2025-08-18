@@ -20,9 +20,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DatePicker } from "@/components/ui/date-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { type CheckRecord, CHECK_RECORD_STATUS } from "@/types/check-record"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function CheckManagementPage() {
   const { toast } = useToast()
+  const { user } = useAuth()
   const { records: checkRecords, isLoading, fetchRecords, createRecord, updateRecord, deleteRecord } = useCheckRecords()
 
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false)
@@ -57,7 +59,7 @@ export default function CheckManagementPage() {
       search: searchTerm,
       status: statusFilter,
       date: dateFilter ? format(dateFilter, "yyyy-MM-dd") : undefined,
-      companyId: 1, // TODO: Get from user context/auth
+      companyId: user?.companyId || 1,
     }
 
     await fetchRecords(filters)

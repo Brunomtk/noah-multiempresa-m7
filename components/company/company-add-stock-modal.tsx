@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { useCompanyMaterialsUtils } from "@/hooks/use-company-materials"
 import type { Material } from "@/types/material"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CompanyAddStockModalProps {
   open: boolean
@@ -27,7 +28,8 @@ interface CompanyAddStockModalProps {
 }
 
 export function CompanyAddStockModal({ open, onOpenChange, material, onSuccess }: CompanyAddStockModalProps) {
-  const companyId = 1 // Mock company ID
+  const { user } = useAuth()
+  const companyId = user?.companyId || 1
   const { addStock, formatQuantity, formatCurrency } = useCompanyMaterialsUtils(companyId)
 
   const [loading, setLoading] = useState(false)

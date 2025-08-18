@@ -40,9 +40,14 @@ export const professionalFeedbackApi = {
   // Get professional's own feedbacks
   async getMyFeedbacks(
     filters: InternalFeedbackFilters = {},
+    professionalId?: number,
   ): Promise<{ data?: InternalFeedbackPagedResponse; error?: string }> {
     try {
       const params = new URLSearchParams()
+
+      if (professionalId) {
+        params.append("ProfessionalId", professionalId.toString())
+      }
 
       // Add filters to params
       if (filters.status && filters.status !== "all") {
@@ -87,15 +92,17 @@ export const professionalFeedbackApi = {
   },
 
   // Create new feedback
-  async create(data: CreateFeedbackData): Promise<{ data?: InternalFeedback; error?: string }> {
+  async create(
+    data: CreateFeedbackData,
+    professionalId?: number,
+    teamId?: number,
+    userName?: string,
+  ): Promise<{ data?: InternalFeedback; error?: string }> {
     try {
-      // Get current user info from token or context
-      const currentUser = await fetchApi<any>("/Users/current") // Assuming this endpoint exists
-
       const feedbackData = {
         title: data.title,
-        professionalId: currentUser?.id || 1, // Use current user ID
-        teamId: currentUser?.teamId || 1, // Use current user's team ID
+        professionalId: professionalId || 1,
+        teamId: teamId || 1,
         category: data.category,
         status: data.status,
         date: new Date().toISOString(),
@@ -117,14 +124,16 @@ export const professionalFeedbackApi = {
   },
 
   // Add comment to feedback
-  async addComment(feedbackId: number, commentText: string): Promise<{ data?: InternalFeedback; error?: string }> {
+  async addComment(
+    feedbackId: number,
+    commentText: string,
+    userId?: number,
+    userName?: string,
+  ): Promise<{ data?: InternalFeedback; error?: string }> {
     try {
-      // Get current user info
-      const currentUser = await fetchApi<any>("/Users/current")
-
       const commentData: AddCommentData = {
-        authorId: currentUser?.id || 1,
-        author: currentUser?.name || currentUser?.firstName + " " + currentUser?.lastName || "Professional",
+        authorId: userId || 1,
+        author: userName || "Professional",
         text: commentText,
       }
 

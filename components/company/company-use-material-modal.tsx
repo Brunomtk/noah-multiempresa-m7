@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { useCompanyMaterialsUtils } from "@/hooks/use-company-materials"
 import type { Material } from "@/types/material"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CompanyUseMaterialModalProps {
   open: boolean
@@ -27,7 +28,8 @@ interface CompanyUseMaterialModalProps {
 }
 
 export function CompanyUseMaterialModal({ open, onOpenChange, material, onSuccess }: CompanyUseMaterialModalProps) {
-  const companyId = 1 // Mock company ID
+  const { user } = useAuth()
+  const companyId = user?.companyId || 1
   const { useMaterial, formatQuantity } = useCompanyMaterialsUtils(companyId)
 
   const [loading, setLoading] = useState(false)
@@ -39,6 +41,9 @@ export function CompanyUseMaterialModal({ open, onOpenChange, material, onSucces
     notes: "",
   })
 
+  // Ensure useMaterial is always called at the top level
+  const materialUsageFunction = useMaterial
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!material) return
@@ -46,7 +51,7 @@ export function CompanyUseMaterialModal({ open, onOpenChange, material, onSucces
     setLoading(true)
 
     try {
-      await useMaterial({
+      await materialUsageFunction({
         materialId: material.id,
         quantity: formData.quantity,
         reason: formData.reason,

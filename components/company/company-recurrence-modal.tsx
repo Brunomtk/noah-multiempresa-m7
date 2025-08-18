@@ -16,6 +16,7 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import type { CompanyRecurrence } from "@/types/company-recurrence"
 import { useCompanyRecurrenceContext } from "@/contexts/company-recurrence-context"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CompanyRecurrenceModalProps {
   isOpen: boolean
@@ -54,8 +55,8 @@ export function CompanyRecurrenceModal({
   const [startDateOpen, setStartDateOpen] = useState(false)
   const [endDateOpen, setEndDateOpen] = useState(false)
 
-  // Mock company ID - in real app, get from auth context
-  const companyId = 1
+  const { user } = useAuth()
+  const companyId = user?.companyId || 1
 
   useEffect(() => {
     if (isOpen) {

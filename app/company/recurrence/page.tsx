@@ -12,6 +12,7 @@ import { CompanyRecurrenceModal } from "@/components/company/company-recurrence-
 import { CompanyRecurrenceDetailsModal } from "@/components/company/company-recurrence-details-modal"
 import { CompanyRecurrenceProvider, useCompanyRecurrenceContext } from "@/contexts/company-recurrence-context"
 import type { CompanyRecurrence } from "@/types/company-recurrence"
+import { useAuth } from "@/contexts/auth-context"
 
 function CompanyRecurrenceContent() {
   const {
@@ -41,8 +42,8 @@ function CompanyRecurrenceContent() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
 
-  // Mock company ID - in real app, get from auth context
-  const companyId = 1
+  const { user } = useAuth()
+  const companyId = user?.companyId || 1
 
   useEffect(() => {
     fetchRecurrences(companyId)

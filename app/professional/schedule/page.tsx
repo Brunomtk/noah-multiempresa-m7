@@ -27,6 +27,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { format, addDays, subDays, isToday } from "date-fns"
 import { useProfessionalSchedule } from "@/hooks/use-professional-schedule"
+import { useAuth } from "@/contexts/auth-context"
 import type { Appointment } from "@/types/appointment"
 
 export default function ProfessionalSchedule() {
@@ -34,6 +35,8 @@ export default function ProfessionalSchedule() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [currentDate, setCurrentDate] = useState(new Date())
+
+  const { user } = useAuth()
 
   const {
     appointments,
@@ -52,25 +55,36 @@ export default function ProfessionalSchedule() {
     return { startDate, endDate }
   }, [currentDate])
 
-  // Fetch appointments when date range changes
   useEffect(() => {
-    fetchAppointmentsByDateRange(dateRange.startDate, dateRange.endDate)
-  }, [dateRange.startDate, dateRange.endDate, fetchAppointmentsByDateRange])
+    if (user?.professionalId) {
+      fetchAppointmentsByDateRange(dateRange.startDate, dateRange.endDate, user.professionalId)
+    }
+  }, [dateRange.startDate, dateRange.endDate, fetchAppointmentsByDateRange, user?.professionalId])
 
   // Fetch schedule summary only once on mount
   useEffect(() => {
-    const now = new Date()
-    fetchScheduleSummary(now.getMonth() + 1, now.getFullYear())
-  }, [fetchScheduleSummary])
+    if (user?.professionalId) {
+      const now = new Date()
+      fetchScheduleSummary(now.getMonth() + 1, now.getFullYear(), user.professionalId)
+    }
+  }, [fetchScheduleSummary, user?.professionalId])
+
+  const filteredAppointments = useMemo(() => {
+    if (!user?.professionalId) return []
+    return appointments.filter(
+      (appointment) =>
+        appointment.professionalId === user.professionalId || appointment.professional?.id === user.professionalId,
+    )
+  }, [appointments, user?.professionalId])
 
   // Get appointments for the current day
   const getTodayAppointments = useMemo(() => {
     const formattedDate = format(currentDate, "yyyy-MM-dd")
-    return appointments.filter((appointment) => {
+    return filteredAppointments.filter((appointment) => {
       const appointmentDate = format(new Date(appointment.start), "yyyy-MM-dd")
       return appointmentDate === formattedDate
     })
-  }, [appointments, currentDate])
+  }, [filteredAppointments, currentDate])
 
   const generateDayTimeSlots = useMemo(() => {
     const timeSlots = []
@@ -136,7 +150,7 @@ export default function ProfessionalSchedule() {
     for (let i = -3; i <= 3; i++) {
       const date = i === 0 ? currentDate : i < 0 ? subDays(currentDate, Math.abs(i)) : addDays(currentDate, i)
       const formattedDate = format(date, "yyyy-MM-dd")
-      const dayAppointments = appointments.filter((appointment) => {
+      const dayAppointments = filteredAppointments.filter((appointment) => {
         const appointmentDate = format(new Date(appointment.start), "yyyy-MM-dd")
         return appointmentDate === formattedDate
       })
@@ -150,7 +164,7 @@ export default function ProfessionalSchedule() {
       })
     }
     return days
-  }, [currentDate, appointments])
+  }, [currentDate, filteredAppointments])
 
   // Generate days for the month view
   const generateMonthDays = useMemo(() => {
@@ -172,7 +186,7 @@ export default function ProfessionalSchedule() {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day)
       const formattedDate = format(date, "yyyy-MM-dd")
-      const dayAppointments = appointments.filter((appointment) => {
+      const dayAppointments = filteredAppointments.filter((appointment) => {
         const appointmentDate = format(new Date(appointment.start), "yyyy-MM-dd")
         return appointmentDate === formattedDate
       })
@@ -185,7 +199,7 @@ export default function ProfessionalSchedule() {
     }
 
     return days
-  }, [currentDate, appointments])
+  }, [currentDate, filteredAppointments])
 
   const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
@@ -268,6 +282,17 @@ export default function ProfessionalSchedule() {
       height: `${height}px`,
       marginTop: `${topOffset}px`,
     }
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading user data...</p>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -462,8 +487,8 @@ export default function ProfessionalSchedule() {
               <div className="mt-8 space-y-4">
                 <h3 className="text-lg font-semibold mb-4">Week Appointments</h3>
 
-                {appointments.length > 0 ? (
-                  appointments.map((appointment) => (
+                {filteredAppointments.length > 0 ? (
+                  filteredAppointments.map((appointment) => (
                     <div key={appointment.id} className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="space-y-1">

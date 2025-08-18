@@ -118,7 +118,7 @@ export function useCompanyCancellations() {
   useEffect(() => {
     context.fetchCancellations()
     context.fetchStats()
-  }, [context.filters])
+  }, [context.fetchCancellations, context.fetchStats])
 
   return {
     ...context,

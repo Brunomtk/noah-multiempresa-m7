@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
-import { CompanyPaymentsProvider } from "@/contexts/company-payments-context"
-import { CompanyPaymentsContent } from "@/components/company/company-payments-content"
+import { CompanyPaymentsClient } from "./company-payments-client"
 
 export const metadata: Metadata = {
   title: "Payments | Noah Company",
@@ -8,12 +7,5 @@ export const metadata: Metadata = {
 }
 
 export default function CompanyPaymentsPage() {
-  // In a real app, this would come from auth context or session
-  const companyId = 1 // This should be dynamic based on the logged-in company
-
-  return (
-    <CompanyPaymentsProvider companyId={companyId}>
-      <CompanyPaymentsContent />
-    </CompanyPaymentsProvider>
-  )
+  return <CompanyPaymentsClient />
 }

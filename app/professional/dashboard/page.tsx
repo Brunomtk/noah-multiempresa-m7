@@ -101,11 +101,11 @@ export default function ProfessionalDashboardPage() {
 
   useEffect(() => {
     const loadDashboardData = async () => {
-      if (!user?.id) return
+      if (!user?.professionalId) return
 
       setIsLoading(true)
       try {
-        const professionalId = user.id.toString()
+        const professionalId = user.professionalId.toString()
         const today = new Date()
         const startDate = format(today, "yyyy-MM-dd")
         const endDate = format(today, "yyyy-MM-dd")
@@ -124,15 +124,14 @@ export default function ProfessionalDashboardPage() {
           checkRecordsRes.status === "fulfilled" && checkRecordsRes.value?.results ? checkRecordsRes.value.results : []
         const feedbacks = feedbacksRes.status === "fulfilled" && feedbacksRes.value?.data ? feedbacksRes.value.data : []
 
-        // Filter today's appointments
         const todayAppointments = appointments.filter((apt) => {
           const aptDate = new Date(apt.start)
           return aptDate.toDateString() === today.toDateString()
         })
 
         setAppointments(todayAppointments)
-        setCheckRecords(checkRecords.slice(0, 10)) // Show recent 10
-        setFeedbacks(feedbacks.slice(0, 5)) // Show recent 5
+        setCheckRecords(checkRecords.slice(0, 10))
+        setFeedbacks(feedbacks.slice(0, 5))
 
         setStats({
           todayAppointments: todayAppointments.length,
@@ -146,7 +145,6 @@ export default function ProfessionalDashboardPage() {
           (acc, apt) => {
             let status = "scheduled"
 
-            // Map integer status to string status
             if (typeof apt.status === "number") {
               switch (apt.status) {
                 case 0:
@@ -183,7 +181,6 @@ export default function ProfessionalDashboardPage() {
           (acc, record) => {
             let status = "pending"
 
-            // Map integer status to string status
             if (typeof record.status === "number") {
               switch (record.status) {
                 case 0:
@@ -227,7 +224,7 @@ export default function ProfessionalDashboardPage() {
     }
 
     loadDashboardData()
-  }, [user?.id, toast])
+  }, [user?.professionalId, toast])
 
   const getStatusBadge = (status: number, type: "appointment" | "check" | "feedback") => {
     if (type === "check") {
@@ -459,7 +456,6 @@ export default function ProfessionalDashboardPage() {
         </Card>
       </div>
 
-      {/* Today's Appointments */}
       <Card>
         <CardHeader>
           <CardTitle>Today's Appointments</CardTitle>
@@ -500,7 +496,6 @@ export default function ProfessionalDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Check Records */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Check Records</CardTitle>
@@ -541,7 +536,6 @@ export default function ProfessionalDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Internal Feedback */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Feedback</CardTitle>

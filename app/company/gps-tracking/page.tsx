@@ -13,6 +13,7 @@ import { CompanyGpsTrackingProvider } from "@/contexts/company-gps-tracking-cont
 import { GpsTrackingModal } from "@/components/company/company-gps-tracking-modal"
 import { GpsTrackingDetailsModal } from "@/components/company/company-gps-tracking-details-modal"
 import type { GPSTracking } from "@/types/gps-tracking"
+import { useAuth } from "@/contexts/auth-context"
 
 function CompanyGpsTrackingContent() {
   const {
@@ -40,8 +41,8 @@ function CompanyGpsTrackingContent() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedProfessional, setSelectedProfessional] = useState<number | null>(null)
 
-  // Mock company ID - in real app, get from auth context
-  const companyId = "1"
+  const { user } = useAuth()
+  const companyId = user?.companyId?.toString() || "1"
 
   useEffect(() => {
     fetchGpsRecords(companyId)

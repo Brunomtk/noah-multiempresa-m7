@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 import { professionalFeedbackApi } from "@/lib/api/professional-feedback"
 import type { InternalFeedback, InternalFeedbackFilters } from "@/types/internal-feedback"
 
@@ -18,6 +19,7 @@ export function useProfessionalFeedback() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const fetchFeedbacks = useCallback(
     async (filters: InternalFeedbackFilters = {}) => {
@@ -25,7 +27,7 @@ export function useProfessionalFeedback() {
       setError(null)
 
       try {
-        const { data, error } = await professionalFeedbackApi.getMyFeedbacks(filters)
+        const { data, error } = await professionalFeedbackApi.getMyFeedbacks(filters, user?.professionalId)
 
         if (error) {
           throw new Error(error)
@@ -46,7 +48,7 @@ export function useProfessionalFeedback() {
         setIsLoading(false)
       }
     },
-    [toast],
+    [toast, user?.professionalId],
   )
 
   const createFeedback = useCallback(
@@ -55,7 +57,12 @@ export function useProfessionalFeedback() {
       setError(null)
 
       try {
-        const { data: newFeedback, error } = await professionalFeedbackApi.create(data)
+        const { data: newFeedback, error } = await professionalFeedbackApi.create(
+          data,
+          user?.professionalId,
+          user?.teamId,
+          user?.name,
+        )
 
         if (error) {
           throw new Error(error)
@@ -82,7 +89,7 @@ export function useProfessionalFeedback() {
         setIsLoading(false)
       }
     },
-    [toast],
+    [toast, user?.professionalId, user?.teamId, user?.name],
   )
 
   const addComment = useCallback(
@@ -91,7 +98,12 @@ export function useProfessionalFeedback() {
       setError(null)
 
       try {
-        const { data: updatedFeedback, error } = await professionalFeedbackApi.addComment(feedbackId, comment)
+        const { data: updatedFeedback, error } = await professionalFeedbackApi.addComment(
+          feedbackId,
+          comment,
+          user?.id,
+          user?.name,
+        )
 
         if (error) {
           throw new Error(error)
@@ -118,7 +130,7 @@ export function useProfessionalFeedback() {
         setIsLoading(false)
       }
     },
-    [toast],
+    [toast, user?.id, user?.name],
   )
 
   const getFeedbackById = useCallback(
