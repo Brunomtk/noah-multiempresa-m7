@@ -1,5 +1,5 @@
 // Base API URL
-export const API_BASE_URL = "https://206.189.191.51:5000/api"
+export const API_BASE_URL = "http://209.97.149.15:5000/api"
 export const API_URL = API_BASE_URL
 
 // Get API URL
