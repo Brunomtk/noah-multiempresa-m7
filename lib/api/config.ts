@@ -5,7 +5,7 @@ export const fetchApi = async (endpoint: string, options?: RequestInit): Promise
 
   const response = await fetch(url, {
     mode: "cors",
-    credentials: "omit",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
