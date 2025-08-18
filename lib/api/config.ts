@@ -1,12 +1,14 @@
-export const API_BASE_URL = "/api"
+export const API_BASE_URL = "https://206.189.191.51:5001/api"
 
-// This will make all API calls go through the same domain, eliminating CORS issues
 export const fetchApi = async (endpoint: string, options?: RequestInit): Promise<any> => {
   const url = `${API_BASE_URL}/${endpoint.startsWith("/") ? endpoint.slice(1) : endpoint}`
 
   const response = await fetch(url, {
+    mode: "cors",
+    credentials: "omit",
     headers: {
       "Content-Type": "application/json",
+      Accept: "application/json",
       ...options?.headers,
     },
     ...options,
