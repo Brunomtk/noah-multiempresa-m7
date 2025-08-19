@@ -21,8 +21,6 @@ import {
   CheckSquare,
   MessageSquare,
   X,
-  BarChart3,
-  Star,
 } from "lucide-react"
 import { NoahLogo } from "@/components/noah-logo"
 import { useCompanySidebar } from "./company-sidebar-context"
@@ -59,16 +57,6 @@ const menuItems = [
     title: "Professionals",
     href: "/company/professionals",
     icon: UserCheck,
-  },
-  {
-    title: "Reports",
-    href: "/company/reports",
-    icon: BarChart3,
-  },
-  {
-    title: "Reviews",
-    href: "/company/reviews",
-    icon: Star,
   },
   {
     title: "Payments",

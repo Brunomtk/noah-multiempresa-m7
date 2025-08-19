@@ -286,6 +286,22 @@ export function CompanyAppointmentModal({ isOpen, onClose, onSubmit, appointment
     setCreatedAppointment(null)
   }
 
+  const handleCustomerChange = (customerId: string) => {
+    setFormData({ ...formData, customerId })
+
+    // Find the selected customer and auto-fill address if available
+    if (customerId && customerId !== "none") {
+      const selectedCustomer = customers.find((c) => c.id.toString() === customerId)
+      if (selectedCustomer && selectedCustomer.address && !formData.address) {
+        setFormData((prev) => ({
+          ...prev,
+          customerId,
+          address: selectedCustomer.address,
+        }))
+      }
+    }
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -339,10 +355,7 @@ export function CompanyAppointmentModal({ isOpen, onClose, onSubmit, appointment
                 <Label htmlFor="customer" className="text-sm font-medium">
                   Customer <span className="text-red-400">*</span>
                 </Label>
-                <Select
-                  value={formData.customerId}
-                  onValueChange={(value) => setFormData({ ...formData, customerId: value })}
-                >
+                <Select value={formData.customerId} onValueChange={handleCustomerChange}>
                   <SelectTrigger className="bg-[#0f172a] border-[#2a3349] text-white focus:border-[#06b6d4]">
                     <SelectValue placeholder="Select a customer" />
                   </SelectTrigger>

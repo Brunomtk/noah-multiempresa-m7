@@ -20,15 +20,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useCompanyPayments } from "@/hooks/use-company-payments"
+import { useCompanyPaymentsContext } from "@/contexts/company-payments-context"
 import { CompanyPaymentModal } from "./company-payment-modal"
 import { CompanyPaymentDetailsModal } from "./company-payment-details-modal"
 import type { Payment } from "@/types/payment"
 
 export function CompanyPaymentsContent() {
-  const { payments, loading, error, searchTerm, setSearchTerm, statusFilter, setStatusFilter, refreshPayments } =
-    useCompanyPayments()
+  const { payments, isLoading, error, statistics, fetchPayments, markAsPaid, markAsOverdue, markAsCancelled } =
+    useCompanyPaymentsContext()
 
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
@@ -36,6 +38,30 @@ export function CompanyPaymentsContent() {
   const handleViewDetails = (payment: Payment) => {
     setSelectedPayment(payment)
     setIsDetailsModalOpen(true)
+  }
+
+  const handleMarkAsPaid = async (payment: Payment) => {
+    try {
+      await markAsPaid(payment.id)
+    } catch (error) {
+      console.error("Failed to mark payment as paid:", error)
+    }
+  }
+
+  const handleMarkAsOverdue = async (payment: Payment) => {
+    try {
+      await markAsOverdue(payment.id)
+    } catch (error) {
+      console.error("Failed to mark payment as overdue:", error)
+    }
+  }
+
+  const handleMarkAsCancelled = async (payment: Payment) => {
+    try {
+      await markAsCancelled(payment.id)
+    } catch (error) {
+      console.error("Failed to cancel payment:", error)
+    }
   }
 
   const getStatusBadge = (status: number) => {
@@ -63,8 +89,6 @@ export function CompanyPaymentsContent() {
         return <Badge variant="outline">Bank Transfer</Badge>
       case 3:
         return <Badge variant="outline">PIX</Badge>
-      case 4:
-        return <Badge variant="outline">Cash</Badge>
       default:
         return <Badge variant="outline">Other</Badge>
     }
@@ -77,20 +101,32 @@ export function CompanyPaymentsContent() {
     }).format(amount)
   }
 
-  const totalAmount = payments.reduce((sum, payment) => sum + payment.amount, 0)
-  const paidAmount = payments
-    .filter((payment) => payment.status === 1)
-    .reduce((sum, payment) => sum + payment.amount, 0)
-  const pendingAmount = payments
-    .filter((payment) => payment.status === 0)
-    .reduce((sum, payment) => sum + payment.amount, 0)
+  const filteredPayments = payments.filter((payment) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      payment.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.planName?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesStatus = statusFilter === "all" || payment.status.toString() === statusFilter
+
+    return matchesSearch && matchesStatus
+  })
+
+  const totalAmount = statistics?.totalAmount || filteredPayments.reduce((sum, payment) => sum + payment.amount, 0)
+  const paidAmount =
+    statistics?.completedAmount ||
+    filteredPayments.filter((payment) => payment.status === 1).reduce((sum, payment) => sum + payment.amount, 0)
+  const pendingAmount =
+    statistics?.pendingAmount ||
+    filteredPayments.filter((payment) => payment.status === 0).reduce((sum, payment) => sum + payment.amount, 0)
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Error loading payments</p>
-          <Button onClick={refreshPayments} variant="outline">
+          <p className="text-red-600 mb-4">Error loading payments: {error.message}</p>
+          <Button onClick={() => fetchPayments()} variant="outline">
             <RefreshCw className="mr-2 h-4 w-4" />
             Try Again
           </Button>
@@ -108,7 +144,7 @@ export function CompanyPaymentsContent() {
           <p className="text-muted-foreground">Manage your company payments and invoices</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button onClick={refreshPayments} variant="outline" size="sm">
+          <Button onClick={() => fetchPayments()} variant="outline" size="sm">
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
@@ -167,7 +203,7 @@ export function CompanyPaymentsContent() {
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="search"
-                  placeholder="Search by description, customer..."
+                  placeholder="Search by reference, company, plan..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
@@ -200,7 +236,7 @@ export function CompanyPaymentsContent() {
           <CardDescription>A list of all payments for your company</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <RefreshCw className="h-6 w-6 animate-spin" />
             </div>
@@ -208,19 +244,20 @@ export function CompanyPaymentsContent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Reference</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Due Date</TableHead>
+                  <TableHead>Payment Date</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.length === 0 ? (
+                {filteredPayments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <div className="flex flex-col items-center space-y-2">
                         <FileText className="h-8 w-8 text-muted-foreground" />
                         <p className="text-muted-foreground">No payments found</p>
@@ -232,9 +269,9 @@ export function CompanyPaymentsContent() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  payments.map((payment) => (
+                  filteredPayments.map((payment) => (
                     <TableRow key={payment.id}>
-                      <TableCell className="font-medium">{payment.description}</TableCell>
+                      <TableCell className="font-medium">{payment.reference}</TableCell>
                       <TableCell>{formatCurrency(payment.amount)}</TableCell>
                       <TableCell>{getMethodBadge(payment.method)}</TableCell>
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
@@ -242,6 +279,11 @@ export function CompanyPaymentsContent() {
                         {payment.dueDate
                           ? format(new Date(payment.dueDate), "MMM dd, yyyy", { locale: enUS })
                           : "No due date"}
+                      </TableCell>
+                      <TableCell>
+                        {payment.paymentDate
+                          ? format(new Date(payment.paymentDate), "MMM dd, yyyy", { locale: enUS })
+                          : "Not paid"}
                       </TableCell>
                       <TableCell>{format(new Date(payment.createdDate), "MMM dd, yyyy", { locale: enUS })}</TableCell>
                       <TableCell className="text-right">
@@ -256,8 +298,21 @@ export function CompanyPaymentsContent() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleViewDetails(payment)}>View Details</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>Edit Payment</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">Cancel Payment</DropdownMenuItem>
+                            {payment.status === 0 && (
+                              <DropdownMenuItem onClick={() => handleMarkAsPaid(payment)}>
+                                Mark as Paid
+                              </DropdownMenuItem>
+                            )}
+                            {payment.status === 0 && (
+                              <DropdownMenuItem onClick={() => handleMarkAsOverdue(payment)}>
+                                Mark as Overdue
+                              </DropdownMenuItem>
+                            )}
+                            {payment.status !== 3 && (
+                              <DropdownMenuItem className="text-red-600" onClick={() => handleMarkAsCancelled(payment)}>
+                                Cancel Payment
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -274,7 +329,7 @@ export function CompanyPaymentsContent() {
       <CompanyPaymentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={refreshPayments}
+        onSuccess={() => fetchPayments()}
       />
 
       {selectedPayment && (
