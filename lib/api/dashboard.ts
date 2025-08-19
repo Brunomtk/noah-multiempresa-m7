@@ -41,11 +41,10 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
     console.log("Fetching dashboard stats from API...")
 
     // Fetch real data from multiple endpoints
-    const [companiesData, customersData, appointmentsData, checkRecordsData] = await Promise.allSettled([
+    const [companiesData, customersData, appointmentsData] = await Promise.allSettled([
       apiCall("/Companies"),
       apiCall("/Customer"),
       apiCall("/Appointment"),
-      apiCall("/CheckRecord"),
     ])
 
     // Process the results
@@ -60,7 +59,6 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
     const companies = processData(companiesData)
     const customers = processData(customersData)
     const appointments = processData(appointmentsData)
-    const checkRecords = processData(checkRecordsData)
 
     const stats = {
       companies: {
@@ -91,16 +89,11 @@ export async function getDashboardStats(): Promise<ApiResponse<any>> {
         loading: false,
       },
       checkRecords: {
-        total: Array.isArray(checkRecords) ? checkRecords.length : 0,
-        checkedIn: Array.isArray(checkRecords)
-          ? checkRecords.filter((c: any) => c.checkInTime && !c.checkOutTime).length
-          : 0,
-        checkedOut: Array.isArray(checkRecords)
-          ? checkRecords.filter((c: any) => c.checkInTime && c.checkOutTime).length
-          : 0,
+        total: 0,
+        checkedIn: 0,
+        checkedOut: 0,
         loading: false,
       },
-      // Remove payments section since the API doesn't exist
       payments: {
         total: 0,
         paid: 0,
@@ -177,52 +170,6 @@ export async function getDashboardChartData(period = "7d", type = "appointments"
     return {
       status: 200,
       data: [],
-    }
-  }
-}
-
-// Get dashboard check records
-export async function getDashboardCheckRecords(page = 1, pageSize = 10): Promise<ApiResponse<any>> {
-  try {
-    const url = `${getApiUrl()}/CheckRecord?PageNumber=${page}&PageSize=${pageSize}`
-    console.log("Fetching dashboard check records from URL:", url)
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: createHeaders(),
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    return {
-      status: 200,
-      data: {
-        data: data.results || data.result || [],
-        meta: {
-          currentPage: data.currentPage || page,
-          totalPages: data.pageCount || data.totalPages || 1,
-          totalItems: data.totalItems || data.totalCount || 0,
-          itemsPerPage: data.pageSize || pageSize,
-        },
-      },
-    }
-  } catch (error) {
-    console.error("Error fetching dashboard check records:", error)
-    return {
-      status: 200,
-      data: {
-        data: [],
-        meta: {
-          currentPage: 1,
-          totalPages: 1,
-          totalItems: 0,
-          itemsPerPage: pageSize,
-        },
-      },
     }
   }
 }

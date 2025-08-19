@@ -8,6 +8,8 @@ type SidebarContextType = {
   collapsed: boolean
   toggleSidebar: () => void
   setCollapsed: (value: boolean) => void
+  isMobileOpen: boolean
+  setIsMobileOpen: (value: boolean) => void
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
@@ -15,6 +17,7 @@ const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 export function CompanySidebarProvider({ children }: { children: React.ReactNode }) {
   // Use localStorage to persist the state between page navigations
   const [collapsed, setCollapsed] = useState<boolean>(false)
+  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false)
 
   // Initialize from localStorage when component mounts
   useEffect(() => {
@@ -30,11 +33,19 @@ export function CompanySidebarProvider({ children }: { children: React.ReactNode
   }, [collapsed])
 
   const toggleSidebar = () => {
-    setCollapsed(!collapsed)
+    // On mobile, toggle the mobile overlay
+    if (window.innerWidth < 1024) {
+      setIsMobileOpen(!isMobileOpen)
+    } else {
+      // On desktop, toggle collapse
+      setCollapsed(!collapsed)
+    }
   }
 
   return (
-    <SidebarContext.Provider value={{ collapsed, toggleSidebar, setCollapsed }}>{children}</SidebarContext.Provider>
+    <SidebarContext.Provider value={{ collapsed, toggleSidebar, setCollapsed, isMobileOpen, setIsMobileOpen }}>
+      {children}
+    </SidebarContext.Provider>
   )
 }
 

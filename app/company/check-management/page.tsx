@@ -25,7 +25,16 @@ import { useAuth } from "@/contexts/auth-context"
 export default function CheckManagementPage() {
   const { toast } = useToast()
   const { user } = useAuth()
-  const { records: checkRecords, isLoading, fetchRecords, createRecord, updateRecord, deleteRecord } = useCheckRecords()
+  const {
+    records: checkRecords,
+    isLoading,
+    fetchRecords,
+    createRecord,
+    updateRecord,
+    deleteRecord,
+    checkIn,
+    checkOut,
+  } = useCheckRecords()
 
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false)
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState(false)
@@ -69,10 +78,55 @@ export default function CheckManagementPage() {
     const result = await createRecord(data)
     if (result) {
       setIsCheckRecordModalOpen(false)
+      await loadCheckRecords()
       toast({
         title: "Success",
         description: "Check record created successfully",
       })
+    }
+  }
+
+  const handleCheckIn = async (data: any) => {
+    if (selectedCheckRecord) {
+      const checkInData = {
+        professionalId: selectedCheckRecord.professionalId,
+        professionalName: selectedCheckRecord.professionalName,
+        companyId: selectedCheckRecord.companyId,
+        customerId: selectedCheckRecord.customerId,
+        customerName: selectedCheckRecord.customerName,
+        appointmentId: selectedCheckRecord.appointmentId,
+        address: selectedCheckRecord.address,
+        teamId: selectedCheckRecord.teamId,
+        teamName: selectedCheckRecord.teamName,
+        serviceType: selectedCheckRecord.serviceType,
+        notes: data.notes || selectedCheckRecord.notes,
+      }
+
+      const result = await checkIn(checkInData)
+      if (result) {
+        setIsCheckInModalOpen(false)
+        setSelectedCheckRecord(null)
+        await loadCheckRecords()
+        toast({
+          title: "Success",
+          description: "Check-in performed successfully",
+        })
+      }
+    }
+  }
+
+  const handleCheckOut = async (data: any) => {
+    if (selectedCheckRecord) {
+      const result = await checkOut(selectedCheckRecord.id.toString())
+      if (result) {
+        setIsCheckOutModalOpen(false)
+        setSelectedCheckRecord(null)
+        await loadCheckRecords()
+        toast({
+          title: "Success",
+          description: "Check-out performed successfully",
+        })
+      }
     }
   }
 
@@ -82,6 +136,7 @@ export default function CheckManagementPage() {
       if (result) {
         setIsCheckInModalOpen(false)
         setIsCheckOutModalOpen(false)
+        await loadCheckRecords()
         toast({
           title: "Success",
           description: "Check record updated successfully",
@@ -150,17 +205,17 @@ export default function CheckManagementPage() {
   const getStatusBadge = (status: number) => {
     switch (status) {
       case CHECK_RECORD_STATUS.PENDING:
-        return <Badge className="bg-yellow-500">Pending</Badge>
+        return <Badge className="bg-yellow-500 text-xs">Pending</Badge>
       case CHECK_RECORD_STATUS.CHECKED_IN:
-        return <Badge className="bg-blue-500">Checked In</Badge>
+        return <Badge className="bg-blue-500 text-xs">Checked In</Badge>
       case CHECK_RECORD_STATUS.CHECKED_OUT:
-        return <Badge className="bg-purple-500">Checked Out</Badge>
+        return <Badge className="bg-purple-500 text-xs">Checked Out</Badge>
       case CHECK_RECORD_STATUS.COMPLETED:
-        return <Badge className="bg-green-500">Completed</Badge>
+        return <Badge className="bg-green-500 text-xs">Completed</Badge>
       case CHECK_RECORD_STATUS.CANCELLED:
-        return <Badge className="bg-red-500">Cancelled</Badge>
+        return <Badge className="bg-red-500 text-xs">Cancelled</Badge>
       default:
-        return <Badge className="bg-gray-500">Unknown</Badge>
+        return <Badge className="bg-gray-500 text-xs">Unknown</Badge>
     }
   }
 
@@ -176,51 +231,76 @@ export default function CheckManagementPage() {
     if (!records.length) {
       return (
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <Calendar className="h-12 w-12 text-gray-400 mb-2" />
-          <h3 className="text-lg font-medium text-white">No check records found</h3>
-          <p className="text-gray-400 mt-1">Try adjusting your filters or create a new check record.</p>
+          <Calendar className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mb-2" />
+          <h3 className="text-base sm:text-lg font-medium text-white">No check records found</h3>
+          <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or create a new check record.</p>
         </div>
       )
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {records.map((record) => (
           <Card key={record.id} className="bg-[#1a2234] border-[#2a3349] overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex items-center p-4">
-                <Avatar className="h-10 w-10 mr-4">
-                  <AvatarImage src="/placeholder-user.jpg" alt={record.professionalName} />
-                  <AvatarFallback className="bg-[#06b6d4]">{record.professionalName?.charAt(0) || "P"}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-white truncate">{record.professionalName}</p>
-                    {getStatusBadge(record.status)}
-                  </div>
-                  <div className="flex items-center text-xs text-gray-400 mt-1">
-                    <span className="truncate">{record.address}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <div className="flex items-center text-xs text-gray-400">
-                      <span>
-                        {record.checkInTime
-                          ? `Check-in: ${format(new Date(record.checkInTime), "MMM d, yyyy HH:mm")}`
-                          : "Not checked in"}
-                      </span>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
+                    <AvatarImage src="/placeholder-user.jpg" alt={record.professionalName} />
+                    <AvatarFallback className="bg-[#06b6d4] text-xs sm:text-sm">
+                      {record.professionalName?.charAt(0) || "P"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                      <p className="text-sm font-medium text-white truncate">{record.professionalName}</p>
+                      {getStatusBadge(record.status)}
                     </div>
-                    {record.checkOutTime && (
-                      <div className="flex items-center text-xs text-gray-400">
-                        <span>Check-out: {format(new Date(record.checkOutTime), "MMM d, yyyy HH:mm")}</span>
+                    <div className="text-xs text-gray-400 mt-1 truncate">{record.address}</div>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mt-1">
+                      <div className="text-xs text-gray-400">
+                        {record.checkInTime
+                          ? `Check-in: ${format(new Date(record.checkInTime), "MMM d, HH:mm")}`
+                          : "Not checked in"}
                       </div>
-                    )}
+                      {record.checkOutTime && (
+                        <div className="text-xs text-gray-400">
+                          Check-out: {format(new Date(record.checkOutTime), "MMM d, HH:mm")}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="ml-4 flex-shrink-0">
+
+                <div className="flex gap-2 sm:flex-shrink-0">
+                  {record.status === CHECK_RECORD_STATUS.PENDING && (
+                    <Button
+                      size="sm"
+                      className="bg-[#06b6d4] hover:bg-[#0891b2] text-white flex-1 sm:flex-none text-xs"
+                      onClick={() => {
+                        setSelectedCheckRecord(record)
+                        setIsCheckInModalOpen(true)
+                      }}
+                    >
+                      Check-In
+                    </Button>
+                  )}
+                  {record.status === CHECK_RECORD_STATUS.CHECKED_IN && (
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none text-xs"
+                      onClick={() => {
+                        setSelectedCheckRecord(record)
+                        setIsCheckOutModalOpen(true)
+                      }}
+                    >
+                      Check-Out
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+                    className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent flex-1 sm:flex-none text-xs"
                     onClick={() => {
                       setSelectedCheckRecord(record)
                       if (activeTab === "check-in") {
@@ -233,7 +313,7 @@ export default function CheckManagementPage() {
                       }
                     }}
                   >
-                    View Details
+                    View
                   </Button>
                 </div>
               </div>
@@ -243,22 +323,22 @@ export default function CheckManagementPage() {
 
         {/* Pagination */}
         {pagination.pageCount > 1 && (
-          <div className="flex items-center justify-between pt-4">
-            <div className="text-sm text-gray-400">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4">
+            <div className="text-xs sm:text-sm text-gray-400 text-center sm:text-left">
               Showing {pagination.firstRowOnPage || 1} to {pagination.lastRowOnPage || 0} of {pagination.totalItems}{" "}
               records
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
-                className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+                className="border-[#2a3349] text-white hover:bg-[#2a3349] text-xs"
               >
                 Previous
               </Button>
-              <span className="text-sm text-white">
+              <span className="text-xs sm:text-sm text-white">
                 Page {pagination.currentPage} of {pagination.pageCount}
               </span>
               <Button
@@ -266,7 +346,7 @@ export default function CheckManagementPage() {
                 size="sm"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= pagination.pageCount}
-                className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+                className="border-[#2a3349] text-white hover:bg-[#2a3349] text-xs"
               >
                 Next
               </Button>
@@ -278,14 +358,14 @@ export default function CheckManagementPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Check Management</h1>
-          <p className="text-gray-400">Manage check-ins and check-outs for professionals.</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">Check Management</h1>
+          <p className="text-sm sm:text-base text-gray-400">Manage check-ins and check-outs for professionals.</p>
         </div>
         <Button
-          className="bg-[#06b6d4] hover:bg-[#0891b2] text-white"
+          className="bg-[#06b6d4] hover:bg-[#0891b2] text-white w-full sm:w-auto"
           onClick={() => {
             setSelectedCheckRecord(null)
             setIsCheckRecordModalOpen(true)
@@ -299,19 +379,21 @@ export default function CheckManagementPage() {
       {/* Filters */}
       <Card className="bg-[#1a2234] border-[#2a3349]">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-white text-lg">Check Records</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-white text-base sm:text-lg">Check Records</CardTitle>
+              <CardDescription className="text-gray-400 text-sm">View and manage all check records.</CardDescription>
+            </div>
             <Button
               variant="outline"
               size="sm"
-              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent w-full sm:w-auto"
               onClick={() => setIsFilterOpen(!isFilterOpen)}
             >
               <Filter className="h-4 w-4 mr-2" />
               Filters
             </Button>
           </div>
-          <CardDescription className="text-gray-400">View and manage all check records.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col space-y-4">
@@ -326,7 +408,7 @@ export default function CheckManagementPage() {
             </div>
 
             {isFilterOpen && (
-              <div className="flex flex-col sm:flex-row gap-4 pt-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 pt-2">
                 <div className="flex-1">
                   <Select value={statusFilter?.toString() || "all"} onValueChange={handleStatusFilterChange}>
                     <SelectTrigger className="w-full bg-[#0f172a] border-[#2a3349] text-white">
@@ -353,7 +435,7 @@ export default function CheckManagementPage() {
                         }`}
                       >
                         <Calendar className="mr-2 h-4 w-4" />
-                        {dateFilter ? format(dateFilter, "PPP") : "Pick a date"}
+                        <span className="truncate">{dateFilter ? format(dateFilter, "PPP") : "Pick a date"}</span>
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 bg-[#1a2234] border-[#2a3349]">
@@ -364,7 +446,7 @@ export default function CheckManagementPage() {
 
                 <Button
                   variant="outline"
-                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+                  className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent w-full sm:w-auto"
                   onClick={clearFilters}
                 >
                   <X className="h-4 w-4 mr-2" />
@@ -374,22 +456,22 @@ export default function CheckManagementPage() {
             )}
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid grid-cols-3 bg-[#0f172a] border border-[#2a3349]">
+              <TabsList className="grid grid-cols-3 bg-[#0f172a] border border-[#2a3349] w-full">
                 <TabsTrigger
                   value="check-in"
-                  className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white"
+                  className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white text-xs sm:text-sm"
                 >
                   Check-In
                 </TabsTrigger>
                 <TabsTrigger
                   value="check-out"
-                  className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white"
+                  className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white text-xs sm:text-sm"
                 >
                   Check-Out
                 </TabsTrigger>
                 <TabsTrigger
                   value="history"
-                  className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white"
+                  className="data-[state=active]:bg-[#06b6d4] data-[state=active]:text-white text-xs sm:text-sm"
                 >
                   History
                 </TabsTrigger>
@@ -415,7 +497,7 @@ export default function CheckManagementPage() {
           setIsCheckInModalOpen(false)
           setSelectedCheckRecord(null)
         }}
-        onSubmit={handleUpdateCheckRecord}
+        onSubmit={handleCheckIn}
         checkIn={selectedCheckRecord}
       />
 
@@ -425,7 +507,7 @@ export default function CheckManagementPage() {
           setIsCheckOutModalOpen(false)
           setSelectedCheckRecord(null)
         }}
-        onSubmit={handleUpdateCheckRecord}
+        onSubmit={handleCheckOut}
         checkOut={selectedCheckRecord}
       />
 

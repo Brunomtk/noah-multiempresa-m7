@@ -9,8 +9,15 @@ import { Providers } from "./providers"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Cleaning Platform",
+  title: "Maids Flow",
   description: "Professional cleaning management platform",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/apple-icon.png",
+  },
     generator: 'v0.app'
 }
 

@@ -112,15 +112,12 @@ export const DashboardProvider = ({ children }: DashboardProviderProps) => {
       console.log("Fetching dashboard stats from API...")
 
       // Fetch real data from API endpoints
-      const [companiesData, customersData, appointmentsData, checkRecordsData, paymentsData] = await Promise.allSettled(
-        [
-          apiCall("/Companies").catch(() => ({ results: [] })),
-          apiCall("/Customer").catch(() => ({ results: [] })),
-          apiCall("/Appointment").catch(() => ({ results: [] })),
-          apiCall("/CheckRecord").catch(() => ({ results: [] })),
-          apiCall("/Payments").catch(() => ({ results: [] })),
-        ],
-      )
+      const [companiesData, customersData, appointmentsData, paymentsData] = await Promise.allSettled([
+        apiCall("/Companies").catch(() => ({ results: [] })),
+        apiCall("/Customer").catch(() => ({ results: [] })),
+        apiCall("/Appointment").catch(() => ({ results: [] })),
+        apiCall("/Payments").catch(() => ({ results: [] })),
+      ])
 
       // Process companies data
       const companies = companiesData.status === "fulfilled" ? companiesData.value : { results: [] }
@@ -152,16 +149,10 @@ export const DashboardProvider = ({ children }: DashboardProviderProps) => {
         ? appointmentsArray.filter((a: any) => a.status === "Cancelled" || a.status === 0).length
         : 0
 
-      // Process check records data
-      const checkRecords = checkRecordsData.status === "fulfilled" ? checkRecordsData.value : { results: [] }
-      const checkRecordsArray = checkRecords.results || checkRecords.result || checkRecords.data || checkRecords || []
-      const checkRecordsTotal = Array.isArray(checkRecordsArray) ? checkRecordsArray.length : 0
-      const checkRecordsCheckedIn = Array.isArray(checkRecordsArray)
-        ? checkRecordsArray.filter((c: any) => c.checkInTime && !c.checkOutTime).length
-        : 0
-      const checkRecordsCheckedOut = Array.isArray(checkRecordsArray)
-        ? checkRecordsArray.filter((c: any) => c.checkInTime && c.checkOutTime).length
-        : 0
+      // Process check records data - removed unfiltered call
+      const checkRecordsTotal = 0
+      const checkRecordsCheckedIn = 0
+      const checkRecordsCheckedOut = 0
 
       // Process payments data
       const payments = paymentsData.status === "fulfilled" ? paymentsData.value : { results: [] }

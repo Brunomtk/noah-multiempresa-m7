@@ -16,9 +16,9 @@ export default function CompanyLayout({
       <CompanyGpsTrackingProvider>
         <div className="flex h-screen overflow-hidden bg-[#0f172a]">
           <CompanySidebar />
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             <CompanyHeader />
-            <main className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">{children}</main>
+            <main className="flex-1 overflow-auto p-3 sm:p-6 bg-gray-50 dark:bg-gray-900">{children}</main>
           </div>
         </div>
       </CompanyGpsTrackingProvider>

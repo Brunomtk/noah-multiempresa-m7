@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DatePicker } from "@/components/ui/date-picker"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Clock, Loader2 } from "lucide-react"
 import { format } from "date-fns"
@@ -50,7 +49,7 @@ export function CompanyAppointmentModal({ isOpen, onClose, onSubmit, appointment
     notes: "",
   })
 
-  const [date, setDate] = useState<Date>()
+  const [date, setDate] = useState<string>("")
   const [startTime, setStartTime] = useState("09:00")
   const [endTime, setEndTime] = useState("11:00")
 
@@ -112,7 +111,7 @@ export function CompanyAppointmentModal({ isOpen, onClose, onSubmit, appointment
 
         if (appointment.start) {
           const startDateTime = new Date(appointment.start)
-          setDate(startDateTime)
+          setDate(format(startDateTime, "yyyy-MM-dd"))
           setStartTime(format(startDateTime, "HH:mm"))
         }
 
@@ -135,10 +134,10 @@ export function CompanyAppointmentModal({ isOpen, onClose, onSubmit, appointment
 
         // Set default dates if provided in appointment prop
         if (appointment?.start) {
-          setDate(new Date(appointment.start))
+          setDate(format(new Date(appointment.start), "yyyy-MM-dd"))
           setStartTime(format(new Date(appointment.start), "HH:mm"))
         } else {
-          setDate(undefined)
+          setDate("")
           setStartTime("09:00")
         }
 
@@ -451,11 +450,12 @@ export function CompanyAppointmentModal({ isOpen, onClose, onSubmit, appointment
                   <Label className="text-sm font-medium">
                     Date <span className="text-red-400">*</span>
                   </Label>
-                  <DatePicker
-                    date={date}
-                    onDateChange={setDate}
-                    placeholder="Pick appointment date"
-                    className="bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#1a2234] focus:border-[#06b6d4]"
+                  <Input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="bg-[#0f172a] border-[#2a3349] text-white focus:border-[#06b6d4]"
+                    required
                   />
                 </div>
 

@@ -43,7 +43,7 @@ export function CompanyCheckInModal({ isOpen, onClose, onSubmit, checkIn }: Comp
         checkInTime: `${hours}:${minutes}`,
         status: "on-time",
         gpsVerified: false,
-        notes: "",
+        notes: checkIn.notes || "",
       })
     }
   }, [checkIn])
@@ -52,11 +52,13 @@ export function CompanyCheckInModal({ isOpen, onClose, onSubmit, checkIn }: Comp
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    onSubmit(formData)
-    setIsLoading(false)
+    try {
+      await onSubmit(formData)
+    } catch (error) {
+      console.error("[v0] Error during check-in:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleChange = (field: string, value: any) => {
@@ -69,7 +71,7 @@ export function CompanyCheckInModal({ isOpen, onClose, onSubmit, checkIn }: Comp
         <DialogHeader>
           <DialogTitle>Manual Check-in</DialogTitle>
           <DialogDescription className="text-gray-400">
-            Record check-in for {checkIn?.professional} at {checkIn?.location}
+            Record check-in for {checkIn?.professionalName} at {checkIn?.address}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -138,7 +140,7 @@ export function CompanyCheckInModal({ isOpen, onClose, onSubmit, checkIn }: Comp
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
             >
               Cancel
             </Button>

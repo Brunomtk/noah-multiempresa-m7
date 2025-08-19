@@ -1,150 +1,71 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Calendar, CheckCircle, Home, MessageSquare, TrendingUp, User, Bell, Menu, LogOut } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+import { CheckCircle, Home, MessageSquare, TrendingUp, User } from "lucide-react"
 
 const navigation = [
   {
     name: "Dashboard",
     href: "/professional/dashboard",
     icon: Home,
-  },
-  {
-    name: "Schedule",
-    href: "/professional/schedule",
-    icon: Calendar,
+    label: "Home",
   },
   {
     name: "Check-in/out",
     href: "/professional/check",
     icon: CheckCircle,
-  },
-  {
-    name: "Performance",
-    href: "/professional/performance",
-    icon: TrendingUp,
+    label: "Check",
   },
   {
     name: "Feedback",
     href: "/professional/feedback",
     icon: MessageSquare,
+    label: "Feedback",
   },
   {
-    name: "Notifications",
-    href: "/professional/notifications",
-    icon: Bell,
+    name: "Performance",
+    href: "/professional/performance",
+    icon: TrendingUp,
+    label: "Stats",
   },
   {
     name: "Profile",
     href: "/professional/profile",
     icon: User,
+    label: "Profile",
   },
 ]
 
 export function ProfessionalMobileNav() {
-  const [open, setOpen] = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
-  const { user, logout } = useAuth()
-
-  const handleLogout = () => {
-    logout()
-    router.push("/login")
-    setOpen(false)
-  }
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  const getRoleLabel = (role: string) => {
-    switch (role?.toLowerCase()) {
-      case "professional":
-        return "Professional"
-      case "admin":
-        return "Administrator"
-      case "company":
-        return "Company"
-      default:
-        return role || "User"
-    }
-  }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden">
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle navigation menu</span>
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-64 p-0">
-        <div className="flex h-full flex-col">
-          {/* User Info */}
-          <div className="p-6">
-            <div className="flex items-center space-x-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={user?.avatar || ""} alt={user?.name || ""} />
-                <AvatarFallback>{user?.name ? getInitials(user.name) : "U"}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{user?.name || "User"}</p>
-                <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
-                <Badge variant="secondary" className="mt-1 text-xs">
-                  {getRoleLabel(user?.role || "")}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-4">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Button
-                  key={item.name}
-                  asChild
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn("w-full justify-start", isActive && "bg-secondary text-secondary-foreground")}
-                  onClick={() => setOpen(false)}
-                >
-                  <Link href={item.href}>
-                    <item.icon className="mr-2 h-4 w-4" />
-                    {item.name}
-                  </Link>
-                </Button>
-              )
-            })}
-          </nav>
-
-          <Separator />
-
-          {/* Logout */}
-          <div className="p-4">
-            <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t md:hidden">
+      <nav className="flex items-center justify-around px-2 py-2">
+        {navigation.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href)
+          return (
+            <Button
+              key={item.name}
+              asChild
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "flex flex-col items-center justify-center h-12 w-full gap-1 rounded-lg",
+                isActive && "text-primary bg-primary/10",
+              )}
+            >
+              <Link href={item.href}>
+                <item.icon className={cn("h-4 w-4", isActive && "text-primary")} />
+                <span className={cn("text-xs font-medium", isActive && "text-primary")}>{item.label}</span>
+              </Link>
             </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+          )
+        })}
+      </nav>
+    </div>
   )
 }

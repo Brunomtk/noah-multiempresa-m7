@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { DatePicker } from "@/components/ui/date-picker"
 import { Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { getApiUrl } from "@/lib/api/utils"
@@ -46,7 +45,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
     professionalId: "",
     type: "",
     status: "0",
-    date: undefined as Date | undefined,
+    date: "",
     startTime: "",
     endTime: "",
     notes: "",
@@ -100,7 +99,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
         professionalId: appointment.professionalId?.toString() || "none",
         type: appointment.type?.toString() || "",
         status: appointment.status?.toString() || "0",
-        date: startDate,
+        date: startDate ? format(startDate, "yyyy-MM-dd") : "",
         startTime: startDate ? format(startDate, "HH:mm") : "",
         endTime: endDate ? format(endDate, "HH:mm") : "",
         notes: appointment.notes || "",
@@ -115,7 +114,7 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
         professionalId: "none",
         type: "",
         status: "0",
-        date: undefined,
+        date: "",
         startTime: "",
         endTime: "",
         notes: "",
@@ -391,11 +390,12 @@ export function AppointmentModal({ isOpen, onClose, onSubmit, appointment }: App
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label>Date</Label>
-                <DatePicker
-                  date={formData.date}
-                  onDateChange={(date) => handleChange("date", date)}
-                  placeholder="Pick appointment date"
-                  className="bg-[#0f172a] border-[#2a3349] text-white hover:bg-[#2a3349]"
+                <Input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => handleChange("date", e.target.value)}
+                  className="bg-[#0f172a] border-[#2a3349] text-white"
+                  required
                 />
               </div>
 

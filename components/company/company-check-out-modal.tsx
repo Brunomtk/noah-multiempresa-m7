@@ -45,7 +45,7 @@ export function CompanyCheckOutModal({ isOpen, onClose, onSubmit, checkOut }: Co
         status: "completed",
         gpsVerified: false,
         tasksCompleted: false,
-        notes: "",
+        notes: checkOut.notes || "",
       })
     }
   }, [checkOut])
@@ -54,11 +54,13 @@ export function CompanyCheckOutModal({ isOpen, onClose, onSubmit, checkOut }: Co
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    onSubmit(formData)
-    setIsLoading(false)
+    try {
+      await onSubmit(formData)
+    } catch (error) {
+      console.error("[v0] Error during check-out:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleChange = (field: string, value: any) => {
@@ -71,7 +73,7 @@ export function CompanyCheckOutModal({ isOpen, onClose, onSubmit, checkOut }: Co
         <DialogHeader>
           <DialogTitle>Record Check-out</DialogTitle>
           <DialogDescription className="text-gray-400">
-            Complete check-out for {checkOut?.professional} at {checkOut?.location}
+            Complete check-out for {checkOut?.professionalName} at {checkOut?.address}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -156,7 +158,7 @@ export function CompanyCheckOutModal({ isOpen, onClose, onSubmit, checkOut }: Co
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-[#2a3349] text-white hover:bg-[#2a3349]"
+              className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
             >
               Cancel
             </Button>

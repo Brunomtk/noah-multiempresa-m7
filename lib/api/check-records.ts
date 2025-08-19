@@ -92,7 +92,12 @@ export async function getCheckRecords(filters: CheckRecordFilters = {}): Promise
     if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
 
     const queryString = params.toString()
-    const endpoint = queryString ? `/CheckRecord?${queryString}` : "/CheckRecord"
+
+    if (!queryString) {
+      throw new Error("At least one filter parameter is required to fetch check records")
+    }
+
+    const endpoint = `/CheckRecord?${queryString}`
 
     const data = await apiRequest(endpoint)
 
@@ -233,9 +238,12 @@ export async function performCheckOut(id: string): Promise<CheckRecord> {
 }
 
 // Helper functions for getting related data
-export async function getProfessionals(companyId?: string) {
+export async function getProfessionals(companyId: string) {
   try {
-    const endpoint = companyId ? `/Professional?CompanyId=${companyId}` : "/Professional"
+    if (!companyId) {
+      throw new Error("Company ID is required")
+    }
+    const endpoint = `/Professional?CompanyId=${companyId}`
     const data = await apiRequest(endpoint)
     return data.results || data || []
   } catch (error) {
@@ -254,9 +262,12 @@ export async function getCompanies() {
   }
 }
 
-export async function getCustomers(companyId?: string) {
+export async function getCustomers(companyId: string) {
   try {
-    const endpoint = companyId ? `/Customer?CompanyId=${companyId}` : "/Customer"
+    if (!companyId) {
+      throw new Error("Company ID is required")
+    }
+    const endpoint = `/Customer?CompanyId=${companyId}`
     const data = await apiRequest(endpoint)
     return data.results || data || []
   } catch (error) {
@@ -265,9 +276,12 @@ export async function getCustomers(companyId?: string) {
   }
 }
 
-export async function getTeams(companyId?: string) {
+export async function getTeams(companyId: string) {
   try {
-    const endpoint = companyId ? `/Team?CompanyId=${companyId}` : "/Team"
+    if (!companyId) {
+      throw new Error("Company ID is required")
+    }
+    const endpoint = `/Team?CompanyId=${companyId}`
     const data = await apiRequest(endpoint)
     return data.results || data || []
   } catch (error) {
@@ -276,16 +290,18 @@ export async function getTeams(companyId?: string) {
   }
 }
 
-export async function getAppointments(
-  filters: {
-    companyId?: string
-    professionalId?: string
-    customerId?: string
-    startDate?: string
-    endDate?: string
-  } = {},
-) {
+export async function getAppointments(filters: {
+  companyId: string
+  professionalId?: string
+  customerId?: string
+  startDate?: string
+  endDate?: string
+}) {
   try {
+    if (!filters.companyId) {
+      throw new Error("Company ID is required")
+    }
+
     const params = new URLSearchParams()
 
     if (filters.companyId) params.append("CompanyId", filters.companyId)
@@ -295,7 +311,7 @@ export async function getAppointments(
     if (filters.endDate) params.append("EndDate", filters.endDate)
 
     const queryString = params.toString()
-    const endpoint = queryString ? `/Appointment?${queryString}` : "/Appointment"
+    const endpoint = `/Appointment?${queryString}`
 
     const data = await apiRequest(endpoint)
     return data.results || data || []
