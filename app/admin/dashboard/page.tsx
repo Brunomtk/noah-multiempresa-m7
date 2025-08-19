@@ -45,16 +45,16 @@ function DashboardContent() {
   ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>
-          <p className="text-gray-400">Welcome to Noah's administrative panel.</p>
+          <h1 className="text-xl md:text-2xl font-bold text-white mb-1">Dashboard</h1>
+          <p className="text-sm md:text-base text-gray-400">Welcome to Noah's administrative panel.</p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent"
+          className="border-[#2a3349] text-white hover:bg-[#2a3349] bg-transparent w-full sm:w-auto"
           onClick={refresh}
           disabled={isLoading}
         >
@@ -68,21 +68,21 @@ function DashboardContent() {
 
       {/* Quick Actions */}
       <Card className="bg-[#1a2234] border-[#2a3349] text-white">
-        <CardContent className="p-6">
+        <CardContent className="p-4 md:p-6">
           <div className="mb-4">
-            <h3 className="text-lg font-medium">Quick Actions</h3>
-            <p className="text-gray-400 text-sm">Quick access to main features</p>
+            <h3 className="text-base md:text-lg font-medium">Quick Actions</h3>
+            <p className="text-gray-400 text-xs md:text-sm">Quick access to main features</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
             {quickActions.map((action, index) => (
               <Card
                 key={index}
                 className="bg-[#0f172a] border-[#2a3349] hover:border-[#06b6d4] transition-colors cursor-pointer"
                 onClick={() => router.push(action.path)}
               >
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                  <action.icon className="h-6 w-6 text-[#06b6d4] mb-2" />
-                  <span className="text-xs">{action.label}</span>
+                <CardContent className="p-3 md:p-4 flex flex-col items-center justify-center text-center min-h-[80px] md:min-h-[90px]">
+                  <action.icon className="h-5 w-5 md:h-6 md:w-6 text-[#06b6d4] mb-1 md:mb-2" />
+                  <span className="text-xs leading-tight">{action.label}</span>
                 </CardContent>
               </Card>
             ))}

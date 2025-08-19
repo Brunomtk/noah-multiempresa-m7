@@ -77,26 +77,27 @@ export async function getCheckRecords(filters: CheckRecordFilters = {}): Promise
   try {
     const params = new URLSearchParams()
 
-    // Add filters as query parameters matching the API documentation
-    if (filters.professionalId) params.append("ProfessionalId", filters.professionalId.toString())
-    if (filters.companyId) params.append("CompanyId", filters.companyId.toString())
-    if (filters.customerId) params.append("CustomerId", filters.customerId.toString())
-    if (filters.teamId) params.append("TeamId", filters.teamId.toString())
-    if (filters.appointmentId) params.append("AppointmentId", filters.appointmentId.toString())
-    if (filters.status !== undefined) params.append("Status", filters.status.toString())
-    if (filters.serviceType) params.append("ServiceType", filters.serviceType)
-    if (filters.startDate) params.append("StartDate", filters.startDate)
-    if (filters.endDate) params.append("EndDate", filters.endDate)
-    if (filters.search) params.append("Search", filters.search)
-    if (filters.page) params.append("PageNumber", filters.page.toString())
-    if (filters.pageSize) params.append("PageSize", filters.pageSize.toString())
-
-    const queryString = params.toString()
-
-    if (!queryString) {
-      throw new Error("At least one filter parameter is required to fetch check records")
+    const defaultFilters = {
+      page: 1,
+      pageSize: 50,
+      ...filters,
     }
 
+    // Add filters as query parameters matching the API documentation
+    if (defaultFilters.professionalId) params.append("ProfessionalId", defaultFilters.professionalId.toString())
+    if (defaultFilters.companyId) params.append("CompanyId", defaultFilters.companyId.toString())
+    if (defaultFilters.customerId) params.append("CustomerId", defaultFilters.customerId.toString())
+    if (defaultFilters.teamId) params.append("TeamId", defaultFilters.teamId.toString())
+    if (defaultFilters.appointmentId) params.append("AppointmentId", defaultFilters.appointmentId.toString())
+    if (defaultFilters.status !== undefined) params.append("Status", defaultFilters.status.toString())
+    if (defaultFilters.serviceType) params.append("ServiceType", defaultFilters.serviceType)
+    if (defaultFilters.startDate) params.append("StartDate", defaultFilters.startDate)
+    if (defaultFilters.endDate) params.append("EndDate", defaultFilters.endDate)
+    if (defaultFilters.search) params.append("Search", defaultFilters.search)
+    if (defaultFilters.page) params.append("PageNumber", defaultFilters.page.toString())
+    if (defaultFilters.pageSize) params.append("PageSize", defaultFilters.pageSize.toString())
+
+    const queryString = params.toString()
     const endpoint = `/CheckRecord?${queryString}`
 
     const data = await apiRequest(endpoint)

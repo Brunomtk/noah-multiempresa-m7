@@ -149,7 +149,7 @@ export default function ProfilePage() {
 
   if (initialLoading || !user) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-4 md:py-6">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -158,49 +158,59 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Profile</h1>
-        <p className="text-gray-400 mt-1">Manage your personal information and account settings</p>
+    <div className="container mx-auto py-4 md:py-6 px-4 md:px-0">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Profile</h1>
+        <p className="text-gray-400 mt-1 text-sm md:text-base">Manage your personal information and account settings</p>
       </div>
 
       <div className="max-w-2xl">
         <Card>
           <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your personal details and account information</CardDescription>
+            <CardTitle className="text-lg md:text-xl">Personal Information</CardTitle>
+            <CardDescription className="text-sm md:text-base">
+              Update your personal details and account information
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <CardContent className="space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name" className="text-sm">
+                  Full Name
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Enter your full name"
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-sm">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                   placeholder="Enter your email"
+                  className="text-sm"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="role" className="text-sm">
+                  Role
+                </Label>
                 <Select
                   value={formData.role}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -212,12 +222,14 @@ export default function ProfilePage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status" className="text-sm">
+                  Status
+                </Label>
                 <Select
                   value={formData.status.toString()}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, status: Number.parseInt(value) }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -229,21 +241,24 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">New Password</Label>
+              <Label htmlFor="password" className="text-sm">
+                New Password
+              </Label>
               <Input
                 id="password"
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
                 placeholder="Leave empty to keep current password"
+                className="text-sm"
               />
-              <p className="text-sm text-gray-400">Leave empty if you don't want to change your password</p>
+              <p className="text-xs md:text-sm text-gray-400">Leave empty if you don't want to change your password</p>
             </div>
 
-            <div className="pt-4 border-t border-[#2a3349]">
+            <div className="pt-3 md:pt-4 border-t border-[#2a3349]">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Account Information</Label>
-                <div className="text-sm text-gray-400 space-y-1">
+                <div className="text-xs md:text-sm text-gray-400 space-y-1">
                   <p>Account ID: {user.id}</p>
                   <p>Created: {new Date(user.createdDate).toLocaleDateString()}</p>
                   <p>Last Updated: {new Date(user.updatedDate).toLocaleDateString()}</p>
@@ -251,8 +266,8 @@ export default function ProfilePage() {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading}>
+          <CardFooter className="flex flex-col sm:flex-row sm:justify-between gap-3">
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading} className="w-full sm:w-auto">
               {deleteLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -265,7 +280,7 @@ export default function ProfilePage() {
                 </>
               )}
             </Button>
-            <Button onClick={handleSave} disabled={loading}>
+            <Button onClick={handleSave} disabled={loading} className="w-full sm:w-auto">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -17,7 +17,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 
 export function AdminHeader() {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isMobile } = useSidebar()
   const { user, logout } = useAuth()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
@@ -45,51 +45,60 @@ export function AdminHeader() {
   }
 
   return (
-    <header className="h-16 border-b border-[#2a3349] bg-[#1a2234] px-4 flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          className="lg:hidden text-gray-400 hover:text-white hover:bg-[#2a3349]"
-        >
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
-        </Button>
+    <header className="h-16 border-b border-[#2a3349] bg-[#1a2234] px-3 md:px-4 flex items-center justify-between">
+      <div className="flex items-center gap-2 md:gap-4">
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="text-gray-400 hover:text-white hover:bg-[#2a3349] h-8 w-8 md:h-10 md:w-10"
+          >
+            <Menu className="h-4 w-4 md:h-5 md:w-5" />
+            <span className="sr-only">Toggle menu</span>
+          </Button>
+        )}
 
-        <div className="relative hidden md:flex items-center">
+        <div className="relative hidden sm:flex items-center">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 w-[300px] bg-[#0f172a] border-[#2a3349] text-white focus-visible:ring-[#06b6d4]"
+            className="pl-10 w-[200px] md:w-[300px] bg-[#0f172a] border-[#2a3349] text-white focus-visible:ring-[#06b6d4] text-sm"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         <div className="relative">
-          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-[#2a3349]">
-            <Bell className="h-5 w-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-gray-400 hover:text-white hover:bg-[#2a3349] h-8 w-8 md:h-10 md:w-10"
+          >
+            <Bell className="h-4 w-4 md:h-5 md:w-5" />
             <span className="sr-only">Notifications</span>
           </Button>
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-            <span className="text-xs text-white font-bold">3</span>
+          <span className="absolute -top-1 -right-1 w-2 h-2 md:w-3 md:h-3 bg-red-500 rounded-full flex items-center justify-center">
+            <span className="text-xs text-white font-bold hidden md:inline">3</span>
           </span>
         </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full bg-[#2a3349] hover:bg-[#374151]">
+            <Button
+              variant="ghost"
+              className="relative h-8 w-8 md:h-10 md:w-10 rounded-full bg-[#2a3349] hover:bg-[#374151]"
+            >
               {user?.avatar ? (
                 <img
                   src={user.avatar || "/placeholder.svg"}
                   alt={user.name || "User"}
-                  className="h-8 w-8 rounded-full object-cover"
+                  className="h-6 w-6 md:h-8 md:w-8 rounded-full object-cover"
                 />
               ) : (
-                <div className="h-8 w-8 rounded-full bg-[#06b6d4] flex items-center justify-center text-white text-sm font-medium">
+                <div className="h-6 w-6 md:h-8 md:w-8 rounded-full bg-[#06b6d4] flex items-center justify-center text-white text-xs md:text-sm font-medium">
                   {user?.name ? getUserInitials(user.name) : "U"}
                 </div>
               )}

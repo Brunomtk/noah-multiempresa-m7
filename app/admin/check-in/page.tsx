@@ -46,11 +46,18 @@ export default function CheckInPage() {
   const loadCheckIns = async () => {
     try {
       setIsLoading(true)
-      const response = await getCheckRecords()
+      const defaultFilters = {
+        page: 1,
+        pageSize: 50, // Load more records by default
+        ...(companyFilter !== "all" && { companyId: Number.parseInt(companyFilter) }),
+        ...(statusFilter !== "all" && { status: Number.parseInt(statusFilter) }),
+        ...(searchQuery && { search: searchQuery }),
+      }
+
+      const response = await getCheckRecords(defaultFilters)
       console.log("Check-ins response:", response)
 
-      // Garantir que sempre temos um array
-      const data = response.data || response.results || response.result || []
+      const data = response.results || []
       setCheckIns(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error("Error loading check-ins:", error)
@@ -158,11 +165,9 @@ export default function CheckInPage() {
     if (checkIn.status === 1) {
       // checked_in
       try {
-        const response = await performCheckOut({
-          checkRecordId: checkIn.id.toString(),
-        })
+        const response = await performCheckOut(checkIn.id.toString())
 
-        if (response.data) {
+        if (response) {
           await loadCheckIns() // Recarregar a lista
           toast({
             title: "Check-out completed",
